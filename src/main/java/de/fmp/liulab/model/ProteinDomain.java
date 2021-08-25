@@ -30,6 +30,23 @@ public class ProteinDomain implements Comparable<ProteinDomain> {
 	}
 
 	/**
+	 * Constructor
+	 * 
+	 * @param name        protein domain name
+	 * @param startId     start index
+	 * @param endId       end index
+	 * @param isPredicted predicted or original domain
+	 * @param eValue      score
+	 */
+	public ProteinDomain(String name, int startId, int endId, boolean isPredicted, String eValue) {
+		this.name = name;
+		this.startId = startId;
+		this.endId = endId;
+		this.eValue = eValue;
+		this.isPredicted = isPredicted;
+	}
+
+	/**
 	 * Constructor 2
 	 * 
 	 * @param name    protein domain name
@@ -60,17 +77,40 @@ public class ProteinDomain implements Comparable<ProteinDomain> {
 	}
 
 	@Override
-	public boolean equals(Object o) {
-		if (o instanceof ProteinDomain) {
-			ProteinDomain p = (ProteinDomain) o;
-			return this.name.equals(p.name);
-		}
-		return false;
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((eValue == null) ? 0 : eValue.hashCode());
+		result = prime * result + endId;
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		result = prime * result + startId;
+		return result;
 	}
 
 	@Override
-	public int hashCode() {
-		return this.name.hashCode() * 31 + this.startId + this.endId;
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ProteinDomain other = (ProteinDomain) obj;
+		if (eValue == null) {
+			if (other.eValue != null)
+				return false;
+		} else if (!eValue.equals(other.eValue))
+			return false;
+		if (endId != other.endId)
+			return false;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		if (startId != other.startId)
+			return false;
+		return true;
 	}
 
 }

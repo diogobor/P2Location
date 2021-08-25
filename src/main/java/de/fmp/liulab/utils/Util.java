@@ -67,6 +67,7 @@ import de.fmp.liulab.model.PDB;
 import de.fmp.liulab.model.PTM;
 import de.fmp.liulab.model.Protein;
 import de.fmp.liulab.model.ProteinDomain;
+import de.fmp.liulab.model.Residue;
 import de.fmp.liulab.task.MainSingleNodeTask;
 import de.fmp.liulab.task.ProcessProteinLocationTask;
 
@@ -81,6 +82,8 @@ public class Util {
 	public static String PROTEIN_SCALING_FACTOR_COLUMN_NAME = "scaling_factor";
 	public static String HORIZONTAL_EXPANSION_COLUMN_NAME = "is_horizontal_expansion";
 	public static String PROTEIN_DOMAIN_COLUMN = "domain_annotation";
+	public static String PREDICTED_PROTEIN_DOMAIN_COLUMN = "predicted_domains";
+	public static String CONFLICTED_PREDICTED_RESIDUES_COLUMN = "conflicted_residues";
 	public static String PROTEIN_SEQUENCE_COLUMN = "sequence";
 	public static String PTM_COLUMN = "ptms";
 	public static String MONOLINK_COLUMN = "monolinks";
@@ -907,107 +910,15 @@ public class Util {
 		int summary_processed = 0;
 		int total_rows = proteinList.size();
 
-		StringBuilder sb_domains = new StringBuilder();
 		for (final Protein protein : proteinList) {
 
 			CyNode node = getNode(myNetwork, protein.gene);
 			if (node == null)
 				continue;
 
-			if (protein.domains != null && protein.domains.size() > 0) {
-
-				for (ProteinDomain domain : protein.domains) {
-					sb_domains.append(domain.name);
-					sb_domains.append("[");
-					sb_domains.append(domain.startId);
-					sb_domains.append("-");
-					sb_domains.append(domain.endId);
-					sb_domains.append("], ");
-				}
-
-				if (myNetwork.getRow(node).get(PROTEIN_DOMAIN_COLUMN, String.class) != null)
-					myNetwork.getRow(node).set(PROTEIN_DOMAIN_COLUMN, sb_domains.substring(0, sb_domains.length() - 2));
-				else {
-					// Create Scaling factor protein column
-					CyTable nodeTable = myNetwork.getDefaultNodeTable();
-					if (nodeTable.getColumn(Util.PROTEIN_DOMAIN_COLUMN) == null) {
-						try {
-							nodeTable.createColumn(Util.PROTEIN_DOMAIN_COLUMN, String.class, false);
-
-							CyRow row = myNetwork.getRow(node);
-							row.set(PROTEIN_DOMAIN_COLUMN, sb_domains.substring(0, sb_domains.length() - 2));
-
-						} catch (IllegalArgumentException e) {
-							try {
-								CyRow row = myNetwork.getRow(node);
-								row.set(PROTEIN_DOMAIN_COLUMN, sb_domains.substring(0, sb_domains.length() - 2));
-
-							} catch (Exception e2) {
-							}
-						} catch (Exception e) {
-						}
-
-					} else {
-						CyRow row = myNetwork.getRow(node);
-						row.set(PROTEIN_DOMAIN_COLUMN, sb_domains.substring(0, sb_domains.length() - 2));
-					}
-				}
-				sb_domains.delete(0, sb_domains.length());
-			} else {
-				if (myNetwork.getRow(node).get(PROTEIN_DOMAIN_COLUMN, String.class) != null)
-					myNetwork.getRow(node).set(PROTEIN_DOMAIN_COLUMN, "");
-				else {
-					// Create Scaling factor protein column
-					CyTable nodeTable = myNetwork.getDefaultNodeTable();
-					if (nodeTable.getColumn(Util.PROTEIN_DOMAIN_COLUMN) == null) {
-						try {
-							nodeTable.createColumn(Util.PROTEIN_DOMAIN_COLUMN, String.class, false);
-
-							CyRow row = myNetwork.getRow(node);
-							row.set(PROTEIN_DOMAIN_COLUMN, sb_domains.substring(0, sb_domains.length() - 2));
-
-						} catch (IllegalArgumentException e) {
-							try {
-								CyRow row = myNetwork.getRow(node);
-								row.set(PROTEIN_DOMAIN_COLUMN, sb_domains.substring(0, sb_domains.length() - 2));
-
-							} catch (Exception e2) {
-							}
-						} catch (Exception e) {
-						}
-					} else {
-						CyRow row = myNetwork.getRow(node);
-						row.set(PROTEIN_DOMAIN_COLUMN, sb_domains.substring(0, sb_domains.length() - 2));
-					}
-				}
-			}
-
-			if (myNetwork.getRow(node).get(PROTEIN_SEQUENCE_COLUMN, String.class) != null)
-				myNetwork.getRow(node).set(PROTEIN_SEQUENCE_COLUMN, protein.sequence);
-			else {
-				// Create Scaling factor protein column
-				CyTable nodeTable = myNetwork.getDefaultNodeTable();
-				if (nodeTable.getColumn(Util.PROTEIN_SEQUENCE_COLUMN) == null) {
-					try {
-						nodeTable.createColumn(Util.PROTEIN_SEQUENCE_COLUMN, String.class, false);
-
-						CyRow row = myNetwork.getRow(node);
-						row.set(PROTEIN_SEQUENCE_COLUMN, protein.sequence);
-
-					} catch (IllegalArgumentException e) {
-						try {
-							CyRow row = myNetwork.getRow(node);
-							row.set(PROTEIN_SEQUENCE_COLUMN, protein.sequence);
-
-						} catch (Exception e2) {
-						}
-					} catch (Exception e) {
-					}
-				} else {
-					CyRow row = myNetwork.getRow(node);
-					row.set(PROTEIN_SEQUENCE_COLUMN, protein.sequence);
-				}
-			}
+			fillProteinDomainColumns(myNetwork, protein, node);
+			fillProteinSequenceColumn(myNetwork, protein, node);
+			fillConflictedResiduesColumn(myNetwork, protein, node);
 
 			/**
 			 * Get intra and interlinks
@@ -1054,6 +965,157 @@ public class Util {
 				if (taskMonitor != null)
 					taskMonitor.showMessage(TaskMonitor.Level.INFO,
 							"Updating cross-link information: " + old_progress + "%");
+			}
+		}
+	}
+
+	private static void fillConflictedResiduesColumn(CyNetwork myNetwork, final Protein protein, CyNode node) {
+
+		StringBuilder sb_residues = new StringBuilder();
+		if (protein.reactionSites == null)
+			return;
+
+		for (Residue residue : protein.reactionSites) {
+			if (residue.isConflicted) {
+				sb_residues.append(residue.aminoacid);
+				sb_residues.append("[");
+				sb_residues.append(residue.position);
+				sb_residues.append("], ");
+			}
+		}
+
+		addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, sb_residues, CONFLICTED_PREDICTED_RESIDUES_COLUMN);
+	}
+
+	/**
+	 * Method responsible for filling protein sequence column
+	 * 
+	 * @param myNetwork current network
+	 * @param protein   current protein
+	 * @param node      current node
+	 */
+	private static void fillProteinSequenceColumn(CyNetwork myNetwork, final Protein protein, CyNode node) {
+
+		if (myNetwork.getRow(node).get(PROTEIN_SEQUENCE_COLUMN, String.class) != null)
+			myNetwork.getRow(node).set(PROTEIN_SEQUENCE_COLUMN, protein.sequence);
+		else {
+			// Create Scaling factor protein column
+			CyTable nodeTable = myNetwork.getDefaultNodeTable();
+			if (nodeTable.getColumn(PROTEIN_SEQUENCE_COLUMN) == null) {
+				try {
+					nodeTable.createColumn(PROTEIN_SEQUENCE_COLUMN, String.class, false);
+
+					CyRow row = myNetwork.getRow(node);
+					row.set(PROTEIN_SEQUENCE_COLUMN, protein.sequence);
+
+				} catch (IllegalArgumentException e) {
+					try {
+						CyRow row = myNetwork.getRow(node);
+						row.set(PROTEIN_SEQUENCE_COLUMN, protein.sequence);
+
+					} catch (Exception e2) {
+					}
+				} catch (Exception e) {
+				}
+			} else {
+				CyRow row = myNetwork.getRow(node);
+				row.set(PROTEIN_SEQUENCE_COLUMN, protein.sequence);
+			}
+		}
+	}
+
+	/**
+	 * Method responsible for filling protein domains columns: Original and
+	 * predicted columns
+	 * 
+	 * @param myNetwork  current network
+	 * @param sb_domains accumulative protein domains
+	 * @param protein    current protein
+	 * @param node       current node
+	 */
+	private static void fillProteinDomainColumns(CyNetwork myNetwork, final Protein protein, CyNode node) {
+
+		if (protein.domains != null && protein.domains.size() > 0) {
+
+			StringBuilder sb_original_domains = new StringBuilder();
+			StringBuilder sb_predicted_domains = new StringBuilder();
+			for (ProteinDomain domain : protein.domains) {
+				if (domain.isPredicted) {
+					sb_predicted_domains.append(domain.name);
+					sb_predicted_domains.append("[");
+					sb_predicted_domains.append(domain.startId);
+					sb_predicted_domains.append("-");
+					sb_predicted_domains.append(domain.endId);
+					sb_predicted_domains.append("], ");
+				} else {
+					sb_original_domains.append(domain.name);
+					sb_original_domains.append("[");
+					sb_original_domains.append(domain.startId);
+					sb_original_domains.append("-");
+					sb_original_domains.append(domain.endId);
+					sb_original_domains.append("], ");
+				}
+			}
+
+			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, sb_predicted_domains,
+					PREDICTED_PROTEIN_DOMAIN_COLUMN);
+
+			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, sb_original_domains, PROTEIN_DOMAIN_COLUMN);
+		}
+	}
+
+	/**
+	 * Method responsible for adding domain or conflicted residue information into
+	 * the table
+	 * 
+	 * @param myNetwork                         current network
+	 * @param node                              current node
+	 * @param sb_domains_or_conflicted_residues current domains or conflicted
+	 *                                          residues
+	 * @param columnName                        column name: predicted or original
+	 */
+	private static void addDomainsOrConflictedResiduesIntoTheTable(CyNetwork myNetwork, CyNode node,
+			StringBuilder sb_domains_or_conflicted_residues, String columnName) {
+
+		String data = sb_domains_or_conflicted_residues.toString();
+
+		if (myNetwork.getRow(node).get(columnName, String.class) != null) {
+			if (!(data.isBlank() || data.isEmpty()))
+				myNetwork.getRow(node).set(columnName, data.substring(0, data.length() - 2));
+			else
+				myNetwork.getRow(node).set(columnName, data);
+		} else {
+			// Create protein domain or conflicted residue column
+			CyTable nodeTable = myNetwork.getDefaultNodeTable();
+			if (nodeTable.getColumn(columnName) == null) {
+				try {
+					nodeTable.createColumn(columnName, String.class, false);
+
+					CyRow row = myNetwork.getRow(node);
+					if (!(data.isBlank() || data.isEmpty()))
+						row.set(columnName, data.substring(0, data.length() - 2));
+					else
+						myNetwork.getRow(node).set(columnName, data);
+
+				} catch (IllegalArgumentException e) {
+					try {
+						CyRow row = myNetwork.getRow(node);
+						if (!(data.isBlank() || data.isEmpty()))
+							row.set(columnName, data.substring(0, data.length() - 2));
+						else
+							myNetwork.getRow(node).set(columnName, data);
+
+					} catch (Exception e2) {
+					}
+				} catch (Exception e) {
+				}
+
+			} else {
+				CyRow row = myNetwork.getRow(node);
+				if (!(data.isBlank() || data.isEmpty()))
+					row.set(columnName, data.substring(0, data.length() - 2));
+				else
+					myNetwork.getRow(node).set(columnName, data);
 			}
 		}
 	}

@@ -1122,16 +1122,16 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				ptn.pdbIds = myProtein.pdbIds;
 				ptn.proteinID = myProtein.proteinID;
 				ptn.sequence = myProtein.sequence;
-				updateReactionSites(ptn);
+				addReactionSites(ptn);
 			} else {
-				updateReactionSites(myProtein);
+				addReactionSites(myProtein);
 				all_proteins.add(myProtein);
 			}
 
 		} else {// Network does not exists
 
 			List<Protein> proteins = new ArrayList<Protein>();
-			updateReactionSites(myProtein);
+			addReactionSites(myProtein);
 			proteins.add(myProtein);
 			Util.proteinsMap.put(network_name, proteins);
 		}
@@ -1145,7 +1145,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * 
 	 * @param protein
 	 */
-	public static void updateReactionSites(Protein protein) {
+	public static void addReactionSites(Protein protein) {
 		// Find out all lysines
 		List<Residue> residues = new ArrayList<Residue>();
 
@@ -1626,10 +1626,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								Residue res = isResiduePresent.get();
 								double score = -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
-									res.score = score;
-									current_uk_residues.add(res);
-									crossLink.location = res.location;
 
+									if (Util.considerConflict)
+										res.isConflicted = true;
+									else {
+										res.score = score;
+										current_uk_residues.add(res);
+										crossLink.location = res.location;
+									}
 								}
 							}
 						} else {// It means the current residue is B
@@ -1642,9 +1646,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								Residue res = isResiduePresent.get();
 								double score = -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
-									res.score = score;
-									current_uk_residues.add(res);
-									crossLink.location = res.location;
+
+									if (Util.considerConflict)
+										res.isConflicted = true;
+									else {
+										res.score = score;
+										current_uk_residues.add(res);
+										crossLink.location = res.location;
+									}
 								}
 							}
 						}
@@ -1672,9 +1681,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								Residue res = isResiduePresent.get();
 								double score = -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
-									res.score = score;
-									current_uk_residues.add(res);
-									crossLink.location = res.location;
+									if (Util.considerConflict)
+										res.isConflicted = true;
+									else {
+										res.score = score;
+										current_uk_residues.add(res);
+										crossLink.location = res.location;
+									}
 								}
 							}
 						} else {// It means the current residue is B
@@ -1687,9 +1700,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								Residue res = isResiduePresent.get();
 								double score = -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
-									res.score = score;
-									current_uk_residues.add(res);
-									crossLink.location = res.location;
+
+									if (Util.considerConflict)
+										res.isConflicted = true;
+									else {
+										res.score = score;
+										current_uk_residues.add(res);
+										crossLink.location = res.location;
+									}
 								}
 							}
 						}
@@ -1739,6 +1757,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Epoch: " + epochs + "\nPredicting residue location: 100%");
 	}
 
+	/**
+	 * Method responsible for removing unknown protein domains
+	 */
 	private void removeUnknownProteinDomains() {
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
 
@@ -1879,6 +1900,44 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				domain.endId += new_range;
 
 			}
+		}
+
+		UnifyProteinDomains();// E.g. Domain[216-722] and Domain[217-723] => Domain[216-723]
+	}
+
+	/**
+	 * Method responsible for merging similar protein domains with different ranges
+	 */
+	private void UnifyProteinDomains() {
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		for (Protein protein : allProteins) {
+
+			if (protein.domains == null)
+				continue;
+
+			for (ProteinDomain domain : protein.domains) {
+
+				// e.g. Domain[716-722] and Domain[717-723] => Domain[716-723]
+				List<ProteinDomain> candidates_domains = protein.domains.stream()
+						.filter(value -> value.startId >= domain.startId && value.startId <= domain.endId
+								&& value.endId >= domain.endId && value.name.equals(domain.name))
+						.collect(Collectors.toList());
+
+				if (candidates_domains.size() > 0) {
+					for (ProteinDomain expandDomain : candidates_domains) {
+						if (domain.equals(expandDomain))
+							continue;
+
+						domain.endId = expandDomain.endId;
+
+						expandDomain.startId = domain.startId;
+					}
+				}
+			}
+
+			protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
 		}
 	}
 

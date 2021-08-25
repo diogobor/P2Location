@@ -14,6 +14,7 @@ public class Residue {
 	public int predicted_epoch = -1;
 	public Residue previous_residue;
 	public List<Residue> history_residues;
+	public boolean isConflicted = false;
 
 	/**
 	 * Constructor
@@ -43,7 +44,14 @@ public class Residue {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + position + aminoacid;
+		result = prime * result + aminoacid;
+		result = prime * result + ((location == null) ? 0 : location.hashCode());
+		result = prime * result + position;
+		result = prime * result + ((predictedLocation == null) ? 0 : predictedLocation.hashCode());
+		result = prime * result + predicted_epoch;
+		long temp;
+		temp = Double.doubleToLongBits(score);
+		result = prime * result + (int) (temp ^ (temp >>> 32));
 		return result;
 	}
 
@@ -56,9 +64,23 @@ public class Residue {
 		if (getClass() != obj.getClass())
 			return false;
 		Residue other = (Residue) obj;
-		if (!(aminoacid != other.aminoacid && position != other.position && score != other.score
-				&& !location.equals(other.location) && predicted_epoch != other.predicted_epoch
-				&& !predictedLocation.equals(other.predictedLocation)))
+		if (aminoacid != other.aminoacid)
+			return false;
+		if (location == null) {
+			if (other.location != null)
+				return false;
+		} else if (!location.equals(other.location))
+			return false;
+		if (position != other.position)
+			return false;
+		if (predictedLocation == null) {
+			if (other.predictedLocation != null)
+				return false;
+		} else if (!predictedLocation.equals(other.predictedLocation))
+			return false;
+		if (predicted_epoch != other.predicted_epoch)
+			return false;
+		if (Double.doubleToLongBits(score) != Double.doubleToLongBits(other.score))
 			return false;
 		return true;
 	}
