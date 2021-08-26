@@ -350,7 +350,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		Util.node_label_factor_size = 1.0;
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Setting node styles...");
 
-		Util.setNodeStyles(myNetwork, node, netView, style, Util.getProteinSequenceFromUniprot(myCurrentRow));
+		Util.setNodeStyles(myNetwork, node, netView, style);
 		taskMonitor.setProgress(0.2);
 
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting protein domains...");
@@ -443,7 +443,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 	private void resizeProtein(final TaskMonitor taskMonitor) {
 		isPlotDone = false;
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Resizing node length...");
-		Util.setNodeStyles(myNetwork, node, netView, style, Util.getProteinSequenceFromUniprot(myCurrentRow));
+		Util.setNodeStyles(myNetwork, node, netView, style);
 		taskMonitor.setProgress(0.2);
 
 		if (Util.showPTMs) {
@@ -1484,8 +1484,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 						taskMonitor.showMessage(TaskMonitor.Level.INFO, "Setting node styles...");
 
 						Util.node_label_factor_size = 1;
-						Util.setNodeStyles(myNetwork, node, netView, style,
-								Util.getProteinSequenceFromUniprot(myCurrentRow));
+						Util.setNodeStyles(myNetwork, node, netView, style);
 						taskMonitor.setProgress(0.2);
 
 						textLabel_status_result.setText("Getting protein domains from table...");

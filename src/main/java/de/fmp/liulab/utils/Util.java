@@ -2357,8 +2357,8 @@ public class Util {
 	}
 
 	private static void setResidueStyle(CyNetworkView netView, CyNode current_node, View<CyNode> sourceNodeView,
-			Integer aminoacidPos, String proteinSequence, double xl_pos_source, double center_position_source_node,
-			double x_or_y_Pos_source, double initial_position_source_node) {
+			Residue residue, double xl_pos_source, double center_position_source_node, double x_or_y_Pos_source,
+			double initial_position_source_node) {
 
 		View<CyNode> newResidueView = netView.getNodeView(current_node);
 		while (newResidueView == null) {
@@ -2376,28 +2376,46 @@ public class Util {
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_BORDER_WIDTH, 0.0);
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_BORDER_TRANSPARENCY, 0.0);
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_BORDER_PAINT, Color.WHITE);
-		newResidueView.setLockedValue(BasicVisualLexicon.NODE_FILL_COLOR, NodeBorderColor);
+		if (residue.isConflicted)
+			newResidueView.setLockedValue(BasicVisualLexicon.NODE_FILL_COLOR, Color.RED);
+		else
+			newResidueView.setLockedValue(BasicVisualLexicon.NODE_FILL_COLOR, NodeBorderColor);
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_SELECTED_PAINT, Color.RED);
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_Z_LOCATION, 1.0);
 
-		String sequence = "";
+		String tooltip = "";
+		boolean isPredicted = residue.predicted_epoch != -1;
 
-		// SEQUENCE[1]
-		if (aminoacidPos == 1) {
-			sequence = "<b>[" + proteinSequence.charAt(0) + "]</b>"
-					+ proteinSequence.substring(1, proteinSequence.length());
-		} else {
-			// SEQUENCE[>1]
-			sequence = proteinSequence.substring(0, aminoacidPos) + "<b>[" + proteinSequence.charAt(aminoacidPos)
-					+ "]</b>" + proteinSequence.substring(aminoacidPos + 1, proteinSequence.length());
-		}
-
-		String tooltip = "<html><p><b>Residue: </b> " + REACTION_RESIDUE + " [" + (aminoacidPos + 1) + "]<br/>"
-				+ sequence + "<br/>";
+		if (isPredicted)
+			tooltip = "<html><p><b>Residue: </b>" + residue.aminoacid + " [" + residue.position + "]<br/>Predicted: "
+					+ (residue.predicted_epoch != -1) + "<br/>Epoch:" + residue.predicted_epoch + "<br/>Score: "
+					+ Math.floor(residue.score * 100) / 100 + "<br/>IsConflicted: " + residue.isConflicted;
+		else
+			tooltip = "<html><p><b>Residue: </b> " + residue.aminoacid + " [" + residue.position + "]<br/>";
 
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP, tooltip);
 
-		xl_pos_source = aminoacidPos * Util.node_label_factor_size;
+		plotResidueNodes(netView, current_node, sourceNodeView, residue, center_position_source_node,
+				initial_position_source_node);
+	}
+
+	private static void plotResidueNodes(CyNetworkView netView, CyNode current_node, View<CyNode> sourceNodeView,
+			Residue residue, double center_position_source_node, double initial_position_source_node) {
+
+		View<CyNode> newResidueView = netView.getNodeView(current_node);
+		while (newResidueView == null) {
+			netView.updateView();
+			try {
+				Thread.sleep(200);
+			} catch (InterruptedException e1) {
+				e1.printStackTrace();
+			}
+			newResidueView = netView.getNodeView(current_node);
+		}
+
+		double xl_pos_source;
+		double x_or_y_Pos_source;
+		xl_pos_source = residue.position * Util.node_label_factor_size;
 
 		if (xl_pos_source <= center_position_source_node) { // [-protein_length/2, 0]
 			x_or_y_Pos_source = (-center_position_source_node) + xl_pos_source;
@@ -3272,14 +3290,12 @@ public class Util {
 	/**
 	 * Method responsible for setting residues style
 	 * 
-	 * @param myNetwork       current network
-	 * @param node            current node
-	 * @param netView         current network view
-	 * @param style           current style
-	 * @param proteinSequence protein sequence of the current node
+	 * @param myNetwork current network
+	 * @param node      current node
+	 * @param netView   current network view
+	 * @param style     current style
 	 */
-	public static void setNodeResidues(CyNetwork myNetwork, CyNode node, CyNetworkView netView, VisualStyle style,
-			String proteinSequence) {
+	public static void setNodeResidues(CyNetwork myNetwork, CyNode node, CyNetworkView netView, VisualStyle style) {
 
 		if (myNetwork == null || node == null || style == null || netView == null) {
 			return;
@@ -3287,6 +3303,11 @@ public class Util {
 
 		final String node_name = myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME)
 				.toString();
+
+		Protein protein = getProtein(myNetwork, node_name);
+
+		if (protein == null)
+			return;
 
 		View<CyNode> sourceNodeView = netView.getNodeView(node);
 
@@ -3301,21 +3322,24 @@ public class Util {
 			initial_position_source_node = Util.getYPositionOf(sourceNodeView);
 		}
 
-		List<Integer> aaPos = getAllAminoAcidPosInAProtein(REACTION_RESIDUE, proteinSequence);
-		for (int countMonolink = 0; countMonolink < aaPos.size(); countMonolink++) {
+		int countMonolink = 0;
+		for (Residue residue : protein.reactionSites) {
 
 			final String node_name_added_by_app = "RESIDUE" + countMonolink + " [Source: " + node_name + " ("
-					+ (aaPos.get(countMonolink) + 1) + ")]";
+					+ residue.position + ")]";
+
 			CyNode _node = Util.getNode(myNetwork, node_name_added_by_app);
 			if (_node == null) {// Add a new node if does not exist
 
 				_node = myNetwork.addNode();
 				myNetwork.getRow(_node).set(CyNetwork.NAME, node_name_added_by_app);
-			}
+				setResidueStyle(netView, _node, sourceNodeView, residue, xl_pos_source, center_position_source_node,
+						x_or_y_Pos_source, initial_position_source_node);
+			} else
+				plotResidueNodes(netView, _node, sourceNodeView, residue, center_position_source_node,
+						initial_position_source_node);
 
-			setResidueStyle(netView, _node, sourceNodeView, aaPos.get(countMonolink), proteinSequence, xl_pos_source,
-					center_position_source_node, x_or_y_Pos_source, initial_position_source_node);
-
+			countMonolink++;
 		}
 	}
 
@@ -3326,8 +3350,7 @@ public class Util {
 	 * @param node      current node
 	 * @param netView   current network view
 	 */
-	public static void setNodeStyles(CyNetwork myNetwork, CyNode node, CyNetworkView netView, VisualStyle style,
-			String proteinSequence) {
+	public static void setNodeStyles(CyNetwork myNetwork, CyNode node, CyNetworkView netView, VisualStyle style) {
 
 		updateNodeStyle(myNetwork, node, netView);
 
@@ -3349,7 +3372,7 @@ public class Util {
 			myNetwork.getRow(node).set(HORIZONTAL_EXPANSION_COLUMN_NAME, isProtein_expansion_horizontal);
 
 		if (showResidues) {
-			setNodeResidues(myNetwork, node, netView, style, proteinSequence);
+			setNodeResidues(myNetwork, node, netView, style);
 		}
 
 	}

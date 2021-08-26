@@ -136,8 +136,7 @@ public class UpdateViewerTask extends AbstractTask {
 		if (Util.IsNodeModified(myNetwork, netView, current_node)) {
 
 			Util.node_label_factor_size = 1.0;
-			Util.setNodeStyles(myNetwork, current_node, netView, style,
-					Util.getProteinSequenceFromUniprot(myNetwork.getRow(current_node)));
+			Util.setNodeStyles(myNetwork, current_node, netView, style);
 
 			MainSingleNodeTask.isPlotDone = Util.addOrUpdateEdgesToNetwork(myNetwork, current_node, style, netView,
 					nodeView, handleFactory, bendFactory, lexicon, ((Number) length_other_protein_a).floatValue(),
@@ -238,8 +237,7 @@ public class UpdateViewerTask extends AbstractTask {
 	 */
 	private void resizeProtein(CyNode current_node, View<CyNode> nodeView, VisualLexicon lexicon,
 			Object length_other_protein_a, VisualStyle style) {
-		Util.setNodeStyles(myNetwork, current_node, netView, style,
-				Util.getProteinSequenceFromUniprot(myNetwork.getRow(current_node)));
+		Util.setNodeStyles(myNetwork, current_node, netView, style);
 
 		String node_name = myNetwork.getDefaultNodeTable().getRow(current_node.getSUID()).getRaw(CyNetwork.NAME)
 				.toString();

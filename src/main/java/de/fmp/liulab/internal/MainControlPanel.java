@@ -157,43 +157,43 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		else
 			propertyValue = cm.getProperties().getProperty("p2location.epochs");
 		Util.epochs = Integer.parseInt(propertyValue);
-		
+
 		if (cm == null)
 			propertyValue = ((Properties) P2LocationProps).getProperty("p2location.getEpochs");
 		else
 			propertyValue = cm.getProperties().getProperty("p2location.getEpochs");
 		Util.getEpochs = Boolean.parseBoolean(propertyValue);
-		
+
 		if (cm == null)
 			propertyValue = ((Properties) P2LocationProps).getProperty("p2location.threshold_score");
 		else
 			propertyValue = cm.getProperties().getProperty("p2location.threshold_score");
 		Util.threshold_score = Integer.parseInt(propertyValue);
-		
+
 		if (cm == null)
 			propertyValue = ((Properties) P2LocationProps).getProperty("p2location.getThreshold_score");
 		else
 			propertyValue = cm.getProperties().getProperty("p2location.getThreshold_score");
 		Util.getThreshold_score = Boolean.parseBoolean(propertyValue);
-		
+
 		if (cm == null)
 			propertyValue = ((Properties) P2LocationProps).getProperty("p2location.specCount");
 		else
 			propertyValue = cm.getProperties().getProperty("p2location.specCount");
 		Util.specCount = Integer.parseInt(propertyValue);
-		
+
 		if (cm == null)
 			propertyValue = ((Properties) P2LocationProps).getProperty("p2location.getSpecCount");
 		else
 			propertyValue = cm.getProperties().getProperty("p2location.getSpecCount");
 		Util.getSpecCount = Boolean.parseBoolean(propertyValue);
-		
+
 		if (cm == null)
 			propertyValue = ((Properties) P2LocationProps).getProperty("p2location.considerConflict");
 		else
 			propertyValue = cm.getProperties().getProperty("p2location.considerConflict");
 		Util.considerConflict = Boolean.parseBoolean(propertyValue);
-		
+
 		if (cm == null)
 			propertyValue = ((Properties) P2LocationProps).getProperty("p2location.showLinksLegend");
 		else
@@ -474,8 +474,8 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		});
 		spinner_neighborAA.setToolTipText("Set a value between 0 and 100.");
 		link_panel.add(spinner_neighborAA);
-		
-		//Checkbox Conflict -> add + 30
+
+		// Checkbox Conflict -> add + 30
 		offset_y += 60;
 
 		processButton = new JButton("Run");
@@ -521,10 +521,12 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 								epochCombobox.setSelectedIndex(epochsList.size() - 1);
 								current_epoch = Integer.parseInt(epochsList.get(epochsList.size() - 1));
 								enable_disableDisplayBox(true, false);
+								enable_disable_predictBox(true);
 							}
 						};
 
 						dialogTaskManager.execute(ti, observer);
+						enable_disable_predictBox(false);
 
 					} else {
 						JOptionPane.showMessageDialog(null, "No network has been loaded!",
@@ -535,8 +537,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			}
 		});
 		link_panel.add(processButton);
-
-		enable_disable_predictorBox(false);
+		enable_disable_spinners(false);
 
 	}
 
@@ -858,12 +859,33 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 //		display_prediction_panel.add(spinner_score_combinedlink);
 	}
 
-	public static void enable_disable_predictorBox(boolean enable) {
-		spinner_epochs.setEnabled(enable);
-		spinner_score.setEnabled(enable);
-		spinner_specCount.setEnabled(enable);
+	public static void enable_disable_predictBox(boolean enable) {
+
+		if (enable_epochs != null)
+			enable_epochs.setEnabled(enable);
+		if (enable_score != null)
+			enable_score.setEnabled(enable);
+		if (enable_specCount != null)
+			enable_specCount.setEnabled(enable);
+		if (enable_conflict != null)
+			enable_conflict.setEnabled(enable);
 	}
 
+	public static void enable_disable_spinners(boolean enable) {
+		if (spinner_epochs != null)
+			spinner_epochs.setEnabled(enable);
+		if (spinner_score != null)
+			spinner_score.setEnabled(enable);
+		if (spinner_specCount != null)
+			spinner_specCount.setEnabled(enable);
+	}
+
+	/**
+	 * Method responsible for enabling or disabling all fields in Display Box
+	 * 
+	 * @param enable
+	 * @param isInitial
+	 */
 	public static void enable_disableDisplayBox(boolean enable, boolean isInitial) {
 
 		if (epochCombobox != null)
@@ -881,12 +903,17 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			}
 		}
 	}
-	
+
+	/**
+	 * Method responsible for unchecking checkboxes
+	 */
 	public static void unselectCheckboxes() {
 		enable_epochs.setSelected(false);
 		enable_score.setSelected(false);
 		enable_specCount.setSelected(false);
-		enable_conflict.setSelected(false);
+
+		// Except this checkbox
+		enable_conflict.setSelected(true);
 	}
 
 	/**

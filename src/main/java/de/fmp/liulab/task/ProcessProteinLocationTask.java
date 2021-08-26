@@ -1620,16 +1620,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						if (crossLink.pos_site_a == pos) {
 							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
-											&& value.position == crossLink.pos_site_b)
+											&& value.position == crossLink.pos_site_b && !value.isConflicted)
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
 								double score = -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
 
-									if (Util.considerConflict)
+									if (Util.considerConflict && res.score != 0) {
 										res.isConflicted = true;
-									else {
+										res.conflicted_residue = residue;
+									} else {
 										res.score = score;
 										current_uk_residues.add(res);
 										crossLink.location = res.location;
@@ -1640,16 +1641,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
-											&& value.position == crossLink.pos_site_a)
+											&& value.position == crossLink.pos_site_a && !value.isConflicted)
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
 								double score = -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
 
-									if (Util.considerConflict)
+									if (Util.considerConflict && res.score != 0) {
 										res.isConflicted = true;
-									else {
+										res.conflicted_residue = residue;
+									} else {
 										res.score = score;
 										current_uk_residues.add(res);
 										crossLink.location = res.location;
@@ -1674,16 +1676,18 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_b)
-											&& value.position == crossLink.pos_site_b)
+											&& value.position == crossLink.pos_site_b && !value.isConflicted)
 									.findFirst();
 
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
 								double score = -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
-									if (Util.considerConflict)
+
+									if (Util.considerConflict && res.score != 0) {
 										res.isConflicted = true;
-									else {
+										res.conflicted_residue = residue;
+									} else {
 										res.score = score;
 										current_uk_residues.add(res);
 										crossLink.location = res.location;
@@ -1694,16 +1698,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
-											&& value.position == crossLink.pos_site_a)
+											&& value.position == crossLink.pos_site_a && !value.isConflicted)
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
 								double score = -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
 
-									if (Util.considerConflict)
+									if (Util.considerConflict && res.score != 0) {
 										res.isConflicted = true;
-									else {
+										res.conflicted_residue = residue;
+									} else {
 										res.score = score;
 										current_uk_residues.add(res);
 										crossLink.location = res.location;
@@ -1735,6 +1740,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							current_res.predictedLocation = uk_residue.predictedLocation;
 							current_res.previous_residue = uk_residue.previous_residue;
 							current_res.score = uk_residue.score;
+							current_res.isConflicted = uk_residue.isConflicted;
+							current_res.conflicted_residue = uk_residue.conflicted_residue;
 							uk_residue.addHistoryResidue(current_res);
 						}
 

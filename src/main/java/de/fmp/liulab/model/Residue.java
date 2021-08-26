@@ -13,6 +13,7 @@ public class Residue {
 	public double score = 0;
 	public int predicted_epoch = -1;
 	public Residue previous_residue;
+	public Residue conflicted_residue;
 	public List<Residue> history_residues;
 	public boolean isConflicted = false;
 

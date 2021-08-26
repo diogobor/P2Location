@@ -439,7 +439,7 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 		}
 
 		MainControlPanel.enable_disableDisplayBox(false, true);
-		MainControlPanel.enable_disable_predictorBox(false);
+		MainControlPanel.enable_disable_spinners(false);
 		MainControlPanel.unselectCheckboxes();
 	}
 }
