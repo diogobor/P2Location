@@ -80,8 +80,10 @@ public class ProteinDomain implements Comparable<ProteinDomain> {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
+		result = prime * result + ((color == null) ? 0 : color.hashCode());
 		result = prime * result + ((eValue == null) ? 0 : eValue.hashCode());
 		result = prime * result + endId;
+		result = prime * result + (isPredicted ? 1231 : 1237);
 		result = prime * result + ((name == null) ? 0 : name.hashCode());
 		result = prime * result + startId;
 		return result;
@@ -96,12 +98,19 @@ public class ProteinDomain implements Comparable<ProteinDomain> {
 		if (getClass() != obj.getClass())
 			return false;
 		ProteinDomain other = (ProteinDomain) obj;
+		if (color == null) {
+			if (other.color != null)
+				return false;
+		} else if (!color.equals(other.color))
+			return false;
 		if (eValue == null) {
 			if (other.eValue != null)
 				return false;
 		} else if (!eValue.equals(other.eValue))
 			return false;
 		if (endId != other.endId)
+			return false;
+		if (isPredicted != other.isPredicted)
 			return false;
 		if (name == null) {
 			if (other.name != null)

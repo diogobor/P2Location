@@ -1930,9 +1930,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						if (domain.equals(expandDomain))
 							continue;
 
-						domain.endId = expandDomain.endId;
-
-						expandDomain.startId = domain.startId;
+						if (domain.isPredicted) {
+							domain.endId = expandDomain.endId;
+							expandDomain.startId = domain.startId;
+							expandDomain.isPredicted = true;
+							expandDomain.eValue = "predicted";
+						}
 					}
 				}
 			}
