@@ -18,6 +18,8 @@ import org.cytoscape.application.swing.CyEdgeViewContextMenuFactory;
 import org.cytoscape.application.swing.CyNodeViewContextMenuFactory;
 import org.cytoscape.application.swing.CySwingApplication;
 import org.cytoscape.application.swing.CytoPanelComponent;
+import org.cytoscape.model.CyNetworkFactory;
+import org.cytoscape.model.CyNetworkManager;
 import org.cytoscape.model.events.NetworkAddedListener;
 import org.cytoscape.model.events.NetworkDestroyedListener;
 import org.cytoscape.model.events.RowsSetListener;
@@ -45,14 +47,15 @@ import de.fmp.liulab.internal.action.LoadProteinDomainsAction;
 import de.fmp.liulab.internal.action.LoadProteinLocationAction;
 import de.fmp.liulab.internal.action.MainPanelAction;
 import de.fmp.liulab.internal.action.ReadMeAction;
+import de.fmp.liulab.internal.action.ResiduesTreeNodeExecuteAction;
 import de.fmp.liulab.internal.action.SetDomainColorAction;
-import de.fmp.liulab.internal.action.ShortcutSingleNodeExecuteAction;
 import de.fmp.liulab.internal.action.ShortcutWindowSingleNodeLayout;
 import de.fmp.liulab.task.LoadPTMsTaskFactory;
 import de.fmp.liulab.task.MainSingleEdgeTaskFactory;
 import de.fmp.liulab.task.MainSingleNodeTaskFactory;
 import de.fmp.liulab.task.ProcessProteinLocationTaskFactory;
 import de.fmp.liulab.task.ProteinScalingFactorHorizontalExpansionTableTaskFactory;
+import de.fmp.liulab.task.ResiduesTreeTaskFactory;
 import de.fmp.liulab.task.SetDomainColorTaskFactory;
 import de.fmp.liulab.task.UpdateViewerTaskFactory;
 import de.fmp.liulab.task.command_lines.ApplyRestoreStyleCommandTask;
@@ -185,8 +188,14 @@ public class CyActivator extends AbstractCyActivator {
 		TaskFactory mySingleNodeShortCutFactory = new MainSingleNodeTaskFactory(cyApplicationManager, vmmServiceRef,
 				customChartListener, bendFactory, handleFactory, false);
 
-		ShortcutSingleNodeExecuteAction myShortcutSingleNodeAction = new ShortcutSingleNodeExecuteAction(
-				dialogTaskManager, mySingleNodeShortCutFactory);
+		CyNetworkFactory networkFactory = getService(bc, CyNetworkFactory.class);
+		CyNetworkManager networkManager = getService(bc, CyNetworkManager.class);
+
+		TaskFactory myResiduesTreeFactory = new ResiduesTreeTaskFactory(cyApplicationManager, networkFactory,networkManager,
+				vmmServiceRef, customChartListener, bendFactory, handleFactory, false);
+
+		ResiduesTreeNodeExecuteAction myResiduesTreeNodeAction = new ResiduesTreeNodeExecuteAction(dialogTaskManager,
+				myResiduesTreeFactory);
 
 		TaskFactory mySingleNodeContextMenuFactory = new MainSingleNodeTaskFactory(cyApplicationManager, vmmServiceRef,
 				customChartListener, bendFactory, handleFactory, true);
@@ -242,7 +251,7 @@ public class CyActivator extends AbstractCyActivator {
 //		registerService(bc, myExportPTMsAction, CyAction.class, new Properties());
 		registerService(bc, myShortcutWindowSingleNodeAction, CyAction.class, new Properties());
 //		registerService(bc, myLoadProteinDomainsAction, CyAction.class, new Properties());
-//		registerService(bc, myShortcutSingleNodeAction, CyAction.class, new Properties());
+		registerService(bc, myResiduesTreeNodeAction, CyAction.class, new Properties());
 		registerService(bc, myExportProteinDomainsAction, CyAction.class, new Properties());
 //		registerService(bc, mySetProteinDomainsAction, CyAction.class, new Properties());
 

@@ -1630,6 +1630,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									if (Util.considerConflict && res.score != 0) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
+										res.predictedLocation = "UK";
+										res.conflicted_score = score;
 									} else {
 										res.score = score;
 										current_uk_residues.add(res);
@@ -1651,6 +1653,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									if (Util.considerConflict && res.score != 0) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
+										res.predictedLocation = "UK";
+										res.conflicted_score = score;
 									} else {
 										res.score = score;
 										current_uk_residues.add(res);
@@ -1687,6 +1691,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									if (Util.considerConflict && res.score != 0) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
+										res.predictedLocation = "UK";
+										res.conflicted_score = score;
 									} else {
 										res.score = score;
 										current_uk_residues.add(res);
@@ -1708,6 +1714,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									if (Util.considerConflict && res.score != 0) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
+										res.predictedLocation = "UK";
+										res.conflicted_score = score;
 									} else {
 										res.score = score;
 										current_uk_residues.add(res);

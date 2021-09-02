@@ -402,6 +402,7 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 
 			createAuxiliarColumnsTable();
 		}
+
 	}
 
 	/**

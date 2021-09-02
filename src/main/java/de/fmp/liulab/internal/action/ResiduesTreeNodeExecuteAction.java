@@ -17,9 +17,9 @@ import org.cytoscape.work.swing.DialogTaskManager;
  * @author borges.diogo
  *
  */
-public class ShortcutSingleNodeExecuteAction extends AbstractCyAction {
+public class ResiduesTreeNodeExecuteAction extends AbstractCyAction {
 
-	private static final String MENU_NAME = "Apply/Restore layout";
+	private static final String MENU_NAME = "Residues Tree";
 	private static final String MENU_CATEGORY = "Apps.P2Location";
 	private static final long serialVersionUID = 1L;
 	private DialogTaskManager dialogTaskManager;
@@ -30,12 +30,12 @@ public class ShortcutSingleNodeExecuteAction extends AbstractCyAction {
 	 * @param dialogTaskManager task manager
 	 * @param myFactory main factory
 	 */
-	public ShortcutSingleNodeExecuteAction(DialogTaskManager dialogTaskManager, TaskFactory myFactory) {
+	public ResiduesTreeNodeExecuteAction(DialogTaskManager dialogTaskManager, TaskFactory myFactory) {
 		super(MENU_NAME);
 		setPreferredMenu(MENU_CATEGORY);
 		setMenuGravity(1.0f);
 		insertSeparatorAfter = true;
-		setAcceleratorKeyStroke(KeyStroke.getKeyStroke(KeyEvent.VK_E, CTRL_DOWN_MASK));
+		setAcceleratorKeyStroke(KeyStroke.getKeyStroke(KeyEvent.VK_T, CTRL_DOWN_MASK));
 		this.dialogTaskManager = dialogTaskManager;
 		this.myFactory = myFactory;
 	}

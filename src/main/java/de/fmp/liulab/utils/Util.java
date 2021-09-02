@@ -140,7 +140,7 @@ public class Util {
 	public static boolean getSpecCount = false;
 	public static double threshold_score = 10;
 	public static boolean getThreshold_score = false;
-	public static Integer neighborAA = 3;
+	public static Integer neighborAA = 5;
 	public static boolean considerConflict = true;
 
 	// Map<Network name,List<Protein>
@@ -586,20 +586,11 @@ public class Util {
 			} catch (Exception e) {
 				System.out.println(e.getMessage());
 			} finally {
-				if (taskMonitor != null) {
-					summary_processed++;
-					int new_progress = (int) ((double) summary_processed / (total_edges) * 100);
-					if (new_progress > old_progress) {
-						old_progress = new_progress;
 
-						taskMonitor.showMessage(TaskMonitor.Level.INFO,
-								"Defining styles for cross-links: " + old_progress + "%");
+				summary_processed++;
+				progressBar(summary_processed, old_progress, total_edges, "Defining styles for cross-links: ",
+						taskMonitor, textLabel_status_result);
 
-						if (textLabel_status_result != null) {
-							textLabel_status_result.setText("Defining styles for cross-links: " + old_progress + "%");
-						}
-					}
-				}
 			}
 
 		}
@@ -930,18 +921,8 @@ public class Util {
 			}
 
 			summary_processed++;
-			int new_progress = (int) ((double) summary_processed / (total_rows) * 100);
-			if (new_progress > old_progress) {
-				old_progress = new_progress;
-
-				if (textLabel_status_result != null) {
-					textLabel_status_result.setText("Updating proteins information: " + old_progress + "%");
-				}
-
-				if (taskMonitor != null)
-					taskMonitor.showMessage(TaskMonitor.Level.INFO,
-							"Updating proteins information: " + old_progress + "%");
-			}
+			progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ", taskMonitor,
+					textLabel_status_result);
 		}
 
 		/**
@@ -954,37 +935,28 @@ public class Util {
 			updateCrosslinksLocationBasedOnProteinDomains(myNetwork, protein);
 
 			summary_processed++;
-			int new_progress = (int) ((double) summary_processed / (total_rows) * 100);
-			if (new_progress > old_progress) {
-				old_progress = new_progress;
-
-				if (textLabel_status_result != null) {
-					textLabel_status_result.setText("Updating cross-link information: " + old_progress + "%");
-				}
-
-				if (taskMonitor != null)
-					taskMonitor.showMessage(TaskMonitor.Level.INFO,
-							"Updating cross-link information: " + old_progress + "%");
-			}
+			progressBar(summary_processed, old_progress, total_rows, "Updating cross-link information: ", taskMonitor,
+					textLabel_status_result);
 		}
 	}
 
 	private static void fillConflictedResiduesColumn(CyNetwork myNetwork, final Protein protein, CyNode node) {
 
-		StringBuilder sb_residues = new StringBuilder();
+		List<String> list_residues = new ArrayList<String>();
 		if (protein.reactionSites == null)
 			return;
 
 		for (Residue residue : protein.reactionSites) {
 			if (residue.isConflicted) {
-				sb_residues.append(residue.aminoacid);
-				sb_residues.append("[");
-				sb_residues.append(residue.position);
-				sb_residues.append("], ");
+				if (residue.predicted_epoch <= ProcessProteinLocationTask.epochs) {
+					list_residues.add(
+							Character.toString(residue.aminoacid) + "[" + Integer.toString(residue.position) + "]");
+				}
 			}
 		}
 
-		addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, sb_residues, CONFLICTED_PREDICTED_RESIDUES_COLUMN);
+		addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, list_residues,
+				CONFLICTED_PREDICTED_RESIDUES_COLUMN);
 	}
 
 	/**
@@ -1037,73 +1009,65 @@ public class Util {
 
 		if (protein.domains != null && protein.domains.size() > 0) {
 
-			StringBuilder sb_original_domains = new StringBuilder();
-			StringBuilder sb_predicted_domains = new StringBuilder();
+			List<String> list_original_domains = new ArrayList<>();
+			List<String> list_predicted_domains = new ArrayList<>();
 			for (ProteinDomain domain : protein.domains) {
 				if (domain.isPredicted) {
-					sb_predicted_domains.append(domain.name);
-					sb_predicted_domains.append("[");
-					sb_predicted_domains.append(domain.startId);
-					sb_predicted_domains.append("-");
-					sb_predicted_domains.append(domain.endId);
-					sb_predicted_domains.append("], ");
+					list_predicted_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
+							+ Integer.toString(domain.endId) + "]");
 				} else {
-					sb_original_domains.append(domain.name);
-					sb_original_domains.append("[");
-					sb_original_domains.append(domain.startId);
-					sb_original_domains.append("-");
-					sb_original_domains.append(domain.endId);
-					sb_original_domains.append("], ");
+					list_original_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
+							+ Integer.toString(domain.endId) + "]");
 				}
+
 			}
 
-			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, sb_predicted_domains,
+			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, list_predicted_domains,
 					PREDICTED_PROTEIN_DOMAIN_COLUMN);
 
-			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, sb_original_domains, PROTEIN_DOMAIN_COLUMN);
+			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, list_original_domains, PROTEIN_DOMAIN_COLUMN);
 		}
+
 	}
 
 	/**
 	 * Method responsible for adding domain or conflicted residue information into
 	 * the table
 	 * 
-	 * @param myNetwork                         current network
-	 * @param node                              current node
-	 * @param sb_domains_or_conflicted_residues current domains or conflicted
-	 *                                          residues
-	 * @param columnName                        column name: predicted or original
+	 * @param myNetwork                           current network
+	 * @param node                                current node
+	 * @param list_domains_or_conflicted_residues current domains or conflicted
+	 *                                            residues
+	 * @param columnName                          column name: predicted or original
 	 */
 	private static void addDomainsOrConflictedResiduesIntoTheTable(CyNetwork myNetwork, CyNode node,
-			StringBuilder sb_domains_or_conflicted_residues, String columnName) {
-
-		String data = sb_domains_or_conflicted_residues.toString();
-
-		if (myNetwork.getRow(node).get(columnName, String.class) != null) {
-			if (!(data.isBlank() || data.isEmpty()))
-				myNetwork.getRow(node).set(columnName, data.substring(0, data.length() - 2));
+			List<String> list_domains_or_conflicted_residues, String columnName) {
+		
+		if (myNetwork.getRow(node).get(columnName, List.class) != null) {
+			if (list_domains_or_conflicted_residues.size() > 0)
+				myNetwork.getRow(node).set(columnName, Arrays.asList(list_domains_or_conflicted_residues.toArray()));
 			else
-				myNetwork.getRow(node).set(columnName, data);
+				myNetwork.getRow(node).set(columnName, new ArrayList<String>());
 		} else {
 			// Create protein domain or conflicted residue column
 			CyTable nodeTable = myNetwork.getDefaultNodeTable();
 			if (nodeTable.getColumn(columnName) == null) {
 				try {
-					nodeTable.createColumn(columnName, String.class, false);
+					nodeTable.createListColumn(columnName, String.class, false);
 
 					CyRow row = myNetwork.getRow(node);
-					if (!(data.isBlank() || data.isEmpty()))
-						row.set(columnName, data.substring(0, data.length() - 2));
+					if (list_domains_or_conflicted_residues.size() > 0)
+						row.set(columnName, Arrays.asList(list_domains_or_conflicted_residues.toArray()));
 					else
-						myNetwork.getRow(node).set(columnName, data);
+						myNetwork.getRow(node).set(columnName, new ArrayList<String>());
 
 				} catch (IllegalArgumentException e) {
 					try {
 						CyRow row = myNetwork.getRow(node);
-						if (!(data.isBlank() || data.isEmpty()))
-							row.set(columnName, data.substring(0, data.length() - 2));
+						if (list_domains_or_conflicted_residues.size() > 0)
+							row.set(columnName, Arrays.asList(list_domains_or_conflicted_residues.toArray()));
 						else
-							myNetwork.getRow(node).set(columnName, data);
+							myNetwork.getRow(node).set(columnName, new ArrayList<String>());
 
 					} catch (Exception e2) {
 					}
@@ -1112,10 +1076,10 @@ public class Util {
 
 			} else {
 				CyRow row = myNetwork.getRow(node);
-				if (!(data.isBlank() || data.isEmpty()))
-					row.set(columnName, data.substring(0, data.length() - 2));
+				if (list_domains_or_conflicted_residues.size() > 0)
+					row.set(columnName, Arrays.asList(list_domains_or_conflicted_residues.toArray()));
 				else
-					myNetwork.getRow(node).set(columnName, data);
+					myNetwork.getRow(node).set(columnName, new ArrayList<String>());
 			}
 		}
 	}
@@ -2376,7 +2340,7 @@ public class Util {
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_BORDER_WIDTH, 0.0);
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_BORDER_TRANSPARENCY, 0.0);
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_BORDER_PAINT, Color.WHITE);
-		if (residue.isConflicted)
+		if (residue.isConflicted && residue.predicted_epoch <= ProcessProteinLocationTask.epochs)
 			newResidueView.setLockedValue(BasicVisualLexicon.NODE_FILL_COLOR, Color.RED);
 		else
 			newResidueView.setLockedValue(BasicVisualLexicon.NODE_FILL_COLOR, NodeBorderColor);
@@ -2386,11 +2350,16 @@ public class Util {
 		String tooltip = "";
 		boolean isPredicted = residue.predicted_epoch != -1;
 
-		if (isPredicted)
-			tooltip = "<html><p><b>Residue: </b>" + residue.aminoacid + " [" + residue.position + "]<br/>Predicted: "
-					+ (residue.predicted_epoch != -1) + "<br/>Epoch:" + residue.predicted_epoch + "<br/>Score: "
-					+ Math.floor(residue.score * 100) / 100 + "<br/>IsConflicted: " + residue.isConflicted;
-		else
+		if (isPredicted) {
+			if (!residue.isConflicted)
+				tooltip = "<html><p><b>Residue: </b>" + residue.aminoacid + " [" + residue.position
+						+ "]<br/><b>Predicted: </b>" + (residue.predicted_epoch != -1) + "<br/><b>Epoch: </b>"
+						+ residue.predicted_epoch + "<br/><b>Score: </b>" + Math.floor(residue.score * 100) / 100;
+			else
+				tooltip = "<html><p><b>Residue: </b>" + residue.aminoacid + " [" + residue.position
+						+ "]<br/><b>Predicted: </b>" + (residue.predicted_epoch != -1) + "<br/><b>Epoch: </b>"
+						+ residue.predicted_epoch + "<br/><u><i>There is a conflict.</i></u>";
+		} else
 			tooltip = "<html><p><b>Residue: </b> " + residue.aminoacid + " [" + residue.position + "]<br/>";
 
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP, tooltip);
@@ -3505,15 +3474,9 @@ public class Util {
 				}
 			}
 
-			if (taskMonitor != null) {
-				summary_processed++;
-				int new_progress = (int) ((double) summary_processed / (total_edges) * 100);
-				if (new_progress > old_progress) {
-					old_progress = new_progress;
+			summary_processed++;
+			progressBar(summary_processed, old_progress, total_edges, "Restoring edges styles: ", taskMonitor, null);
 
-					taskMonitor.showMessage(TaskMonitor.Level.INFO, "Restoring edges styles: " + old_progress + "%");
-				}
-			}
 		}
 
 		String node_name = myNetwork.getDefaultNodeTable().getRow(current_node.getSUID()).getRaw(CyNetwork.NAME)
@@ -3535,6 +3498,30 @@ public class Util {
 		}
 
 		// ######################### UPDATE EDGES #########################
+	}
+
+	/**
+	 * Method responsible for displaying progress bar
+	 * 
+	 * @param summary_processed current processed value
+	 * @param old_progress      old progress value
+	 * @param total_process     total number to be processed
+	 * @param message           message to display
+	 * @param taskMonitor       task monitor
+	 */
+	private static void progressBar(int summary_processed, int old_progress, int total_process, String message,
+			TaskMonitor taskMonitor, JLabel textLabel_status_result) {
+
+		int new_progress = (int) ((double) summary_processed / (total_process) * 100);
+		if (new_progress > old_progress) {
+			old_progress = new_progress;
+
+			if (taskMonitor != null)
+				taskMonitor.showMessage(TaskMonitor.Level.INFO, message + old_progress + "%");
+
+			if (textLabel_status_result != null)
+				textLabel_status_result.setText("Defining styles for cross-links: " + old_progress + "%");
+		}
 	}
 
 	/**
@@ -4119,13 +4106,8 @@ public class Util {
 					response.append('\r');
 
 					summary_processed += line.toCharArray().length + 1;
-					int new_progress = (int) ((double) summary_processed / (total_lines) * 100);
-					if (new_progress > old_progress) {
-						old_progress = new_progress;
-
-						taskMonitor.showMessage(TaskMonitor.Level.INFO,
-								"Downloading protein information from Uniprot: " + old_progress + "%");
-					}
+					progressBar(summary_processed, old_progress, total_lines,
+							"Downloading protein information from Uniprot: ", taskMonitor, null);
 
 				}
 				rd.close();
@@ -4266,13 +4248,9 @@ public class Util {
 					response.append('\r');
 
 					summary_processed += line.toCharArray().length + 1;
-					int new_progress = (int) ((double) summary_processed / (total_lines) * 100);
-					if (new_progress > old_progress) {
-						old_progress = new_progress;
+					progressBar(summary_processed, old_progress, total_lines, "Downloading PDB file from server: ",
+							taskMonitor, null);
 
-						taskMonitor.showMessage(TaskMonitor.Level.INFO,
-								"Downloading PDB file from server: " + old_progress + "%");
-					}
 				}
 				rd.close();
 				return new String[] { "PDB", response.toString() };
@@ -4328,13 +4306,8 @@ public class Util {
 					response.append('\r');
 
 					summary_processed += line.toCharArray().length + 1;
-					int new_progress = (int) ((double) summary_processed / (total_lines) * 100);
-					if (new_progress > old_progress) {
-						old_progress = new_progress;
-
-						taskMonitor.showMessage(TaskMonitor.Level.INFO,
-								"Downloading PDB file from server: " + old_progress + "%");
-					}
+					progressBar(summary_processed, old_progress, total_lines, "Downloading PDB file from server: ",
+							taskMonitor, null);
 				}
 				rd.close();
 				return new String[] { "PDB", response.toString() };
@@ -4395,13 +4368,8 @@ public class Util {
 					response.append('\r');
 
 					summary_processed += line.toCharArray().length + 1;
-					int new_progress = (int) ((double) summary_processed / (total_lines) * 100);
-					if (new_progress > old_progress) {
-						old_progress = new_progress;
-
-						taskMonitor.showMessage(TaskMonitor.Level.INFO,
-								"Downloading CIF file from server: " + old_progress + "%");
-					}
+					progressBar(summary_processed, old_progress, total_lines, "Downloading CIF file from server: ",
+							taskMonitor, null);
 				}
 				rd.close();
 				return response.toString();
@@ -4610,14 +4578,8 @@ public class Util {
 					response.append('\r');
 
 					summary_processed += line.toCharArray().length + 1;
-					int new_progress = (int) ((double) summary_processed / (total_lines) * 100);
-					if (new_progress > old_progress) {
-						old_progress = new_progress;
-
-						taskMonitor.showMessage(TaskMonitor.Level.INFO,
-								"Downloading protein information from Uniprot: " + old_progress + "%");
-					}
-
+					progressBar(summary_processed, old_progress, total_lines,
+							"Downloading protein information from Uniprot: ", taskMonitor, null);
 				}
 				rd.close();
 				String responseString = response.toString();
@@ -4933,13 +4895,8 @@ public class Util {
 					response.append('\r');
 
 					summary_processed += line.toCharArray().length + 1;
-					int new_progress = (int) ((double) summary_processed / (total_lines) * 100);
-					if (new_progress > old_progress) {
-						old_progress = new_progress;
-
-						taskMonitor.showMessage(TaskMonitor.Level.INFO,
-								"Downloading Pfam file from server: " + old_progress + "%");
-					}
+					progressBar(summary_processed, old_progress, total_lines, "Downloading Pfam file from server: ",
+							taskMonitor, null);
 				}
 				rd.close();
 				String responseString = response.toString();

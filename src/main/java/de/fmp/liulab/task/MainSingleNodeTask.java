@@ -594,14 +594,13 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 
 		myCurrentRow = myNetwork.getRow(node);
 
-		String node_name = myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME).toString();
-		myProtein = Util.getProtein(myNetwork, node_name);
+		String nodeName = (String) myCurrentRow.getRaw(CyNetwork.NAME);
+		myProtein = Util.getProtein(myNetwork, nodeName);
 		if (myProtein == null) {
 			throw new Exception("There is no information in column 'sequence' or 'domain_annotation' for the protein: "
-					+ node_name);
+					+ nodeName);
 		}
 
-		String nodeName = (String) myCurrentRow.getRaw(CyNetwork.NAME);
 		if (nodeName.contains("PTM - "))
 			return;
 
@@ -2290,8 +2289,15 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 			int endId = domainTableDataModel.getValueAt(row, 2) != null ? (int) domainTableDataModel.getValueAt(row, 2)
 					: 0;
 
+			String eValue = domainTableDataModel.getValueAt(row, 3) != null
+					? domainTableDataModel.getValueAt(row, 3).toString()
+					: "";
+
+			boolean isPredicted = eValue.equals("predicted");
+
 			Optional<ProteinDomain> isPtnDomainPresent = myProtein.domains.stream()
-					.filter(value -> value.name.equals(domain) && value.startId == startId && value.endId == endId)
+					.filter(value -> value.name.equals(domain) && value.startId == startId && value.endId == endId
+							&& value.isPredicted == isPredicted)
 					.findFirst();
 
 			if (domainTableDataModel.getValueAt(row, 4) != null
@@ -2314,9 +2320,13 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 					ProteinDomain _myProteinDomain = isPtnDomainPresent.get();
 					_myProteinDomain.startId = startId;
 					_myProteinDomain.endId = endId;
-					_myProteinDomain.eValue = "";
 				} else {
-					myProtein.domains.add(new ProteinDomain(domain, startId, endId, ""));
+					ProteinDomain _myProteinDomain = new ProteinDomain(domain, startId, endId, "");
+					if (isPredicted) {
+						_myProteinDomain.isPredicted = true;
+						_myProteinDomain.eValue = "predicted";
+					}
+					myProtein.domains.add(_myProteinDomain);
 				}
 
 			}

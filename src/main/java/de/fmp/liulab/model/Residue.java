@@ -11,6 +11,7 @@ public class Residue {
 	public int position;
 	public Protein protein;
 	public double score = 0;
+	public double conflicted_score = 0;
 	public int predicted_epoch = -1;
 	public Residue previous_residue;
 	public Residue conflicted_residue;

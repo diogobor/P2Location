@@ -210,17 +210,17 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 		// ######## PROTEIN DOMAINS ########
 		if (nodeTable.getColumn(Util.PROTEIN_DOMAIN_COLUMN) == null) {
 			try {
-				nodeTable.createColumn(Util.PROTEIN_DOMAIN_COLUMN, String.class, false);
+				nodeTable.createListColumn(Util.PROTEIN_DOMAIN_COLUMN, String.class, false);
 
 				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
-					row.set(Util.PROTEIN_DOMAIN_COLUMN, "");
+					row.set(Util.PROTEIN_DOMAIN_COLUMN, new ArrayList<String>());
 				}
 
 			} catch (IllegalArgumentException e) {
 				try {
 					for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
-						if (row.get(Util.PROTEIN_DOMAIN_COLUMN, String.class) == null)
-							row.set(Util.PROTEIN_DOMAIN_COLUMN, "");
+						if (row.get(Util.PROTEIN_DOMAIN_COLUMN, List.class) == null)
+							row.set(Util.PROTEIN_DOMAIN_COLUMN, new ArrayList<String>());
 					}
 				} catch (Exception e2) {
 				}
@@ -240,14 +240,14 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 				Util.init_availableProteinDomainColorsMap();
 
 				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
-					if (row.get(Util.PROTEIN_DOMAIN_COLUMN, String.class) == null)
-						row.set(Util.PROTEIN_DOMAIN_COLUMN, "");
+					if (row.get(Util.PROTEIN_DOMAIN_COLUMN, List.class) == null)
+						row.set(Util.PROTEIN_DOMAIN_COLUMN, new ArrayList<String>());
 					else {
 						String nodeName = row.get(CyNetwork.NAME, String.class);
-						String domains = row.get(Util.PROTEIN_DOMAIN_COLUMN, String.class);
+						@SuppressWarnings("unchecked")
+						List<String> domains = row.get(Util.PROTEIN_DOMAIN_COLUMN, List.class);
 
-						if (!(domains.isBlank() || domains.isEmpty()) && proteinDomainsMapOK) {
-
+						if (domains != null && domains.size() > 0 && proteinDomainsMapOK) {
 							updateProteinDomainsMap(nodeName, domains, false, taskMonitor);
 						}
 					}
@@ -259,17 +259,17 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 		// ######## PREDICTED PROTEIN DOMAINS ########
 		if (nodeTable.getColumn(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN) == null) {
 			try {
-				nodeTable.createColumn(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, String.class, false);
+				nodeTable.createListColumn(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, String.class, false);
 
 				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
-					row.set(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, "");
+					row.set(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, new ArrayList<String>());
 				}
 
 			} catch (IllegalArgumentException e) {
 				try {
 					for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
-						if (row.get(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, String.class) == null)
-							row.set(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, "");
+						if (row.get(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, List.class) == null)
+							row.set(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, new ArrayList<String>());
 					}
 				} catch (Exception e2) {
 				}
@@ -289,14 +289,14 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 				Util.init_availableProteinDomainColorsMap();
 
 				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
-					if (row.get(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, String.class) == null)
-						row.set(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, "");
+					if (row.get(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, List.class) == null)
+						row.set(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, new ArrayList<String>());
 					else {
 						String nodeName = row.get(CyNetwork.NAME, String.class);
-						String domains = row.get(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, String.class);
+						@SuppressWarnings("unchecked")
+						List<String> domains = row.get(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, List.class);
 
-						if (!(domains.isBlank() || domains.isEmpty()) && proteinDomainsMapOK) {
-
+						if (domains != null && domains.size() > 0 && proteinDomainsMapOK) {
 							updateProteinDomainsMap(nodeName, domains, true, taskMonitor);
 						}
 					}
@@ -308,17 +308,17 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 		// ######## CONFLICTED PREDICTED RESIDUES ########
 		if (nodeTable.getColumn(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN) == null) {
 			try {
-				nodeTable.createColumn(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, String.class, false);
+				nodeTable.createListColumn(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, String.class, false);
 
 				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
-					row.set(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, "");
+					row.set(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, new ArrayList<String>());
 				}
 
 			} catch (IllegalArgumentException e) {
 				try {
 					for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
-						if (row.get(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, String.class) == null)
-							row.set(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, "");
+						if (row.get(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, List.class) == null)
+							row.set(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, new ArrayList<String>());
 					}
 				} catch (Exception e2) {
 				}
@@ -338,13 +338,15 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 				Util.init_availableProteinDomainColorsMap();
 
 				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
-					if (row.get(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, String.class) == null)
-						row.set(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, "");
+					if (row.get(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, List.class) == null)
+						row.set(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, new ArrayList<String>());
 					else {
 						String nodeName = row.get(CyNetwork.NAME, String.class);
-						String conflictedResidues = row.get(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN, String.class);
+						@SuppressWarnings("unchecked")
+						List<String> conflictedResidues = row.get(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN,
+								List.class);
 
-						if (!(conflictedResidues.isBlank() || conflictedResidues.isEmpty()) && proteinDomainsMapOK) {
+						if (conflictedResidues != null && conflictedResidues.size() > 0 && proteinDomainsMapOK) {
 
 							updateConflictedResidues(nodeName, conflictedResidues, taskMonitor);
 						}
@@ -481,13 +483,14 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 	/**
 	 * Method responsible for updating conflicted residues
 	 * 
-	 * @param nodeName              current node
-	 * @param conflictedResiduesStr conflicted residues
-	 * @param taskMonitor           task monitor
+	 * @param nodeName           current node
+	 * @param conflictedResidues conflicted residues
+	 * @param taskMonitor        task monitor
 	 */
-	private void updateConflictedResidues(String nodeName, String conflictedResiduesStr, TaskMonitor taskMonitor) {
+	private void updateConflictedResidues(String nodeName, List<String> conflictedResidues, TaskMonitor taskMonitor) {
 
-		if (conflictedResiduesStr.isBlank() || conflictedResiduesStr.isEmpty())
+		if (conflictedResidues == null || conflictedResidues.size() == 0 || conflictedResidues.get(0).isBlank()
+				|| conflictedResidues.get(0).isEmpty())
 			return;
 
 		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
@@ -498,7 +501,7 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			if (isPtnPresent.isPresent()) {
 				Protein _myProtein = isPtnPresent.get();
 
-				updateResidueStatus(_myProtein.reactionSites, conflictedResiduesStr, nodeName, taskMonitor);
+				updateResidueStatus(_myProtein.reactionSites, conflictedResidues, nodeName, taskMonitor);
 			}
 
 			else {
@@ -511,18 +514,19 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 	 * Method responsible for updating residues status according to the conflict
 	 * status
 	 * 
-	 * @param residues              current residues
-	 * @param conflictedResiduesStr all conflicted residues
-	 * @param nodeName              node name
-	 * @param taskMonitor           task monitor
+	 * @param residues           current residues
+	 * @param conflictedResidues all conflicted residues
+	 * @param nodeName           node name
+	 * @param taskMonitor        task monitor
 	 */
-	private void updateResidueStatus(List<Residue> residues, String conflictedResiduesStr, String nodeName,
+	private void updateResidueStatus(List<Residue> residues, List<String> conflictedResidues, String nodeName,
 			TaskMonitor taskMonitor) {
 
 		try {
-			String[] cols = conflictedResiduesStr.split(",");
-			for (String col : cols) {
-				String[] residuesArray = col.split("\\[|\\]");
+
+			for (String residue : conflictedResidues) {
+
+				String[] residuesArray = residue.split("\\[|\\]");
 				char residueName = residuesArray[0].trim().charAt(0);
 				int position = Integer.parseInt(residuesArray[1]);
 
@@ -547,18 +551,21 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 	 * Method responsible for updating protein domains map
 	 * 
 	 * @param nodeName    node name
-	 * @param domainsStr  domains stored in Cytoscape Table
+	 * @param domains     domains stored in Cytoscape Table
 	 * @param isPredicted predicted or original domain
 	 * @param taskMonitor task monitor
 	 */
-	private void updateProteinDomainsMap(String nodeName, String domainsStr, boolean isPredicted,
+	private void updateProteinDomainsMap(String nodeName, List<String> domains, boolean isPredicted,
 			TaskMonitor taskMonitor) {
+
+		if (domains == null || domains.size() == 0 || domains.get(0).isBlank() || domains.get(0).isEmpty())
+			return;
 
 		List<ProteinDomain> proteinDomains = new ArrayList<ProteinDomain>();
 		try {
-			String[] cols = domainsStr.split(",");
-			for (String col : cols) {
-				String[] domainsArray = col.split("\\[|\\]");
+
+			for (String domain : domains) {
+				String[] domainsArray = domain.split("\\[|\\]");
 				String domainName = domainsArray[0].trim();
 				String[] colRange = domainsArray[1].split("-");
 				int startId = Integer.parseInt(colRange[0]);

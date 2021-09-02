@@ -24,6 +24,7 @@ import org.cytoscape.work.TaskMonitor;
 import de.fmp.liulab.internal.view.ExtensionFileFilter;
 import de.fmp.liulab.model.Protein;
 import de.fmp.liulab.model.ProteinDomain;
+import de.fmp.liulab.model.Residue;
 import de.fmp.liulab.utils.Util;
 
 /**
@@ -139,15 +140,67 @@ public class ExportProteinDomainsAction extends AbstractCyAction {
 				List<Protein> all_proteinDomains = Util.proteinsMap.get(myNetwork.toString());
 				for (Protein protein : all_proteinDomains) {
 
-					if (protein.domains == null)
-						continue;
+					StringBuilder sb_conflicted_residues = new StringBuilder();
+					StringBuilder sb_original_domains = new StringBuilder();
+					StringBuilder sb_predicted_domains = new StringBuilder();
 
-					StringBuilder sb_domains = new StringBuilder();
-					for (ProteinDomain domain : protein.domains) {
-						sb_domains.append(domain.name + "[" + domain.startId + "-" + domain.endId + "],");
+					if (protein.reactionSites != null) {
+						for (Residue residue : protein.reactionSites) {
+							sb_conflicted_residues.append(residue.aminoacid + "[" + residue.position + "],");
+						}
 					}
-					myWriter.write(protein.gene + "," + "\""
-							+ sb_domains.toString().substring(0, sb_domains.toString().length() - 1) + "\"\n");
+
+					if (protein.domains != null) {
+						for (ProteinDomain domain : protein.domains) {
+							if (!domain.isPredicted)
+								sb_original_domains
+										.append(domain.name + "[" + domain.startId + "-" + domain.endId + "],");
+							else
+								sb_predicted_domains
+										.append(domain.name + "[" + domain.startId + "-" + domain.endId + "],");
+						}
+					}
+					if (sb_original_domains.length() > 0 && sb_predicted_domains.length() > 0
+							&& sb_conflicted_residues.length() > 0)// 3 columns
+						myWriter.write(protein.gene + "," + "\""
+								+ sb_original_domains
+										.toString().substring(0, sb_original_domains.toString().length() - 1)
+								+ "\"" + "," + "\""
+								+ sb_predicted_domains.toString().substring(0,
+										sb_predicted_domains.toString().length() - 1)
+								+ "\"" + "," + "\"" + sb_conflicted_residues.toString().substring(0,
+										sb_conflicted_residues.toString().length() - 1)
+								+ "\"\n");
+					else if (sb_original_domains.length() > 0 && sb_predicted_domains.length() > 0)// 1st and 2nd
+						myWriter.write(protein.gene + "," + "\""
+								+ sb_original_domains.toString().substring(0,
+										sb_original_domains.toString().length() - 1)
+								+ "\"" + "," + "\"" + sb_predicted_domains.toString().substring(0,
+										sb_predicted_domains.toString().length() - 1)
+								+ "\"\n");
+					else if (sb_original_domains.length() > 0 && sb_conflicted_residues.length() > 0)// 1st and 3rd
+						myWriter.write(protein.gene + "," + "\""
+								+ sb_original_domains.toString().substring(0,
+										sb_original_domains.toString().length() - 1)
+								+ "\"" + ",," + "\"" + sb_conflicted_residues.toString().substring(0,
+										sb_conflicted_residues.toString().length() - 1)
+								+ "\"\n");
+					else if (sb_predicted_domains.length() > 0 && sb_conflicted_residues.length() > 0)// 2nd and 3rd
+						myWriter.write(protein.gene + ",," + "\""
+								+ sb_predicted_domains.toString().substring(0,
+										sb_predicted_domains.toString().length() - 1)
+								+ "\"" + "," + "\"" + sb_conflicted_residues.toString().substring(0,
+										sb_conflicted_residues.toString().length() - 1)
+								+ "\"\n");
+					else if (sb_original_domains.length() > 0)// 1st
+						myWriter.write(protein.gene + "," + "\"" + sb_original_domains.toString().substring(0,
+								sb_original_domains.toString().length() - 1) + "\"" + "\n");
+					else if (sb_predicted_domains.length() > 0)// 2nd
+						myWriter.write(protein.gene + ",," + "\"" + sb_predicted_domains.toString().substring(0,
+								sb_predicted_domains.toString().length() - 1) + "\"" + "\n");
+					else if (sb_conflicted_residues.length() > 0)// 3rd
+						myWriter.write(protein.gene + ",,," + "\"" + sb_conflicted_residues.toString().substring(0,
+								sb_conflicted_residues.toString().length() - 1) + "\"" + "\n");
 				}
 
 				myWriter.close();
