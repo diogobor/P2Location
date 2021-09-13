@@ -26,6 +26,7 @@ import org.cytoscape.model.events.RowsSetListener;
 import org.cytoscape.property.CyProperty;
 import org.cytoscape.service.util.AbstractCyActivator;
 import org.cytoscape.util.swing.OpenBrowser;
+import org.cytoscape.view.model.CyNetworkViewFactory;
 import org.cytoscape.view.model.CyNetworkViewManager;
 import org.cytoscape.view.model.events.ViewChangedListener;
 import org.cytoscape.view.presentation.customgraphics.CyCustomGraphics2Factory;
@@ -190,9 +191,12 @@ public class CyActivator extends AbstractCyActivator {
 
 		CyNetworkFactory networkFactory = getService(bc, CyNetworkFactory.class);
 		CyNetworkManager networkManager = getService(bc, CyNetworkManager.class);
+		CyNetworkViewManager viewManager = getService(bc, CyNetworkViewManager.class);
+		CyNetworkViewFactory viewFactory = getService(bc, CyNetworkViewFactory.class);
 
-		TaskFactory myResiduesTreeFactory = new ResiduesTreeTaskFactory(cyApplicationManager, networkFactory,networkManager,
-				vmmServiceRef, customChartListener, bendFactory, handleFactory, false);
+		TaskFactory myResiduesTreeFactory = new ResiduesTreeTaskFactory(cyApplicationManager, networkFactory,
+				networkManager, viewManager, viewFactory, vmmServiceRef, customChartListener, bendFactory,
+				handleFactory, false);
 
 		ResiduesTreeNodeExecuteAction myResiduesTreeNodeAction = new ResiduesTreeNodeExecuteAction(dialogTaskManager,
 				myResiduesTreeFactory);

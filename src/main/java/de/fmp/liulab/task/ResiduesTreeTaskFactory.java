@@ -3,6 +3,8 @@ package de.fmp.liulab.task;
 import org.cytoscape.application.CyApplicationManager;
 import org.cytoscape.model.CyNetworkFactory;
 import org.cytoscape.model.CyNetworkManager;
+import org.cytoscape.view.model.CyNetworkViewFactory;
+import org.cytoscape.view.model.CyNetworkViewManager;
 import org.cytoscape.view.presentation.customgraphics.CyCustomGraphics2Factory;
 import org.cytoscape.view.presentation.property.values.BendFactory;
 import org.cytoscape.view.presentation.property.values.HandleFactory;
@@ -17,6 +19,8 @@ public class ResiduesTreeTaskFactory extends AbstractTaskFactory {
 	private CyApplicationManager cyApplicationManager;
 	private CyNetworkFactory netFactory;
 	private CyNetworkManager networkManager;
+	private CyNetworkViewManager viewManager;
+	private CyNetworkViewFactory viewFactory;
 	private VisualMappingManager vmmServiceRef;
 	private CyCustomGraphics2Factory vgFactory;
 	private HandleFactory handleFactory;
@@ -34,9 +38,9 @@ public class ResiduesTreeTaskFactory extends AbstractTaskFactory {
 	 * @param forcedWindowOpen     forced window open
 	 */
 	public ResiduesTreeTaskFactory(CyApplicationManager cyApplicationManager, CyNetworkFactory netFactory,
-			CyNetworkManager networkManager, final VisualMappingManager vmmServiceRef,
-			CustomChartListener customChartListener, BendFactory bendFactory, HandleFactory handleFactory,
-			boolean forcedWindowOpen) {
+			CyNetworkManager networkManager, CyNetworkViewManager viewManager, CyNetworkViewFactory viewFactory,
+			final VisualMappingManager vmmServiceRef, CustomChartListener customChartListener, BendFactory bendFactory,
+			HandleFactory handleFactory, boolean forcedWindowOpen) {
 		this.cyApplicationManager = cyApplicationManager;
 		this.vmmServiceRef = vmmServiceRef;
 		this.vgFactory = customChartListener.getFactory();
@@ -44,6 +48,8 @@ public class ResiduesTreeTaskFactory extends AbstractTaskFactory {
 		this.handleFactory = handleFactory;
 		this.forcedWindowOpen = forcedWindowOpen;
 		this.netFactory = netFactory;
+		this.viewManager = viewManager;
+		this.viewFactory = viewFactory;
 		this.networkManager = networkManager;
 	}
 
@@ -58,13 +64,13 @@ public class ResiduesTreeTaskFactory extends AbstractTaskFactory {
 	 */
 	@Override
 	public TaskIterator createTaskIterator() {
-		return new TaskIterator(new ResiduesTreeTask(cyApplicationManager, netFactory, networkManager, vmmServiceRef,
-				vgFactory, bendFactory, handleFactory, forcedWindowOpen, false));
+		return new TaskIterator(new ResiduesTreeTask(cyApplicationManager, netFactory, networkManager, viewManager,
+				viewFactory, vmmServiceRef, vgFactory, bendFactory, handleFactory, forcedWindowOpen, false));
 	}
 
 	public TaskIterator createTaskIterator(boolean isCommand) {
-		return new TaskIterator(new ResiduesTreeTask(cyApplicationManager, netFactory, networkManager, vmmServiceRef,
-				vgFactory, bendFactory, handleFactory, forcedWindowOpen, isCommand));
+		return new TaskIterator(new ResiduesTreeTask(cyApplicationManager, netFactory, networkManager, viewManager,
+				viewFactory, vmmServiceRef, vgFactory, bendFactory, handleFactory, forcedWindowOpen, isCommand));
 	}
 
 }

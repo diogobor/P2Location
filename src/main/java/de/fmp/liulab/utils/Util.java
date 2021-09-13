@@ -42,6 +42,8 @@ import org.cytoscape.view.model.CyNetworkView;
 import org.cytoscape.view.model.View;
 import org.cytoscape.view.model.VisualLexicon;
 import org.cytoscape.view.model.VisualProperty;
+import org.cytoscape.view.presentation.customgraphics.CyCustomGraphics2;
+import org.cytoscape.view.presentation.customgraphics.CyCustomGraphics2Factory;
 import org.cytoscape.view.presentation.property.ArrowShapeVisualProperty;
 import org.cytoscape.view.presentation.property.BasicVisualLexicon;
 import org.cytoscape.view.presentation.property.LineTypeVisualProperty;
@@ -92,8 +94,8 @@ public class Util {
 	public static String NODE_LABEL_POSITION = "NODE_LABEL_POSITION";
 	public static String XL_PROTEIN_A_B = "crosslinks_ab";
 	public static String XL_PROTEIN_B_A = "crosslinks_ba";
-	private static String PROTEIN_A = "protein_a";
-	private static String PROTEIN_B = "protein_b";
+	public static String PROTEIN_A = "protein_a";
+	public static String PROTEIN_B = "protein_b";
 	private static String XL_SCORE_AB = "score_ab";
 	private static String XL_SCORE_BA = "score_ba";
 	public static String XL_COMB_SCORE = "ppi_score";
@@ -104,7 +106,7 @@ public class Util {
 
 	private static String OS = System.getProperty("os.name").toLowerCase();
 
-	private final static float OFFSET_BEND = 2;
+	public final static float OFFSET_BEND = 2;
 	private final static float OFFSET_MONOLINK = 1;
 	private final static float PTM_LENGTH = 45;
 	private static String edge_label_blank_spaces = "\n\n";
@@ -117,8 +119,8 @@ public class Util {
 	public static boolean showLinksLegend = false;
 	public static boolean showIntraLinks = true;
 	public static boolean showInterLinks = true;
-	public static boolean showPTMs = true;
-	public static boolean showMonolinkedPeptides = true;
+	public static boolean showPTMs = false;
+	public static boolean showMonolinkedPeptides = false;
 	public static boolean showResidues = true;
 	public static Integer edge_label_font_size = 12;
 	public static Integer node_label_font_size = 12;
@@ -1042,7 +1044,7 @@ public class Util {
 	 */
 	private static void addDomainsOrConflictedResiduesIntoTheTable(CyNetwork myNetwork, CyNode node,
 			List<String> list_domains_or_conflicted_residues, String columnName) {
-		
+
 		if (myNetwork.getRow(node).get(columnName, List.class) != null) {
 			if (list_domains_or_conflicted_residues.size() > 0)
 				myNetwork.getRow(node).set(columnName, Arrays.asList(list_domains_or_conflicted_residues.toArray()));
@@ -2320,7 +2322,19 @@ public class Util {
 		}
 	}
 
-	private static void setResidueStyle(CyNetworkView netView, CyNode current_node, View<CyNode> sourceNodeView,
+	/**
+	 * Method responsible for plotting residues
+	 * 
+	 * @param netView                      current net view
+	 * @param current_node                 current node
+	 * @param sourceNodeView               current source node view
+	 * @param residue                      current residue
+	 * @param xl_pos_source                position of source xl
+	 * @param center_position_source_node  center position of source node
+	 * @param x_or_y_Pos_source            x or y position of source node
+	 * @param initial_position_source_node initial position of source node
+	 */
+	public static void setResidueStyle(CyNetworkView netView, CyNode current_node, View<CyNode> sourceNodeView,
 			Residue residue, double xl_pos_source, double center_position_source_node, double x_or_y_Pos_source,
 			double initial_position_source_node) {
 
@@ -3275,7 +3289,7 @@ public class Util {
 
 		Protein protein = getProtein(myNetwork, node_name);
 
-		if (protein == null)
+		if (protein == null || protein.reactionSites == null)
 			return;
 
 		View<CyNode> sourceNodeView = netView.getNodeView(node);
@@ -3292,6 +3306,7 @@ public class Util {
 		}
 
 		int countMonolink = 0;
+
 		for (Residue residue : protein.reactionSites) {
 
 			final String node_name_added_by_app = "RESIDUE" + countMonolink + " [Source: " + node_name + " ("
@@ -3343,7 +3358,173 @@ public class Util {
 		if (showResidues) {
 			setNodeResidues(myNetwork, node, netView, style);
 		}
+	}
 
+	/**
+	 * Set all domains to a node
+	 * 
+	 * @param taskMonitor
+	 * @param myProtein
+	 * @param nodeView
+	 * @param myNetwork
+	 * @param node
+	 * @param vgFactory
+	 * @param lexicon
+	 */
+	public static void setNodeDomainColors(final TaskMonitor taskMonitor, Protein myProtein, View<CyNode> nodeView,
+			CyNetwork myNetwork, CyNode node, @SuppressWarnings("rawtypes") CyCustomGraphics2Factory vgFactory,
+			VisualLexicon lexicon) {
+		// ######################### NODE_COLOR_LINEAR_GRADIENT ######################
+		boolean hasDomain = false;
+		StringBuilder sb_domains = new StringBuilder();
+		@SuppressWarnings("unchecked")
+		VisualProperty<CyCustomGraphics2<?>> vp_node_linear_gradient = (VisualProperty<CyCustomGraphics2<?>>) lexicon
+				.lookup(CyNode.class, "NODE_CUSTOMGRAPHICS_1");
+
+		if (myProtein == null)
+			return;
+
+		float protein_length = Util.getProteinLength();
+		if (myProtein.sequence != null)
+			protein_length = myProtein.sequence.length();
+
+		if (vp_node_linear_gradient != null) {
+
+			Map<String, Object> chartProps = new HashMap<String, Object>();
+			List<java.awt.Color> colors = new ArrayList<java.awt.Color>();
+			List<Float> values = new ArrayList<Float>();
+			values.add(0.0f);
+			colors.add(new Color(255, 255, 255, 100));
+
+			Collections.sort(myProtein.domains);
+
+			int countDomain = 1;
+			for (ProteinDomain domain : myProtein.domains) {
+
+				int startId = domain.startId;
+				int endId = domain.endId;
+
+				if (startId > protein_length)
+					continue;
+
+				if (startId < 0)
+					continue;
+
+				if (endId > protein_length) {
+
+					if (taskMonitor != null)
+						taskMonitor.showMessage(TaskMonitor.Level.ERROR, "ERROR Domain: " + domain.name
+								+ " - The position of the final residue is greater than the length of the protein.");
+					endId = (int) protein_length;
+				}
+
+				float initial_range = ((float) startId / protein_length);
+				float initial_range_white = initial_range - 0.0001f >= 0.0 ? initial_range - 0.0001f : initial_range;
+
+				if (initial_range_white == 0) {
+					values.add(initial_range_white);
+					values.add(initial_range + 0.0001f);
+
+				} else {
+					values.add(initial_range_white);
+					values.add(initial_range);
+				}
+				colors.add(new Color(255, 255, 255, 100));
+				if (domain.color == null) {
+					colors.add(Util.proteinDomainsColorMap.get(domain.name));
+				} else {
+					colors.add(domain.color);
+				}
+
+				float end_range = ((float) endId / protein_length);
+				float end_range_white = end_range + 0.0001f <= 1.0 ? end_range + 0.0001f : end_range;
+
+				if (end_range_white == 1.0) {
+					values.add(end_range - 0.0001f);
+
+				} else {
+					values.add(end_range);
+				}
+
+				if (domain.color == null) {
+					colors.add(Util.proteinDomainsColorMap.get(domain.name));
+				} else {
+					colors.add(domain.color);
+				}
+				values.add(end_range_white);
+				colors.add(new Color(255, 255, 255, 100));
+
+				Color legend_color = null;
+				if (domain.color == null) {
+					legend_color = Util.proteinDomainsColorMap.get(domain.name);
+				} else {
+					legend_color = domain.color;
+				}
+
+				sb_domains.append("<p style=\"color:rgb(" + legend_color.getRed() + ", " + legend_color.getGreen()
+						+ ", " + legend_color.getBlue() + ");\">" + countDomain + ". <i>" + domain.name + " </i>["
+						+ startId + " - " + endId + "]</p>");
+				hasDomain = true;
+				countDomain++;
+
+			}
+			values.add(1.0f);
+			colors.add(new Color(255, 255, 255, 100));
+			chartProps.put("cy_gradientFractions", values);
+			chartProps.put("cy_gradientColors", colors);
+
+			if (Util.isProtein_expansion_horizontal)
+				chartProps.put("cy_angle", 0.0);
+			else
+				chartProps.put("cy_angle", 270.0);
+
+			@SuppressWarnings("unchecked")
+			CyCustomGraphics2<?> customGraphics = vgFactory.getInstance(chartProps);
+			if (vp_node_linear_gradient != null)
+				nodeView.setLockedValue(vp_node_linear_gradient, customGraphics);
+		}
+
+		if (hasDomain) {
+			if (myProtein.domains.size() > 1)
+				nodeView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP,
+						"<html><p><b>Protein:</b></p><p>" + myProtein.gene + " [1 - " + (int) protein_length
+								+ "]</p><br/><p><b>Domains:</i></p>" + sb_domains.toString() + "</html>");
+			else
+				nodeView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP,
+						"<html><p><b>Protein:</b></p><p>" + myProtein.gene + " [1 - " + (int) protein_length
+								+ "]</p><br/><p><b>Domain:</i></p>" + sb_domains.toString() + "</html>");
+
+			String network_name = myNetwork.toString();
+			if (Util.proteinsMap.containsKey(network_name)) {
+
+				List<Protein> all_proteins = Util.proteinsMap.get(network_name);
+				Optional<Protein> isPtnPresent = all_proteins.stream()
+						.filter(value -> value.gene.equals(myProtein.gene)).findFirst();
+				if (isPtnPresent.isPresent()) {
+					Protein ptn = isPtnPresent.get();
+					ptn.checksum = myProtein.checksum;
+					ptn.domains = myProtein.domains;
+					ptn.fullName = myProtein.fullName;
+					ptn.gene = myProtein.gene;
+					ptn.interLinks = myProtein.interLinks;
+					ptn.intraLinks = myProtein.intraLinks;
+					ptn.pdbIds = myProtein.pdbIds;
+					ptn.proteinID = myProtein.proteinID;
+					ptn.reactionSites = myProtein.reactionSites;
+					ptn.sequence = myProtein.sequence;
+				}
+
+			} else {// Network does not exists
+
+				List<Protein> proteins = new ArrayList<Protein>();
+				proteins.add(myProtein);
+				Util.proteinsMap.put(network_name, proteins);
+			}
+
+		} else
+			nodeView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP, "<html><p><b>Protein:</b></p><p>" + myProtein.gene
+					+ " [1 - " + (int) protein_length + "]</p></html>");
+		// ############################### END ################################
 	}
 
 	/**

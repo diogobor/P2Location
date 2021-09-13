@@ -357,7 +357,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		getProteinDomains(node);
 
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Setting protein domains to node...");
-		setNodeDomainColors(taskMonitor);
+		Util.setNodeDomainColors(taskMonitor, myProtein, nodeView, myNetwork, node, vgFactory, lexicon);
 		taskMonitor.setProgress(0.75);
 
 		if (Util.showPTMs) {
@@ -597,8 +597,8 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		String nodeName = (String) myCurrentRow.getRaw(CyNetwork.NAME);
 		myProtein = Util.getProtein(myNetwork, nodeName);
 		if (myProtein == null) {
-			throw new Exception("There is no information in column 'sequence' or 'domain_annotation' for the protein: "
-					+ nodeName);
+			throw new Exception(
+					"There is no information in column 'sequence' or 'domain_annotation' for the protein: " + nodeName);
 		}
 
 		if (nodeName.contains("PTM - "))
@@ -1507,7 +1507,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 
 						textLabel_status_result.setText("Setting protein domains to node...");
 						taskMonitor.showMessage(TaskMonitor.Level.INFO, "Setting protein domains to node...");
-						setNodeDomainColors(taskMonitor);
+						Util.setNodeDomainColors(taskMonitor, myProtein, nodeView, myNetwork, node, vgFactory, lexicon);
 						taskMonitor.setProgress(0.75);
 
 						update_protein_domain_table(taskMonitor, myProtein.domains);
@@ -2336,143 +2336,6 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 			throw new Exception("WARNING: No domain has been found.");
 		}
 		Util.updateProteinDomainsColorMap(myProtein.domains);
-	}
-
-	/**
-	 * Set all domains to a node
-	 */
-	private void setNodeDomainColors(final TaskMonitor taskMonitor) {
-		// ######################### NODE_COLOR_LINEAR_GRADIENT ######################
-		boolean hasDomain = false;
-		StringBuilder sb_domains = new StringBuilder();
-		VisualProperty<CyCustomGraphics2<?>> vp_node_linear_gradient = (VisualProperty<CyCustomGraphics2<?>>) lexicon
-				.lookup(CyNode.class, "NODE_CUSTOMGRAPHICS_1");
-		if (vp_node_linear_gradient != null) {
-
-			Map<String, Object> chartProps = new HashMap<String, Object>();
-			List<java.awt.Color> colors = new ArrayList<java.awt.Color>();
-			List<Float> values = new ArrayList<Float>();
-			values.add(0.0f);
-			colors.add(new Color(255, 255, 255, 100));
-
-			if (myProtein == null)
-				return;
-
-			Collections.sort(myProtein.domains);
-
-			int countDomain = 1;
-			for (ProteinDomain domain : myProtein.domains) {
-
-				int startId = domain.startId;
-				int endId = domain.endId;
-
-				if (startId > Util.getProteinLength())
-					continue;
-				if (endId > Util.getProteinLength()) {
-					taskMonitor.showMessage(TaskMonitor.Level.ERROR, "ERROR Domain: " + domain.name
-							+ " - The position of the final residue is greater than the length of the protein.");
-					endId = (int) Util.getProteinLength();
-				}
-
-				float initial_range = ((float) startId / Util.getProteinLength());
-				float initial_range_white = initial_range - 0.0001f >= 0.0 ? initial_range - 0.0001f : initial_range;
-
-				if (initial_range_white == 0) {
-					values.add(initial_range_white);
-					values.add(initial_range + 0.0001f);
-
-				} else {
-					values.add(initial_range_white);
-					values.add(initial_range);
-				}
-				colors.add(new Color(255, 255, 255, 100));
-				if (domain.color == null) {
-					colors.add(Util.proteinDomainsColorMap.get(domain.name));
-				} else {
-					colors.add(domain.color);
-				}
-
-				float end_range = ((float) endId / Util.getProteinLength());
-				float end_range_white = end_range + 0.0001f <= 1.0 ? end_range + 0.0001f : end_range;
-
-				if (end_range_white == 1.0) {
-					values.add(end_range - 0.0001f);
-
-				} else {
-					values.add(end_range);
-				}
-
-				if (domain.color == null) {
-					colors.add(Util.proteinDomainsColorMap.get(domain.name));
-				} else {
-					colors.add(domain.color);
-				}
-				values.add(end_range_white);
-				colors.add(new Color(255, 255, 255, 100));
-
-				sb_domains.append(
-						"<p>" + countDomain + ". <i>" + domain.name + " </i>[" + startId + " - " + endId + "]</p>");
-				hasDomain = true;
-				countDomain++;
-			}
-			values.add(1.0f);
-			colors.add(new Color(255, 255, 255, 100));
-			chartProps.put("cy_gradientFractions", values);
-			chartProps.put("cy_gradientColors", colors);
-
-			if (Util.isProtein_expansion_horizontal)
-				chartProps.put("cy_angle", 0.0);
-			else
-				chartProps.put("cy_angle", 270.0);
-
-			CyCustomGraphics2<?> customGraphics = vgFactory.getInstance(chartProps);
-			if (vp_node_linear_gradient != null)
-				nodeView.setLockedValue(vp_node_linear_gradient, customGraphics);
-		}
-
-		String protein_name = myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME).toString();
-
-		if (hasDomain) {
-			if (myProtein.domains.size() > 1)
-				nodeView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP,
-						"<html><p><b>Protein:</b></p><p>" + protein_name + " [1 - " + (int) Util.getProteinLength()
-								+ "]</p><br/><p><b>Domains:</i></p>" + sb_domains.toString() + "</html>");
-			else
-				nodeView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP,
-						"<html><p><b>Protein:</b></p><p>" + protein_name + " [1 - " + (int) Util.getProteinLength()
-								+ "]</p><br/><p><b>Domain:</i></p>" + sb_domains.toString() + "</html>");
-
-			String network_name = myNetwork.toString();
-			if (Util.proteinsMap.containsKey(network_name)) {
-
-				List<Protein> all_proteins = Util.proteinsMap.get(network_name);
-				Optional<Protein> isPtnPresent = all_proteins.stream()
-						.filter(value -> value.gene.equals(myProtein.gene)).findFirst();
-				if (isPtnPresent.isPresent()) {
-					Protein ptn = isPtnPresent.get();
-					ptn.checksum = myProtein.checksum;
-					ptn.domains = myProtein.domains;
-					ptn.fullName = myProtein.fullName;
-					ptn.gene = myProtein.gene;
-					ptn.interLinks = myProtein.interLinks;
-					ptn.intraLinks = myProtein.intraLinks;
-					ptn.pdbIds = myProtein.pdbIds;
-					ptn.proteinID = myProtein.proteinID;
-					ptn.reactionSites = myProtein.reactionSites;
-					ptn.sequence = myProtein.sequence;
-				}
-
-			} else {// Network does not exists
-
-				List<Protein> proteins = new ArrayList<Protein>();
-				proteins.add(myProtein);
-				Util.proteinsMap.put(network_name, proteins);
-			}
-
-		} else
-			nodeView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP, "<html><p><b>Protein:</b></p><p>" + protein_name
-					+ " [1 - " + (int) Util.getProteinLength() + "]</p></html>");
-		// ############################### END ################################
 	}
 
 }

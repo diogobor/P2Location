@@ -1245,20 +1245,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				} else {
 					sbError.append("WARNING: Row: " + (row + 1) + " - Protein '" + gene + "' has not been found.\n");
 				}
-				// Try to figure out the protein
-//				Optional<Protein> isPtnPresent = proteinList.stream().filter(value -> value.gene.equals(gene))
-//						.findFirst();
-//
-//				if (isPtnPresent.isPresent()) {
-//					// Get ptn if exists
-//					Protein _ptn = isPtnPresent.get();
-//					_ptn.sequence = sequence;
-//					_ptn.domains = proteinDomains;
-//				} else {
-//				Protein ptn = new Protein(gene, gene, sequence, proteinDomains);
-//				proteinList.add(ptn);
-//				}
-
 			}
 
 			if (isFinalStorage && (sequence.isEmpty() || sequence.isBlank())) {
@@ -1624,10 +1610,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
-								double score = -Math.log10(crossLink.score) * 1 / epochs;
+								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
 
-									if (Util.considerConflict && res.score != 0) {
+									if (Util.considerConflict && res.score != 0
+											&& !res.predictedLocation.equals(residue.predictedLocation)) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
 										res.predictedLocation = "UK";
@@ -1647,10 +1634,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
-								double score = -Math.log10(crossLink.score) * 1 / epochs;
+								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
 
-									if (Util.considerConflict && res.score != 0) {
+									if (Util.considerConflict && res.score != 0
+											&& !res.predictedLocation.equals(residue.predictedLocation)) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
 										res.predictedLocation = "UK";
@@ -1685,10 +1673,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
-								double score = -Math.log10(crossLink.score) * 1 / epochs;
+								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
 
-									if (Util.considerConflict && res.score != 0) {
+									if (Util.considerConflict && res.score != 0
+											&& !res.predictedLocation.equals(residue.predictedLocation)) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
 										res.predictedLocation = "UK";
@@ -1708,10 +1697,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
-								double score = -Math.log10(crossLink.score) * 1 / epochs;
+								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
 								if (score > res.score) {
 
-									if (Util.considerConflict && res.score != 0) {
+									if (Util.considerConflict && res.score != 0
+											&& !res.predictedLocation.equals(residue.predictedLocation)) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
 										res.predictedLocation = "UK";
@@ -1741,15 +1731,15 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					if (isValid) {
 
 						if (uk_residue.predicted_epoch != epochs) {
-							Residue current_res = new Residue(uk_residue.aminoacid, uk_residue.location,
-									uk_residue.position, uk_residue.protein);
-							current_res.history_residues = uk_residue.history_residues;
-							current_res.predicted_epoch = uk_residue.predicted_epoch;
-							current_res.predictedLocation = uk_residue.predictedLocation;
-							current_res.previous_residue = uk_residue.previous_residue;
-							current_res.score = uk_residue.score;
-							current_res.isConflicted = uk_residue.isConflicted;
-							current_res.conflicted_residue = uk_residue.conflicted_residue;
+							Residue current_res = new Residue(residue.aminoacid, residue.location, residue.position,
+									residue.protein);
+							current_res.history_residues = residue.history_residues;
+							current_res.predicted_epoch = residue.predicted_epoch;
+							current_res.predictedLocation = residue.predictedLocation;
+							current_res.previous_residue = residue.previous_residue;
+							current_res.score = residue.score;
+							current_res.isConflicted = residue.isConflicted;
+							current_res.conflicted_residue = residue.conflicted_residue;
 							uk_residue.addHistoryResidue(current_res);
 						}
 
@@ -1904,6 +1894,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 			for (ProteinDomain domain : protein.domains) {
 
+				if (!domain.isPredicted)
+					continue;
+
 				int range = domain.endId - domain.startId;
 
 				if (range >= (limit_range))
@@ -1911,8 +1904,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 				int new_range = (limit_range - range) / 2;
 
-				domain.startId -= new_range;
-				domain.endId += new_range;
+				int new_start = domain.startId - new_range;
+				if (new_start < 0)
+					new_start = 0;
+				int new_end = domain.endId + new_range;
+				if (new_end > protein.sequence.length())
+					new_end = protein.sequence.length();
+				domain.startId = new_start;
+				domain.endId = new_end;
 
 			}
 		}

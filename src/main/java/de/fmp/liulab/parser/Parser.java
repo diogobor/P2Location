@@ -53,7 +53,7 @@ public class Parser {
 						isCustomizedCSV = true;
 						continue;
 					}
-					
+
 					qtdParser.add(parserFile.getLine());
 				}
 			}
@@ -292,8 +292,14 @@ public class Parser {
 		StringBuilder sb_domains = new StringBuilder();
 		if (cols_topol_domains.length > 1) {
 			for (int i = 0; i < cols_topol_domains.length; i++) {
-				String protein_domain_name = cols_topol_domains[i + 1].replace("/note=\"", "").replace("\"", "")
-						.replace(",", "-").trim();
+
+				String protein_domain_name = "";
+				// TRANSMEM 1..100
+				if ((i + 1) < cols_topol_domains.length
+						&& !cols_topol_domains[i + 1].trim().matches("(\\w+)(\\s+)(\\d+)(\\.\\.)(\\d+)"))
+					protein_domain_name = cols_topol_domains[i + 1].replace("/note=\"", "").replace("\"", "")
+							.replace(",", "-").trim();
+
 				if (protein_domain_name.contains("evidence"))
 					protein_domain_name = "";
 
@@ -318,7 +324,8 @@ public class Parser {
 
 				if (i + 2 < cols_topol_domains.length && cols_topol_domains[i + 2].contains("evidence"))
 					i += 2;
-				else
+				else if ((i + 1) < cols_topol_domains.length
+						&& !cols_topol_domains[i + 1].trim().matches("(\\w+)(\\s+)(\\d+)(\\.\\.)(\\d+)"))
 					i += 1;
 
 			}
