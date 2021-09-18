@@ -1606,23 +1606,92 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						if (crossLink.pos_site_a == pos) {
 							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
-											&& value.position == crossLink.pos_site_b && !value.isConflicted)
+											&& value.position == crossLink.pos_site_b && !value.isConflicted
+											&& value.predicted_epoch == -1)
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
 								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
+
+								boolean saveConflict = true;
 								if (score > res.score) {
 
 									if (Util.considerConflict && res.score != 0
 											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+
+										if (res.predictedLocation.contains("TRANSMEM")) {
+											Protein current_ptn_rs = res.protein;
+											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
+													value -> value.position >= (res.position - Util.transmemNeighborAA)
+															&& value.position <= (res.position
+																	+ Util.transmemNeighborAA))
+													.collect(Collectors.toList());
+
+											if (neighbors.size() > 0) {
+												for (Residue neighbor : neighbors) {
+													if (!neighbor.predictedLocation.contains("TRANSMEM")) {
+														res.score = score;
+														current_uk_residues.add(res);
+														crossLink.location = res.location;
+														saveConflict = false;
+														break;
+													}
+												}
+											}
+										}
+									} else {
+										saveConflict = false;
+
+										if (residue.predictedLocation.contains("TRANSMEM")) {
+											Protein current_ptn_rs = residue.protein;
+											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
+													value -> value.startId <= (res.position + Util.transmemNeighborAA)
+															&& value.startId >= (res.position
+																	- Util.transmemNeighborAA))
+													.collect(Collectors.toList());
+
+											if (neighbors.size() > 0) {
+												for (ProteinDomain neighbor : neighbors) {
+													if (!neighbor.name.contains("TRANSMEM")) {
+														res.score = score;
+														crossLink.location = res.location;
+														saveConflict = false;
+
+														if (res.predicted_epoch != epochs) {
+															Residue current_res = new Residue(residue.aminoacid,
+																	residue.location, residue.position,
+																	residue.protein);
+															current_res.history_residues = residue.history_residues;
+															current_res.predicted_epoch = residue.predicted_epoch;
+															current_res.predictedLocation = residue.predictedLocation;
+															current_res.previous_residue = residue.previous_residue;
+															current_res.score = residue.score;
+															current_res.isConflicted = residue.isConflicted;
+															current_res.conflicted_residue = residue.conflicted_residue;
+															res.addHistoryResidue(current_res);
+														}
+
+														res.predictedLocation = neighbor.name;
+														res.predicted_epoch = epochs;
+														res.previous_residue = residue;
+
+														break;
+													}
+												}
+											}
+										} else {
+
+											res.score = score;
+											current_uk_residues.add(res);
+											crossLink.location = res.location;
+										}
+									}
+
+									if (saveConflict) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
 										res.predictedLocation = "UK";
 										res.conflicted_score = score;
-									} else {
-										res.score = score;
-										current_uk_residues.add(res);
-										crossLink.location = res.location;
 									}
 								}
 							}
@@ -1630,23 +1699,91 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
-											&& value.position == crossLink.pos_site_a && !value.isConflicted)
+											&& value.position == crossLink.pos_site_a && !value.isConflicted
+											&& value.predicted_epoch == -1)
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
 								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
+
+								boolean saveConflict = true;
 								if (score > res.score) {
 
 									if (Util.considerConflict && res.score != 0
 											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+
+										if (res.predictedLocation.contains("TRANSMEM")) {
+											Protein current_ptn_rs = res.protein;
+											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
+													value -> value.position >= (res.position - Util.transmemNeighborAA)
+															&& value.position <= (res.position
+																	+ Util.transmemNeighborAA))
+													.collect(Collectors.toList());
+
+											if (neighbors.size() > 0) {
+												for (Residue neighbor : neighbors) {
+													if (!neighbor.predictedLocation.contains("TRANSMEM")) {
+														res.score = score;
+														current_uk_residues.add(res);
+														crossLink.location = res.location;
+														saveConflict = false;
+														break;
+													}
+												}
+											}
+										}
+									} else {
+										saveConflict = false;
+
+										if (residue.predictedLocation.contains("TRANSMEM")) {
+											Protein current_ptn_rs = residue.protein;
+											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
+													value -> value.startId >= (res.position - Util.transmemNeighborAA)
+															|| value.endId <= (res.position + Util.transmemNeighborAA))
+													.collect(Collectors.toList());
+
+											if (neighbors.size() > 0) {
+												for (ProteinDomain neighbor : neighbors) {
+													if (!neighbor.name.contains("TRANSMEM")) {
+														res.score = score;
+														crossLink.location = res.location;
+														saveConflict = false;
+
+														if (res.predicted_epoch != epochs) {
+															Residue current_res = new Residue(residue.aminoacid,
+																	residue.location, residue.position,
+																	residue.protein);
+															current_res.history_residues = residue.history_residues;
+															current_res.predicted_epoch = residue.predicted_epoch;
+															current_res.predictedLocation = residue.predictedLocation;
+															current_res.previous_residue = residue.previous_residue;
+															current_res.score = residue.score;
+															current_res.isConflicted = residue.isConflicted;
+															current_res.conflicted_residue = residue.conflicted_residue;
+															res.addHistoryResidue(current_res);
+														}
+
+														res.predictedLocation = neighbor.name;
+														res.predicted_epoch = epochs;
+														res.previous_residue = residue;
+
+														break;
+													}
+												}
+											}
+										} else {
+
+											res.score = score;
+											current_uk_residues.add(res);
+											crossLink.location = res.location;
+										}
+									}
+
+									if (saveConflict) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
 										res.predictedLocation = "UK";
 										res.conflicted_score = score;
-									} else {
-										res.score = score;
-										current_uk_residues.add(res);
-										crossLink.location = res.location;
 									}
 								}
 							}
@@ -1668,24 +1805,93 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_b)
-											&& value.position == crossLink.pos_site_b && !value.isConflicted)
+											&& value.position == crossLink.pos_site_b && !value.isConflicted
+											&& value.predicted_epoch == -1)
 									.findFirst();
 
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
 								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
+
+								boolean saveConflict = true;
 								if (score > res.score) {
 
 									if (Util.considerConflict && res.score != 0
 											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+
+										if (res.predictedLocation.contains("TRANSMEM")) {
+											Protein current_ptn_rs = res.protein;
+											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
+													value -> value.position >= (res.position - Util.transmemNeighborAA)
+															&& value.position <= (res.position
+																	+ Util.transmemNeighborAA))
+													.collect(Collectors.toList());
+
+											if (neighbors.size() > 0) {
+												for (Residue neighbor : neighbors) {
+													if (!neighbor.predictedLocation.contains("TRANSMEM")) {
+														res.score = score;
+														current_uk_residues.add(res);
+														crossLink.location = res.location;
+														saveConflict = false;
+														break;
+													}
+												}
+											}
+										}
+									} else {
+										saveConflict = false;
+
+										if (residue.predictedLocation.contains("TRANSMEM")) {
+											Protein current_ptn_rs = residue.protein;
+											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
+													value -> value.startId <= (res.position + Util.transmemNeighborAA)
+															&& value.startId >= (res.position
+																	- Util.transmemNeighborAA))
+													.collect(Collectors.toList());
+
+											if (neighbors.size() > 0) {
+												for (ProteinDomain neighbor : neighbors) {
+													if (!neighbor.name.contains("TRANSMEM")) {
+														res.score = score;
+														crossLink.location = res.location;
+														saveConflict = false;
+
+														if (res.predicted_epoch != epochs) {
+															Residue current_res = new Residue(residue.aminoacid,
+																	residue.location, residue.position,
+																	residue.protein);
+															current_res.history_residues = residue.history_residues;
+															current_res.predicted_epoch = residue.predicted_epoch;
+															current_res.predictedLocation = residue.predictedLocation;
+															current_res.previous_residue = residue.previous_residue;
+															current_res.score = residue.score;
+															current_res.isConflicted = residue.isConflicted;
+															current_res.conflicted_residue = residue.conflicted_residue;
+															res.addHistoryResidue(current_res);
+														}
+
+														res.predictedLocation = neighbor.name;
+														res.predicted_epoch = epochs;
+														res.previous_residue = residue;
+
+														break;
+													}
+												}
+											}
+										} else {
+
+											res.score = score;
+											current_uk_residues.add(res);
+											crossLink.location = res.location;
+										}
+									}
+
+									if (saveConflict) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
 										res.predictedLocation = "UK";
 										res.conflicted_score = score;
-									} else {
-										res.score = score;
-										current_uk_residues.add(res);
-										crossLink.location = res.location;
 									}
 								}
 							}
@@ -1693,23 +1899,92 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
-											&& value.position == crossLink.pos_site_a && !value.isConflicted)
+											&& value.position == crossLink.pos_site_a && !value.isConflicted
+											&& value.predicted_epoch == -1)
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
 								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
+
+								boolean saveConflict = true;
 								if (score > res.score) {
 
 									if (Util.considerConflict && res.score != 0
 											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+
+										if (res.predictedLocation.contains("TRANSMEM")) {
+											Protein current_ptn_rs = res.protein;
+											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
+													value -> value.position >= (res.position - Util.transmemNeighborAA)
+															&& value.position <= (res.position
+																	+ Util.transmemNeighborAA))
+													.collect(Collectors.toList());
+
+											if (neighbors.size() > 0) {
+												for (Residue neighbor : neighbors) {
+													if (!neighbor.predictedLocation.contains("TRANSMEM")) {
+														res.score = score;
+														current_uk_residues.add(res);
+														crossLink.location = res.location;
+														saveConflict = false;
+														break;
+													}
+												}
+											}
+										}
+									} else {
+										saveConflict = false;
+
+										if (residue.predictedLocation.contains("TRANSMEM")) {
+											Protein current_ptn_rs = residue.protein;
+											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
+													value -> value.startId <= (res.position + Util.transmemNeighborAA)
+															&& value.startId >= (res.position
+																	- Util.transmemNeighborAA))
+													.collect(Collectors.toList());
+
+											if (neighbors.size() > 0) {
+												for (ProteinDomain neighbor : neighbors) {
+													if (!neighbor.name.contains("TRANSMEM")) {
+														res.score = score;
+														crossLink.location = res.location;
+														saveConflict = false;
+
+														if (res.predicted_epoch != epochs) {
+															Residue current_res = new Residue(residue.aminoacid,
+																	residue.location, residue.position,
+																	residue.protein);
+															current_res.history_residues = residue.history_residues;
+															current_res.predicted_epoch = residue.predicted_epoch;
+															current_res.predictedLocation = residue.predictedLocation;
+															current_res.previous_residue = residue.previous_residue;
+															current_res.score = residue.score;
+															current_res.isConflicted = residue.isConflicted;
+															current_res.conflicted_residue = residue.conflicted_residue;
+															res.addHistoryResidue(current_res);
+														}
+
+														res.predictedLocation = neighbor.name;
+														res.predicted_epoch = epochs;
+														res.previous_residue = residue;
+
+														break;
+													}
+												}
+											}
+										} else {
+
+											res.score = score;
+											current_uk_residues.add(res);
+											crossLink.location = res.location;
+										}
+									}
+
+									if (saveConflict) {
 										res.isConflicted = true;
 										res.conflicted_residue = residue;
 										res.predictedLocation = "UK";
 										res.conflicted_score = score;
-									} else {
-										res.score = score;
-										current_uk_residues.add(res);
-										crossLink.location = res.location;
 									}
 								}
 							}

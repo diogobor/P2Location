@@ -98,6 +98,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JSpinner spinner_score;
 	private static JSpinner spinner_specCount;
 	private static JSpinner spinner_neighborAA;
+	private static JSpinner spinner_transmem_neighborAA;
 	private static JSpinner spinner_width_edge_link;
 	private static JSpinner spinner_score_intralink;
 	private static JSpinner spinner_score_interlink;
@@ -467,13 +468,37 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 			@Override
 			public void stateChanged(ChangeEvent e) {
-				Util.specCount = (Integer) spinner_neighborAA.getValue();
+				Util.neighborAA = (Integer) spinner_neighborAA.getValue();
 				P2LocationProps.setProperty("p2location.neighborAA", Util.neighborAA.toString());
 
 			}
 		});
 		spinner_neighborAA.setToolTipText("Set a value between 0 and 100.");
 		link_panel.add(spinner_neighborAA);
+		offset_y += 30;
+		
+		SpinnerModel model_transmem_neighborAA = new SpinnerNumberModel(Util.neighborAA.intValue(), // initial
+				// value
+				1, // min
+				255, // max
+				1); // step
+		spinner_transmem_neighborAA = new JSpinner(model_transmem_neighborAA);
+		spinner_transmem_neighborAA.setBounds(offset_x, offset_y, 60, 20);
+		JComponent comp_transmem_neighborAA = spinner_transmem_neighborAA.getEditor();
+		JFormattedTextField field_transmem_neighborAA = (JFormattedTextField) comp_transmem_neighborAA.getComponent(0);
+		DefaultFormatter formatter_transmem_neighborAA = (DefaultFormatter) field_transmem_neighborAA.getFormatter();
+		formatter_transmem_neighborAA.setCommitsOnValidEdit(true);
+		spinner_transmem_neighborAA.addChangeListener(new ChangeListener() {
+
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				Util.transmemNeighborAA = (Integer) spinner_transmem_neighborAA.getValue();
+				P2LocationProps.setProperty("p2location.transmem_neighborAA", Util.transmemNeighborAA.toString());
+
+			}
+		});
+		spinner_transmem_neighborAA.setToolTipText("Set a value between 0 and 100.");
+		link_panel.add(spinner_transmem_neighborAA);
 
 		// Checkbox Conflict -> add + 30
 		offset_y += 60;
@@ -629,11 +654,11 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	 */
 	private void init_prediction_features(int offset_x, int combobox_width) {
 
-		int offset_y = 15;
+		int offset_y = 25;
 		display_prediction_panel = new JPanel();
 		display_prediction_panel.setBackground(Color.WHITE);
 		display_prediction_panel.setBorder(BorderFactory.createTitledBorder("Display"));
-		display_prediction_panel.setBounds(10, offset_y + 195, 230, 115);
+		display_prediction_panel.setBounds(10, offset_y + 195, 290, 115);
 		display_prediction_panel.setLayout(null);
 		link_panel.add(display_prediction_panel);
 
@@ -655,7 +680,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		// Create the combo box, select item at index 4.
 		// Indices start at 0, so 4 specifies the pig.
 		epochCombobox = new JComboBox(epochsList.toArray());
-		epochCombobox.setBounds(offset_x, offset_y, 100, 40);
+		epochCombobox.setBounds(offset_x, offset_y, 70, 40);
 		epochCombobox.setSelectedIndex(epochsList.size() - 1);
 		epochCombobox.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -1160,10 +1185,16 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		link_panel.add(enable_specCount);
 		offset_y += 20;
 
-		JLabel neighbor_aa = new JLabel("# Neighbor AA");
+		JLabel neighbor_aa = new JLabel("# Neighbor AA - Residue:");
 		neighbor_aa.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		neighbor_aa.setBounds(10, offset_y, 100, 40);
+		neighbor_aa.setBounds(10, offset_y, 150, 40);
 		link_panel.add(neighbor_aa);
+		offset_y += 30;
+		
+		JLabel transmem_neighbor_aa = new JLabel("# Neighbor AA - Transmembrane:");
+		transmem_neighbor_aa.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		transmem_neighbor_aa.setBounds(10, offset_y, 190, 40);
+		link_panel.add(transmem_neighbor_aa);
 		offset_y += 40;
 
 		enable_conflict = new JCheckBox("Consider conflict");
@@ -1451,10 +1482,10 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		this.setBackground(Color.WHITE);
 
 		int button_width = 38;
-		int offset_x = 105;// MacOS and Unix
+		int offset_x = 205;// MacOS and Unix
 		int ipdax = 300;// MacOS and Unix
 		if (Util.isWindows()) {
-			offset_x = 95;
+			offset_x = 195;
 			ipdax = 250;
 		}
 

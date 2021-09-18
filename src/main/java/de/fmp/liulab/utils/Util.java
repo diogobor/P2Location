@@ -143,6 +143,7 @@ public class Util {
 	public static double threshold_score = 10;
 	public static boolean getThreshold_score = false;
 	public static Integer neighborAA = 5;
+	public static Integer transmemNeighborAA = 5;
 	public static boolean considerConflict = true;
 
 	// Map<Network name,List<Protein>
