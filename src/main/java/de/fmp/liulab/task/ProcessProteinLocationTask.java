@@ -76,8 +76,8 @@ import de.fmp.liulab.utils.Util;
 public class ProcessProteinLocationTask extends AbstractTask implements ActionListener {
 
 	private CyApplicationManager cyApplicationManager;
-	private CyNetwork myNetwork;
-	private CyCustomGraphics2Factory vgFactory;
+	private static CyNetwork myNetwork;
+//	private CyCustomGraphics2Factory<?> vgFactory;
 
 	public static VisualLexicon lexicon;
 	public static VisualStyle style;
@@ -93,10 +93,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private static JTable mainProteinDomainTable;
 	public static DefaultTableModel tableDataModel;
 	private static String[] columnNames = { "Node Name", "Sequence", "Domain(s)" };
+	@SuppressWarnings("rawtypes")
 	private final Class[] columnClass = new Class[] { String.class, String.class, String.class };
 	private String rowstring, value;
 	private Clipboard clipboard;
 	private StringSelection stsel;
+	@SuppressWarnings("rawtypes")
 	private static JList rowHeader;
 	private static JScrollPane proteinDomainTableScrollPanel;
 
@@ -117,13 +119,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 	public static Thread disposeMainJFrameThread;
 
-	private final String UNKNOWN_RESIDUE = "UK";
+	private final static String UNKNOWN_RESIDUE = "UK";
 	private boolean predictLocation = false;
 	private boolean updateAnnotationDomain = false;
 
 	// Map<domain name, residues>
-	private HashMap<String, List<Residue>> compartments = new HashMap<String, List<Residue>>();
+	private static HashMap<String, List<Residue>> compartments = new HashMap<String, List<Residue>>();
 	private List<Residue> all_unknownResidues;
+	private static List<Residue> all_knownResidues;
 	public static int epochs = 1;
 	public static HashMap<Integer, Integer> number_unknown_residues = new HashMap<Integer, Integer>();
 
@@ -137,16 +140,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * @param vmmServiceRef        visual mapping manager
 	 * @param vgFactory            graphic factory
 	 */
+	@SuppressWarnings("static-access")
 	public ProcessProteinLocationTask(CyApplicationManager cyApplicationManager,
-			final VisualMappingManager vmmServiceRef, CyCustomGraphics2Factory vgFactory, boolean predictLocation,
-			boolean updateAnnotationDomain) {
+			final VisualMappingManager vmmServiceRef, @SuppressWarnings("rawtypes") CyCustomGraphics2Factory vgFactory,
+			boolean predictLocation, boolean updateAnnotationDomain) {
 
 		this.predictLocation = predictLocation;
 		this.updateAnnotationDomain = updateAnnotationDomain;
 		this.menuBar.domain_ptm_or_monolink = 0;
 		this.cyApplicationManager = cyApplicationManager;
 		this.myNetwork = cyApplicationManager.getCurrentNetwork();
-		this.vgFactory = vgFactory;
+//		this.vgFactory = vgFactory;
 
 		this.style = vmmServiceRef.getCurrentVisualStyle();
 		// Get the current Visual Lexicon
@@ -918,7 +922,18 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						}
 
 						if (Util.proteinsMap.size() > 0) {
-							Util.updateProteins(taskMonitor, myNetwork, textLabel_status_result);
+
+							// Get cross-links
+							Util.getXLs(taskMonitor, myNetwork, textLabel_status_result);
+							Util.updateAllXLLocationBasedOnProteinDomains(taskMonitor, myNetwork,
+									textLabel_status_result);
+
+							// Check conflict among stored residues
+							OrganizeResidueCompartment(taskMonitor);
+							all_knownResidues = getAllKnownResidues();
+							ComputeNewResidues(taskMonitor, all_knownResidues, true);
+
+							Util.updateProteins(taskMonitor, myNetwork, textLabel_status_result, false);
 						}
 
 						taskMonitor.setProgress(1.0);
@@ -1432,6 +1447,25 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	}
 
 	/**
+	 * Method responsible for getting all know residues
+	 * 
+	 * @return
+	 */
+	private static List<Residue> getAllKnownResidues() {
+
+		List<Residue> all_knownResidues = new ArrayList<Residue>();
+		for (Map.Entry<String, List<Residue>> compartment : compartments.entrySet()) {
+
+			if (compartment.getKey().equals(UNKNOWN_RESIDUE))
+				continue;
+
+			all_knownResidues.addAll(compartment.getValue());
+		}
+
+		return all_knownResidues;
+	}
+
+	/**
 	 * Method responsible for starting the prediction location process
 	 * 
 	 * @param taskMonitor
@@ -1461,7 +1495,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			if (uk_res == old_number_uk_residues)
 				break;
 
-			ComputeNewResidues(taskMonitor);
+			ComputeNewResidues(taskMonitor, all_unknownResidues, false);
 			if (compartments.get(UNKNOWN_RESIDUE) != null)
 				old_number_uk_residues = compartments.get(UNKNOWN_RESIDUE).size();
 			else
@@ -1501,7 +1535,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	/**
 	 * Method responsible for organizing residues according to residue location
 	 */
-	private void OrganizeResidueCompartment(TaskMonitor taskMonitor) {
+	private static void OrganizeResidueCompartment(TaskMonitor taskMonitor) {
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
 		compartments = new HashMap<String, List<Residue>>();
@@ -1570,7 +1604,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * @param epochs
 	 * @param taskMonitor
 	 */
-	private void ComputeNewResidues(TaskMonitor taskMonitor) {
+	private static void ComputeNewResidues(TaskMonitor taskMonitor, List<Residue> residue_collection,
+			boolean isKnownResidues) {
 
 		int old_progress = 0;
 		int summary_processed = 0;
@@ -1604,7 +1639,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 						// It means the current residue is A
 						if (crossLink.pos_site_a == pos) {
-							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
+							Optional<Residue> isResiduePresent = residue_collection.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
 											&& value.position == crossLink.pos_site_b && !value.isConflicted
 											&& value.predicted_epoch == -1)
@@ -1616,8 +1651,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								boolean saveConflict = true;
 								if (score > res.score) {
 
-									if (Util.considerConflict && res.score != 0
+									if (Util.considerConflict
 											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+
+										if (!(isKnownResidues && res.score == 0))
+											saveConflict = false;
 
 										if (res.predictedLocation.contains("TRANSMEM")) {
 											Protein current_ptn_rs = res.protein;
@@ -1697,7 +1735,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							}
 						} else {// It means the current residue is B
 
-							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
+							Optional<Residue> isResiduePresent = residue_collection.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
 											&& value.position == crossLink.pos_site_a && !value.isConflicted
 											&& value.predicted_epoch == -1)
@@ -1709,8 +1747,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								boolean saveConflict = true;
 								if (score > res.score) {
 
-									if (Util.considerConflict && res.score != 0
+									if (Util.considerConflict
 											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+
+										if (!(isKnownResidues && res.score == 0))
+											saveConflict = false;
 
 										if (res.predictedLocation.contains("TRANSMEM")) {
 											Protein current_ptn_rs = res.protein;
@@ -1803,7 +1844,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						// It means the current residue is A
 						if (crossLink.protein_a.equals(protein.proteinID) && crossLink.pos_site_a == pos) {
 
-							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
+							Optional<Residue> isResiduePresent = residue_collection.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_b)
 											&& value.position == crossLink.pos_site_b && !value.isConflicted
 											&& value.predicted_epoch == -1)
@@ -1816,8 +1857,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								boolean saveConflict = true;
 								if (score > res.score) {
 
-									if (Util.considerConflict && res.score != 0
+									if (Util.considerConflict
 											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+
+										if (!(isKnownResidues && res.score == 0))
+											saveConflict = false;
 
 										if (res.predictedLocation.contains("TRANSMEM")) {
 											Protein current_ptn_rs = res.protein;
@@ -1897,7 +1941,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							}
 						} else {// It means the current residue is B
 
-							Optional<Residue> isResiduePresent = all_unknownResidues.stream()
+							Optional<Residue> isResiduePresent = residue_collection.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
 											&& value.position == crossLink.pos_site_a && !value.isConflicted
 											&& value.predicted_epoch == -1)
@@ -1909,8 +1953,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								boolean saveConflict = true;
 								if (score > res.score) {
 
-									if (Util.considerConflict && res.score != 0
+									if (Util.considerConflict
 											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+
+										if (!(isKnownResidues && res.score == 0))
+											saveConflict = false;
 
 										if (res.predictedLocation.contains("TRANSMEM")) {
 											Protein current_ptn_rs = res.protein;
@@ -2149,7 +2196,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		// Annotate neighbor amino acids based on predicted location
 		AnnotateNeighborAminoAcids();
 
-		Util.updateProteins(taskMonitor, myNetwork, null);
+		Util.updateProteins(taskMonitor, myNetwork, null, true);
 	}
 
 	/**

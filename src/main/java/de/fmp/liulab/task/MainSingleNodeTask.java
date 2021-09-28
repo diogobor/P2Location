@@ -418,7 +418,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 				_myProtein.domains = proteinDomainList;
 			}
 
-			Util.updateProteins(taskMonitor, myNetwork, null);
+			Util.updateProteins(taskMonitor, myNetwork, null, true);
 		}
 	}
 

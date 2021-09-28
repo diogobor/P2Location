@@ -156,8 +156,12 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 
 		// The last residue will be the target residue
 		List<Residue> dependent_residues = myResidue.history_residues;
+		if (dependent_residues == null) {
+			dependent_residues = new ArrayList<Residue>();
+			dependent_residues.add(myResidue);
+		}
 
-		if (dependent_residues.get(0).conflicted_residue == null)
+		if (dependent_residues.size() > 0 && dependent_residues.get(0).conflicted_residue == null)
 			// Now the target residue is the first element of the list
 			Collections.reverse(dependent_residues);
 
@@ -206,19 +210,21 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 		myNetwork.getRow(conflicted_edge).set(CyNetwork.NAME, conflicted_edge_name);
 
 		// Add edges
-		for (int i = 0; i < dependent_residues.size(); i += 2) {
-			// RESIDUE1 [Source: PTN (POSITION)]
-			String node_name = "Residue" + (i + 1) + " [Source: " + dependent_residues.get(i).protein.gene + " ("
-					+ dependent_residues.get(i).position + ")]";
-			CyNode node1 = Util.getNode(myNetwork, node_name);
+		if (dependent_residues.size() > 1) {
+			for (int i = 0; i < dependent_residues.size(); i += 2) {
+				// RESIDUE1 [Source: PTN (POSITION)]
+				String node_name = "Residue" + (i + 1) + " [Source: " + dependent_residues.get(i).protein.gene + " ("
+						+ dependent_residues.get(i).position + ")]";
+				CyNode node1 = Util.getNode(myNetwork, node_name);
 
-			String node_name_2 = "Residue" + (i + 2) + " [Source: " + dependent_residues.get(i + 1).protein.gene + " ("
-					+ dependent_residues.get(i + 1).position + ")]";
-			CyNode node2 = Util.getNode(myNetwork, node_name_2);
-			CyEdge edge = myNetwork.addEdge(node1, node2, false);
+				String node_name_2 = "Residue" + (i + 2) + " [Source: " + dependent_residues.get(i + 1).protein.gene
+						+ " (" + dependent_residues.get(i + 1).position + ")]";
+				CyNode node2 = Util.getNode(myNetwork, node_name_2);
+				CyEdge edge = myNetwork.addEdge(node1, node2, false);
 
-			String edge_name = "RESIDUE" + (i + 1) + " - RESIDUE" + (i + 2);
-			myNetwork.getRow(edge).set(CyNetwork.NAME, edge_name);
+				String edge_name = "RESIDUE" + (i + 1) + " - RESIDUE" + (i + 2);
+				myNetwork.getRow(edge).set(CyNetwork.NAME, edge_name);
+			}
 		}
 
 		myNetwork.getRow(myNetwork).set(CyNetwork.NAME, "RESIDUE_TREE - Protein: " + myResidue.protein.gene + " - "
@@ -496,6 +502,10 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 
 		// The first residue will be the target residue
 		List<Residue> dependent_residues = myResidue.history_residues;
+		if (dependent_residues == null) {
+			dependent_residues = new ArrayList<Residue>();
+			dependent_residues.add(myResidue);
+		}
 
 		double y_location = 100;
 		for (int i = 0; i < dependent_residues.size(); i++) {
@@ -565,32 +575,39 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 		}
 
 		// Add edge labels with the score
-		for (int i = 0; i < dependent_residues.size(); i += 2) {
-			String edge_name = "RESIDUE" + (i + 1) + " - RESIDUE" + (i + 2);
-			CyEdge new_edge = Util.getEdge(myNetwork, edge_name, false);
+		if (dependent_residues.size() > 1) {
+			for (int i = 0; i < dependent_residues.size(); i += 2) {
+				String edge_name = "RESIDUE" + (i + 1) + " - RESIDUE" + (i + 2);
+				CyEdge new_edge = Util.getEdge(myNetwork, edge_name, false);
 
-			if (new_edge == null)
-				continue;
+				if (new_edge == null)
+					continue;
 
-			View<CyEdge> new_edgeView = view.getEdgeView(new_edge);
-			new_edgeView.setLockedValue(BasicVisualLexicon.EDGE_LABEL,
-					"Score: " + String.format("%.4f", dependent_residues.get(i).score));
+				View<CyEdge> new_edgeView = view.getEdgeView(new_edge);
+				new_edgeView.setLockedValue(BasicVisualLexicon.EDGE_LABEL,
+						"Score: " + String.format("%.4f", dependent_residues.get(i).score));
 
-			Protein new_protein_with_only_target_xls = new Protein(dependent_residues.get(i).protein.proteinID,
-					dependent_residues.get(i).protein.gene, dependent_residues.get(i).protein.sequence);
+				String tooltip = "<html><p>" + dependent_residues.get(i).protein.gene + " ["
+						+ dependent_residues.get(i).position + "] - " + dependent_residues.get(i + 1).protein.gene
+						+ " [" + dependent_residues.get(i + 1).position + "]</p></html>";
+				new_edgeView.setLockedValue(BasicVisualLexicon.EDGE_TOOLTIP, tooltip);
 
-			new_protein_with_only_target_xls.intraLinks = this.getInterestedIntraLinks(dependent_residues.get(i));
-			new_protein_with_only_target_xls.interLinks = this.getInterestedInterLinks(dependent_residues.get(i));
+				Protein new_protein_with_only_target_xls = new Protein(dependent_residues.get(i).protein.proteinID,
+						dependent_residues.get(i).protein.gene, dependent_residues.get(i).protein.sequence);
 
-			String node_name = "Residue" + (i + 1) + " [Source: " + dependent_residues.get(i).protein.gene + " ("
-					+ dependent_residues.get(i).position + ")]";
-			CyNode new_node = Util.getNode(myNetwork, node_name);
+				new_protein_with_only_target_xls.intraLinks = this.getInterestedIntraLinks(dependent_residues.get(i));
+				new_protein_with_only_target_xls.interLinks = this.getInterestedInterLinks(dependent_residues.get(i));
 
-			if (new_node == null)
-				continue;
+				String node_name = "Residue" + (i + 1) + " [Source: " + dependent_residues.get(i).protein.gene + " ("
+						+ dependent_residues.get(i).position + ")]";
+				CyNode new_node = Util.getNode(myNetwork, node_name);
 
-			Util.setProteinLength(new_protein_with_only_target_xls.sequence.length());
-			plotInterLink(myNetwork, view, new_node, new_protein_with_only_target_xls);
+				if (new_node == null)
+					continue;
+
+				Util.setProteinLength(new_protein_with_only_target_xls.sequence.length());
+				plotInterLink(myNetwork, view, new_node, new_protein_with_only_target_xls);
+			}
 		}
 
 		// Conflicted_edge
@@ -601,6 +618,11 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 			View<CyEdge> conflicted_edgeView = view.getEdgeView(conflicted_edge);
 			conflicted_edgeView.setLockedValue(BasicVisualLexicon.EDGE_LABEL,
 					"Score: " + String.format("%.4f", myResidue.conflicted_score));
+			
+			String tooltip = "<html><p>" + dependent_residues.get(0).protein.gene + " ["
+					+ dependent_residues.get(0).position + "] - " + myResidue.conflicted_residue.protein.gene
+					+ " [" + myResidue.conflicted_residue.position + "]</p></html>";
+			conflicted_edgeView.setLockedValue(BasicVisualLexicon.EDGE_TOOLTIP, tooltip);
 		}
 	}
 

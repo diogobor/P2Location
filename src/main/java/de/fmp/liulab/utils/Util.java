@@ -882,13 +882,53 @@ public class Util {
 		return _edge;
 	}
 
+	@SuppressWarnings("unchecked")
+	public static void getXLs(TaskMonitor taskMonitor, CyNetwork myNetwork, JLabel textLabel_status_result) {
+
+		if (taskMonitor != null)
+			taskMonitor.setTitle("Getting cross-links");
+
+		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
+			return;
+
+		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		if (proteinList == null || proteinList.size() == 0)
+			return;
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_rows = proteinList.size();
+
+		for (final Protein protein : proteinList) {
+
+			CyNode node = getNode(myNetwork, protein.gene);
+			if (node == null)
+				continue;
+
+			/**
+			 * Get intra and interlinks
+			 */
+			if (protein.interLinks == null && protein.intraLinks == null) {
+				Tuple2 inter_and_intralinks = Util.getAllLinksFromNode(node, myNetwork);
+				protein.interLinks = (ArrayList<CrossLink>) inter_and_intralinks.getFirst();
+				protein.intraLinks = (ArrayList<CrossLink>) inter_and_intralinks.getSecond();
+			}
+
+			summary_processed++;
+			progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ", taskMonitor,
+					textLabel_status_result);
+
+		}
+	}
+
 	/**
 	 * Update Protein domain column
 	 * 
 	 * @param taskMonitor task monitor
 	 * @param myNetwork   current network
 	 */
-	public static void updateProteins(TaskMonitor taskMonitor, CyNetwork myNetwork, JLabel textLabel_status_result) {
+	public static void updateProteins(TaskMonitor taskMonitor, CyNetwork myNetwork, JLabel textLabel_status_result,
+			boolean getXLs) {
 
 		if (taskMonitor != null)
 			taskMonitor.setTitle("Updating proteins");
@@ -917,10 +957,8 @@ public class Util {
 			/**
 			 * Get intra and interlinks
 			 */
-			if (protein.interLinks == null && protein.intraLinks == null) {
-				Tuple2 inter_and_intralinks = Util.getAllLinksFromNode(node, myNetwork);
-				protein.interLinks = (ArrayList<CrossLink>) inter_and_intralinks.getFirst();
-				protein.intraLinks = (ArrayList<CrossLink>) inter_and_intralinks.getSecond();
+			if (getXLs) {
+				getXLs(taskMonitor, myNetwork, textLabel_status_result);
 			}
 
 			summary_processed++;
@@ -928,19 +966,9 @@ public class Util {
 					textLabel_status_result);
 		}
 
-		/**
-		 * Update CrossLinks location based on protein domain name
-		 */
-		old_progress = 0;
-		summary_processed = 0;
-		total_rows = proteinList.size();
-		for (final Protein protein : proteinList) {
-			updateCrosslinksLocationBasedOnProteinDomains(myNetwork, protein);
+		if (getXLs)
+			updateAllXLLocationBasedOnProteinDomains(taskMonitor, myNetwork, textLabel_status_result);
 
-			summary_processed++;
-			progressBar(summary_processed, old_progress, total_rows, "Updating cross-link information: ", taskMonitor,
-					textLabel_status_result);
-		}
 	}
 
 	private static void fillConflictedResiduesColumn(CyNetwork myNetwork, final Protein protein, CyNode node) {
@@ -1085,6 +1113,41 @@ public class Util {
 					myNetwork.getRow(node).set(columnName, new ArrayList<String>());
 			}
 		}
+	}
+
+	/**
+	 * Method responsible for updating all cross-links location based on protein
+	 * domains
+	 * 
+	 * @param taskMonitor
+	 * @param myNetwork
+	 * @param textLabel_status_result
+	 */
+	public static void updateAllXLLocationBasedOnProteinDomains(TaskMonitor taskMonitor, CyNetwork myNetwork,
+			JLabel textLabel_status_result) {
+
+		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		if (proteinList == null || proteinList.size() == 0)
+			return;
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_rows = proteinList.size();
+
+		/**
+		 * Update CrossLinks location based on protein domain name
+		 */
+		old_progress = 0;
+		summary_processed = 0;
+		total_rows = proteinList.size();
+		for (final Protein protein : proteinList) {
+			updateCrosslinksLocationBasedOnProteinDomains(myNetwork, protein);
+
+			summary_processed++;
+			progressBar(summary_processed, old_progress, total_rows, "Updating cross-link information: ", taskMonitor,
+					textLabel_status_result);
+		}
+
 	}
 
 	/**
@@ -2374,8 +2437,12 @@ public class Util {
 				tooltip = "<html><p><b>Residue: </b>" + residue.aminoacid + " [" + residue.position
 						+ "]<br/><b>Predicted: </b>" + (residue.predicted_epoch != -1) + "<br/><b>Epoch: </b>"
 						+ residue.predicted_epoch + "<br/><u><i>There is a conflict.</i></u>";
-		} else
-			tooltip = "<html><p><b>Residue: </b> " + residue.aminoacid + " [" + residue.position + "]<br/>";
+		} else {
+			if (!residue.isConflicted)
+				tooltip = "<html><p><b>Residue: </b> " + residue.aminoacid + " [" + residue.position + "]<br/>";
+			else
+				tooltip = "<html><p><b>Residue: </b> " + residue.aminoacid + " [" + residue.position + "]<br/><u><i>There is a conflict.</i></u>";
+		}
 
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP, tooltip);
 
@@ -3702,7 +3769,7 @@ public class Util {
 				taskMonitor.showMessage(TaskMonitor.Level.INFO, message + old_progress + "%");
 
 			if (textLabel_status_result != null)
-				textLabel_status_result.setText("Defining styles for cross-links: " + old_progress + "%");
+				textLabel_status_result.setText(message + old_progress + "%");
 		}
 	}
 

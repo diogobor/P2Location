@@ -446,7 +446,7 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			}
 		}
 
-		Util.updateProteins(taskMonitor, myNetwork, null);
+		Util.updateProteins(taskMonitor, myNetwork, null, true);
 
 		isProcessing = false;
 	}
