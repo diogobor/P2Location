@@ -882,11 +882,50 @@ public class Util {
 		return _edge;
 	}
 
+	/**
+	 * Method responsible for getting cross-links of one protein
+	 * 
+	 * @param taskMonitor             current task monitor
+	 * @param protein                 current protein
+	 * @param myNetwork               current network
+	 * @param textLabel_status_result current text label status
+	 */
 	@SuppressWarnings("unchecked")
-	public static void getXLs(TaskMonitor taskMonitor, CyNetwork myNetwork, JLabel textLabel_status_result) {
+	public static void getXLsOneProtein(TaskMonitor taskMonitor, Protein protein, CyNetwork myNetwork,
+			JLabel textLabel_status_result) {
 
 		if (taskMonitor != null)
-			taskMonitor.setTitle("Getting cross-links");
+			taskMonitor.setTitle("Getting cross-links of protein: " + protein.gene);
+
+		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
+			return;
+
+		CyNode node = getNode(myNetwork, protein.gene);
+		if (node == null)
+			return;
+
+		/**
+		 * Get intra and interlinks
+		 */
+		if (protein.interLinks == null && protein.intraLinks == null) {
+			Tuple2 inter_and_intralinks = Util.getAllLinksFromNode(node, myNetwork);
+			protein.interLinks = (ArrayList<CrossLink>) inter_and_intralinks.getFirst();
+			protein.intraLinks = (ArrayList<CrossLink>) inter_and_intralinks.getSecond();
+		}
+
+	}
+
+	/**
+	 * Method responsible for getting cross-links of all proteins
+	 * 
+	 * @param taskMonitor             current task monitor
+	 * @param myNetwork               current network
+	 * @param textLabel_status_result current text label status
+	 */
+	public static void getXLsAllProteins(TaskMonitor taskMonitor, CyNetwork myNetwork, JLabel textLabel_status_result) {
+
+		if (taskMonitor != null)
+			taskMonitor.setTitle("Getting cross-links of all proteins...");
 
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return;
@@ -901,18 +940,7 @@ public class Util {
 
 		for (final Protein protein : proteinList) {
 
-			CyNode node = getNode(myNetwork, protein.gene);
-			if (node == null)
-				continue;
-
-			/**
-			 * Get intra and interlinks
-			 */
-			if (protein.interLinks == null && protein.intraLinks == null) {
-				Tuple2 inter_and_intralinks = Util.getAllLinksFromNode(node, myNetwork);
-				protein.interLinks = (ArrayList<CrossLink>) inter_and_intralinks.getFirst();
-				protein.intraLinks = (ArrayList<CrossLink>) inter_and_intralinks.getSecond();
-			}
+			getXLsOneProtein(taskMonitor, protein, myNetwork, textLabel_status_result);
 
 			summary_processed++;
 			progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ", taskMonitor,
@@ -958,7 +986,8 @@ public class Util {
 			 * Get intra and interlinks
 			 */
 			if (getXLs) {
-				getXLs(taskMonitor, myNetwork, textLabel_status_result);
+				if (protein.interLinks == null && protein.intraLinks == null)
+					getXLsOneProtein(taskMonitor, protein, myNetwork, textLabel_status_result);
 			}
 
 			summary_processed++;
@@ -2441,7 +2470,8 @@ public class Util {
 			if (!residue.isConflicted)
 				tooltip = "<html><p><b>Residue: </b> " + residue.aminoacid + " [" + residue.position + "]<br/>";
 			else
-				tooltip = "<html><p><b>Residue: </b> " + residue.aminoacid + " [" + residue.position + "]<br/><u><i>There is a conflict.</i></u>";
+				tooltip = "<html><p><b>Residue: </b> " + residue.aminoacid + " [" + residue.position
+						+ "]<br/><u><i>There is a conflict.</i></u>";
 		}
 
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP, tooltip);
@@ -3758,7 +3788,7 @@ public class Util {
 	 * @param message           message to display
 	 * @param taskMonitor       task monitor
 	 */
-	private static void progressBar(int summary_processed, int old_progress, int total_process, String message,
+	public static void progressBar(int summary_processed, int old_progress, int total_process, String message,
 			TaskMonitor taskMonitor, JLabel textLabel_status_result) {
 
 		int new_progress = (int) ((double) summary_processed / (total_process) * 100);

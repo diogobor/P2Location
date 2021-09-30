@@ -7,6 +7,7 @@ import javax.swing.JFileChooser;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 
 import de.fmp.liulab.parser.Parser;
 
@@ -49,7 +50,7 @@ public class MenuBar implements ActionListener {
 			try {
 				parserFile.updateDataModel(domain_ptm_or_monolink);
 			} catch (Exception e) {
-				e.printStackTrace();
+				JOptionPane.showMessageDialog(null, e.getMessage(), "P2Location - Error", JOptionPane.ERROR_MESSAGE);
 			}
 		}
 	}

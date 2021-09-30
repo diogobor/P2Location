@@ -100,8 +100,8 @@ public class Parser {
 						if (index == -1)
 							index = Arrays.asList(uniprot_header_lines).indexOf("Gene names  (ordered locus )");
 						if (index == -1)
-							return;
-
+							throw new Exception("ERROR: 'Gene name' column has not been found in the file.");
+						
 						if (index < each_line_cols.length)
 							gene_name = each_line_cols[index];
 
@@ -230,6 +230,8 @@ public class Parser {
 
 				}
 			} catch (Exception e) {
+				if(e.getMessage().startsWith("ERROR: 'Gene name' column"))
+					throw new Exception("ERROR: 'Gene name' column has not been found in the file.");
 			}
 		}
 

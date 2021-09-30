@@ -924,15 +924,16 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						if (Util.proteinsMap.size() > 0) {
 
 							// Get cross-links
-							Util.getXLs(taskMonitor, myNetwork, textLabel_status_result);
+							Util.getXLsAllProteins(taskMonitor, myNetwork, textLabel_status_result);
 							Util.updateAllXLLocationBasedOnProteinDomains(taskMonitor, myNetwork,
 									textLabel_status_result);
 
 							// Check conflict among stored residues
-							OrganizeResidueCompartment(taskMonitor);
-							all_knownResidues = getAllKnownResidues();
-							ComputeNewResidues(taskMonitor, all_knownResidues, true);
-
+							if (Util.considerConflict) {
+								OrganizeResidueCompartment(taskMonitor);
+								all_knownResidues = getAllKnownResidues();
+								ComputeNewResidues(taskMonitor, all_knownResidues, true);
+							}
 							Util.updateProteins(taskMonitor, myNetwork, textLabel_status_result, false);
 						}
 
@@ -1466,11 +1467,48 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	}
 
 	/**
+	 * Method responsible for restoring parameters of residues that contain original
+	 * domain
+	 * 
+	 * @param taskMonitor task monitor
+	 */
+	private void restoreParamsOriginalResidues(TaskMonitor taskMonitor) {
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_ptns = allProteins.size();
+
+		for (final Protein protein : allProteins) {
+			List<Residue> residues = protein.reactionSites;
+
+			if (residues == null)
+				continue;
+
+			for (Residue residue : residues) {
+				if (residue.predictedLocation.equals("UK"))
+					continue;
+
+				residue.history_residues = null;
+				residue.predicted_epoch = -1;
+				residue.previous_residue = null;
+				residue.score = 0.0;
+			}
+
+			Util.progressBar(summary_processed, old_progress, total_ptns, "Restoring residues parameters: ",
+					taskMonitor, null);
+		}
+	}
+
+	/**
 	 * Method responsible for starting the prediction location process
 	 * 
 	 * @param taskMonitor
 	 */
 	private void processLocation(TaskMonitor taskMonitor) {
+
+		restoreParamsOriginalResidues(taskMonitor);
 
 		epochs = 1;
 		int old_number_uk_residues = 0;
@@ -1588,13 +1626,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			}
 
 			summary_processed++;
-			int new_progress = (int) ((double) summary_processed / (total_ptns) * 100);
-			if (new_progress > old_progress) {
-				old_progress = new_progress;
 
-				taskMonitor.showMessage(TaskMonitor.Level.INFO,
-						"Epoch: " + epochs + "\nOrganizing residue compartments: " + old_progress + "%");
-			}
+			Util.progressBar(summary_processed, old_progress, total_ptns,
+					"Epoch: " + epochs + "\nOrganizing residue compartments: ", taskMonitor, null);
+
 		}
 	}
 
@@ -1651,8 +1686,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								boolean saveConflict = true;
 								if (score > res.score) {
 
-									if (Util.considerConflict
-											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+									if (Util.considerConflict && ((!isKnownResidues
+											&& !res.predictedLocation.equals(residue.predictedLocation))
+											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
 										if (!(isKnownResidues && res.score == 0))
 											saveConflict = false;
@@ -1676,6 +1712,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 													}
 												}
 											}
+										} else if (!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation)) {
+											// It will save the new prediction if the current process is not 'known
+											// residues'
+											res.score = score;
+											current_uk_residues.add(res);
+											crossLink.location = res.location;
 										}
 									} else {
 										saveConflict = false;
@@ -1717,8 +1760,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 													}
 												}
 											}
-										} else {
-
+										} else if (!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation)) {
+											// It will save the new prediction if the current process is not 'known
+											// residues'
 											res.score = score;
 											current_uk_residues.add(res);
 											crossLink.location = res.location;
@@ -1747,8 +1792,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								boolean saveConflict = true;
 								if (score > res.score) {
 
-									if (Util.considerConflict
-											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+									if (Util.considerConflict && ((!isKnownResidues
+											&& !res.predictedLocation.equals(residue.predictedLocation))
+											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
 										if (!(isKnownResidues && res.score == 0))
 											saveConflict = false;
@@ -1772,6 +1818,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 													}
 												}
 											}
+										} else if (!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation)) {
+											// It will save the new prediction if the current process is not 'known
+											// residues'
+											res.score = score;
+											current_uk_residues.add(res);
+											crossLink.location = res.location;
 										}
 									} else {
 										saveConflict = false;
@@ -1812,8 +1865,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 													}
 												}
 											}
-										} else {
-
+										} else if (!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation)) {
+											// It will save the new prediction if the current process is not 'known
+											// residues'
 											res.score = score;
 											current_uk_residues.add(res);
 											crossLink.location = res.location;
@@ -1857,8 +1912,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								boolean saveConflict = true;
 								if (score > res.score) {
 
-									if (Util.considerConflict
-											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+									if (Util.considerConflict && ((!isKnownResidues
+											&& !res.predictedLocation.equals(residue.predictedLocation))
+											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
 										if (!(isKnownResidues && res.score == 0))
 											saveConflict = false;
@@ -1882,6 +1938,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 													}
 												}
 											}
+										} else if (!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation)) {
+											// It will save the new prediction if the current process is not 'known
+											// residues'
+											res.score = score;
+											current_uk_residues.add(res);
+											crossLink.location = res.location;
 										}
 									} else {
 										saveConflict = false;
@@ -1923,8 +1986,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 													}
 												}
 											}
-										} else {
-
+										} else if (!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation)) {
+											// It will save the new prediction if the current process is not 'known
+											// residues'
 											res.score = score;
 											current_uk_residues.add(res);
 											crossLink.location = res.location;
@@ -1953,8 +2018,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								boolean saveConflict = true;
 								if (score > res.score) {
 
-									if (Util.considerConflict
-											&& !res.predictedLocation.equals(residue.predictedLocation)) {
+									if (Util.considerConflict && ((!isKnownResidues
+											&& !res.predictedLocation.equals(residue.predictedLocation))
+											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
 										if (!(isKnownResidues && res.score == 0))
 											saveConflict = false;
@@ -1978,6 +2044,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 													}
 												}
 											}
+										} else if (!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation)) {
+											// It will save the new prediction if the current process is not 'known
+											// residues'
+											res.score = score;
+											current_uk_residues.add(res);
+											crossLink.location = res.location;
 										}
 									} else {
 										saveConflict = false;
@@ -2019,8 +2092,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 													}
 												}
 											}
-										} else {
-
+										} else if (!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation)) {
+											// It will save the new prediction if the current process is not 'known
+											// residues'
 											res.score = score;
 											current_uk_residues.add(res);
 											crossLink.location = res.location;
@@ -2072,13 +2147,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				}
 
 				summary_processed++;
-				int new_progress = (int) ((double) summary_processed / (total_compartments) * 100);
-				if (new_progress > old_progress) {
-					old_progress = new_progress;
+				Util.progressBar(summary_processed, old_progress, total_compartments,
+						"Epoch: " + epochs + "\nPredicting residue location: ", taskMonitor, null);
 
-					taskMonitor.showMessage(TaskMonitor.Level.INFO,
-							"Epoch: " + epochs + "\nPredicting residue location: " + old_progress + "%");
-				}
 			}
 		}
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Epoch: " + epochs + "\nPredicting residue location: 100%");
