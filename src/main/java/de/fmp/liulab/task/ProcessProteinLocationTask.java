@@ -1195,6 +1195,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					return lhs.position > rhs.position ? 1 : (lhs.position < rhs.position) ? -1 : 0;
 				}
 			});
+			residues = residues.stream().distinct().collect(Collectors.toList());
 		}
 		protein.reactionSites = residues;
 

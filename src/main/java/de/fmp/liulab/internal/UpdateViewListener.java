@@ -19,10 +19,14 @@ import org.cytoscape.model.CyNetwork;
 import org.cytoscape.model.CyNode;
 import org.cytoscape.model.CyRow;
 import org.cytoscape.model.CyTableUtil;
+import org.cytoscape.model.events.AboutToRemoveEdgesEvent;
+import org.cytoscape.model.events.AboutToRemoveEdgesListener;
 import org.cytoscape.model.events.NetworkAddedEvent;
 import org.cytoscape.model.events.NetworkAddedListener;
 import org.cytoscape.model.events.NetworkDestroyedEvent;
 import org.cytoscape.model.events.NetworkDestroyedListener;
+import org.cytoscape.model.events.RemovedEdgesEvent;
+import org.cytoscape.model.events.RemovedEdgesListener;
 import org.cytoscape.model.events.RowSetRecord;
 import org.cytoscape.model.events.RowsSetEvent;
 import org.cytoscape.model.events.RowsSetListener;
@@ -43,7 +47,9 @@ import org.cytoscape.work.TaskIterator;
 import org.cytoscape.work.TaskObserver;
 import org.cytoscape.work.swing.DialogTaskManager;
 
+import de.fmp.liulab.model.CrossLink;
 import de.fmp.liulab.model.Protein;
+import de.fmp.liulab.model.Residue;
 import de.fmp.liulab.task.MainSingleNodeTask;
 import de.fmp.liulab.task.ProcessProteinLocationTask;
 import de.fmp.liulab.task.ProteinScalingFactorHorizontalExpansionTableTask;
@@ -58,7 +64,7 @@ import de.fmp.liulab.utils.Util;
  *
  */
 public class UpdateViewListener implements ViewChangedListener, RowsSetListener, SetCurrentNetworkListener,
-		NetworkAddedListener, NetworkDestroyedListener {
+		NetworkAddedListener, NetworkDestroyedListener, RemovedEdgesListener, AboutToRemoveEdgesListener {
 
 	private CyApplicationManager cyApplicationManager;
 	private CyNetwork myNetwork;
@@ -442,5 +448,107 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 		MainControlPanel.enable_disableDisplayBox(false, false);
 		MainControlPanel.enable_disable_spinners(false);
 		MainControlPanel.unselectCheckboxes();
+	}
+
+	@Override
+	public void handleEvent(RemovedEdgesEvent e) {
+
+		System.out.println("Edge has been removed sucessfully");
+
+	}
+
+	@Override
+	public void handleEvent(AboutToRemoveEdgesEvent e) {
+
+		String pattern = "(\\[Source: )(\\w+)(\\s+)(\\()(\\d+)(\\))(\\])(\\s+)(\\[Target: )(\\w+)(\\s+)(\\()(\\d+)(\\))(\\])";
+		String edgeName = e.getSource().getDefaultEdgeTable().getRow(e.getEdges().iterator().next().getSUID())
+				.get(CyNetwork.NAME, String.class);
+		if (!edgeName.matches(pattern))
+			return;
+
+		String source_protein_name = edgeName.replaceAll(pattern, "$2").trim();
+		int source_res_pos = Integer.parseInt(edgeName.replaceAll(pattern, "$5").trim());
+
+		String target_protein_name = edgeName.replaceAll(pattern, "$10").trim();
+		int target_res_pos = Integer.parseInt(edgeName.replaceAll(pattern, "$13").trim());
+
+		String[] networkFullName = this.myNetwork.toString().split("#");
+
+		String networkMainName = "";
+		if (networkFullName.length > 0)
+			networkMainName = networkFullName[0];
+
+		List<Protein> proteinList = Util.proteinsMap.get(networkMainName);
+		if (proteinList == null || proteinList.size() == 0)
+			return;
+
+		boolean isIntralink = source_protein_name.equals(target_protein_name);
+
+		Protein source_protein = null;
+		Protein target_protein = null;
+		try {
+			source_protein = proteinList.stream().filter(value -> value.gene.equals(source_protein_name)).findFirst()
+					.get();
+
+			target_protein = proteinList.stream().filter(value -> value.gene.equals(target_protein_name)).findFirst()
+					.get();
+		} catch (Exception e2) {
+			// TODO: handle exception
+		}
+
+		if (source_protein == null || target_protein == null)
+			return;
+
+		if (!isIntralink) {
+
+			// Remove XL from source protein
+			List<CrossLink> allXLs = source_protein.interLinks;
+			CrossLink to_be_removed = allXLs.stream()
+					.filter(value -> (value.protein_a.equals(source_protein_name) && value.pos_site_a == source_res_pos
+							&& value.protein_b.equals(target_protein_name) && value.pos_site_b == target_res_pos)
+							|| (value.protein_a.equals(target_protein_name) && value.pos_site_a == target_res_pos
+									&& value.protein_b.equals(source_protein_name)
+									&& value.pos_site_b == source_res_pos))
+					.findFirst().get();
+
+			if (to_be_removed != null)
+				allXLs.remove(to_be_removed);
+
+			// Remove XL from target protein
+			allXLs = target_protein.interLinks;
+			to_be_removed = allXLs.stream()
+					.filter(value -> (value.protein_a.equals(source_protein_name) && value.pos_site_a == source_res_pos
+							&& value.protein_b.equals(target_protein_name) && value.pos_site_b == target_res_pos)
+							|| (value.protein_a.equals(target_protein_name) && value.pos_site_a == target_res_pos
+									&& value.protein_b.equals(source_protein_name)
+									&& value.pos_site_b == source_res_pos))
+					.findFirst().get();
+
+			if (to_be_removed != null)
+				allXLs.remove(to_be_removed);
+
+		}
+
+		// Update conflicted residues
+		List<Residue> all_residues = source_protein.reactionSites;
+		Residue conflicted_residue = null;
+		try {
+			conflicted_residue = all_residues.stream().filter(value -> value.position == source_res_pos).findFirst()
+					.get();
+
+			conflicted_residue.conflicted_residue = null;
+			conflicted_residue.conflicted_score = 0.0;
+			conflicted_residue.isConflicted = false;
+
+			all_residues = target_protein.reactionSites;
+			conflicted_residue = all_residues.stream().filter(value -> value.position == target_res_pos).findFirst()
+					.get();
+			conflicted_residue.conflicted_residue = null;
+			conflicted_residue.conflicted_score = 0.0;
+			conflicted_residue.isConflicted = false;
+		} catch (Exception e2) {
+			// TODO: handle exception
+		}
+
 	}
 }

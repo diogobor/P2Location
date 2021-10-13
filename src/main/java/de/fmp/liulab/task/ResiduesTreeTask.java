@@ -141,11 +141,16 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 
 	/**
 	 * Method responsible for creating network
+	 * 
+	 * @throws Exception
 	 */
-	private void createNetwork() {
+	private void createNetwork() throws Exception {
 
 		if (myNetFactory == null || myResidue == null)
 			return;
+
+		if (myResidue.conflicted_residue == null)
+			throw new Exception("There is no conflicted residue.");
 
 		CyNetwork myNetwork = myNetFactory.createNetwork();
 
@@ -187,27 +192,32 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 		CyNode conflicted_node = myNetwork.addNode();
 
 		// RESIDUE1 [Source: PTN (POSITION)]
-		String conflicted_node_name = "Residue" + count_residue + " [Source: "
-				+ myResidue.conflicted_residue.protein.gene + " (" + myResidue.conflicted_residue.position + ")]";
-		myNetwork.getRow(conflicted_node).set(CyNetwork.NAME, conflicted_node_name);
-		myNetwork.getRow(conflicted_node).set(Util.PROTEIN_LENGTH_A,
-				Integer.toString(myResidue.conflicted_residue.protein.sequence.length()));
-		myNetwork.getRow(conflicted_node).set(Util.PROTEIN_LENGTH_B,
-				Integer.toString(myResidue.conflicted_residue.protein.sequence.length()));
-		myNetwork.getRow(conflicted_node).set(Util.PROTEIN_A,
-				"sp|" + myResidue.conflicted_residue.protein.proteinID + "|NO");
-		myNetwork.getRow(conflicted_node).set(Util.PROTEIN_B,
-				"sp|" + myResidue.conflicted_residue.protein.proteinID + "|NO");
+		if (myResidue.conflicted_residue != null) {
+			String conflicted_node_name = "Residue" + count_residue + " [Source: "
+					+ myResidue.conflicted_residue.protein.gene + " (" + myResidue.conflicted_residue.position + ")]";
+			myNetwork.getRow(conflicted_node).set(CyNetwork.NAME, conflicted_node_name);
+			myNetwork.getRow(conflicted_node).set(Util.PROTEIN_LENGTH_A,
+					Integer.toString(myResidue.conflicted_residue.protein.sequence.length()));
+			myNetwork.getRow(conflicted_node).set(Util.PROTEIN_LENGTH_B,
+					Integer.toString(myResidue.conflicted_residue.protein.sequence.length()));
+			myNetwork.getRow(conflicted_node).set(Util.PROTEIN_A,
+					"sp|" + myResidue.conflicted_residue.protein.proteinID + "|NO");
+			myNetwork.getRow(conflicted_node).set(Util.PROTEIN_B,
+					"sp|" + myResidue.conflicted_residue.protein.proteinID + "|NO");
 
-		// Add conflicted_edge
-		String conflicted_edge_name = "RESIDUE" + count_residue + " - RESIDUE1";
+			// Add conflicted_edge
+			// [Source: RPL18A (11)] [Target: RPL4 (400)]
+			String conflicted_edge_name = "[Source: " + myResidue.protein.gene + " (" + myResidue.position
+					+ ")] [Target: " + myResidue.conflicted_residue.protein.gene + " ("
+					+ myResidue.conflicted_residue.position + ")]";
 
-		String first_node_name = "Residue1 [Source: " + dependent_residues.get(0).protein.gene + " ("
-				+ dependent_residues.get(0).position + ")]";
-		CyNode first_node = Util.getNode(myNetwork, first_node_name);
+			String first_node_name = "Residue1 [Source: " + dependent_residues.get(0).protein.gene + " ("
+					+ dependent_residues.get(0).position + ")]";
+			CyNode first_node = Util.getNode(myNetwork, first_node_name);
 
-		CyEdge conflicted_edge = myNetwork.addEdge(conflicted_node, first_node, false);
-		myNetwork.getRow(conflicted_edge).set(CyNetwork.NAME, conflicted_edge_name);
+			CyEdge conflicted_edge = myNetwork.addEdge(conflicted_node, first_node, false);
+			myNetwork.getRow(conflicted_edge).set(CyNetwork.NAME, conflicted_edge_name);
+		}
 
 		// Add edges
 		if (dependent_residues.size() > 1) {
@@ -222,13 +232,17 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 				CyNode node2 = Util.getNode(myNetwork, node_name_2);
 				CyEdge edge = myNetwork.addEdge(node1, node2, false);
 
-				String edge_name = "RESIDUE" + (i + 1) + " - RESIDUE" + (i + 2);
+				// [Source: RPL18A (11)] [Target: RPL4 (400)]
+				String edge_name = "[Source: " + dependent_residues.get(i).protein.gene + " ("
+						+ dependent_residues.get(i).position + ")] [Target: "
+						+ dependent_residues.get(i + 1).protein.gene + " (" + dependent_residues.get(i + 1).position
+						+ ")]";
 				myNetwork.getRow(edge).set(CyNetwork.NAME, edge_name);
 			}
 		}
 
-		myNetwork.getRow(myNetwork).set(CyNetwork.NAME, "RESIDUE_TREE - Protein: " + myResidue.protein.gene + " - "
-				+ myResidue.aminoacid + "[" + myResidue.position + "]");
+		myNetwork.getRow(myNetwork).set(CyNetwork.NAME, this.myNetwork.toString() + "#RESIDUE_TREE - Protein: "
+				+ myResidue.protein.gene + " - " + myResidue.aminoacid + "[" + myResidue.position + "]");
 
 		networkManager.addNetwork(myNetwork);
 
@@ -543,41 +557,50 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 		}
 
 		// Conflicted residue
-		String conflicted_node_name = "Residue" + (dependent_residues.size() + 1) + " [Source: "
-				+ myResidue.conflicted_residue.protein.gene + " (" + myResidue.conflicted_residue.position + ")]";
-		CyNode conflicted_node = Util.getNode(myNetwork, conflicted_node_name);
 
-		if (conflicted_node != null) {
+		if (myResidue.conflicted_residue != null) {
+			String conflicted_node_name = "Residue" + (dependent_residues.size() + 1) + " [Source: "
+					+ myResidue.conflicted_residue.protein.gene + " (" + myResidue.conflicted_residue.position + ")]";
+			CyNode conflicted_node = Util.getNode(myNetwork, conflicted_node_name);
 
-			Util.updateProteinDomainsColorMap(myResidue.conflicted_residue.protein.domains);
+			if (conflicted_node != null) {
 
-			View<CyNode> conflicted_nodeView = view.getNodeView(conflicted_node);
-			conflicted_nodeView.setLockedValue(BasicVisualLexicon.NODE_LABEL,
-					myResidue.conflicted_residue.protein.gene);
+				Util.updateProteinDomainsColorMap(myResidue.conflicted_residue.protein.domains);
 
-			Util.setProteinLength(myResidue.conflicted_residue.protein.sequence.length());
-			Util.setNodeStyles(myNetwork, conflicted_node, view, style);
-			Util.setNodeDomainColors(null, myResidue.conflicted_residue.protein, conflicted_nodeView, myNetwork,
-					conflicted_node, vgFactory, lexicon);
+				View<CyNode> conflicted_nodeView = view.getNodeView(conflicted_node);
+				conflicted_nodeView.setLockedValue(BasicVisualLexicon.NODE_LABEL,
+						myResidue.conflicted_residue.protein.gene);
 
-			conflicted_nodeView.setLockedValue(BasicVisualLexicon.NODE_X_LOCATION, 1.0);
-			conflicted_nodeView.setLockedValue(BasicVisualLexicon.NODE_Y_LOCATION, 0.0);
-			this.plotResidue(myResidue.conflicted_residue, conflicted_nodeView, myNetwork, conflicted_node, view);
+				Util.setProteinLength(myResidue.conflicted_residue.protein.sequence.length());
+				Util.setNodeStyles(myNetwork, conflicted_node, view, style);
+				Util.setNodeDomainColors(null, myResidue.conflicted_residue.protein, conflicted_nodeView, myNetwork,
+						conflicted_node, vgFactory, lexicon);
 
-			Protein new_protein_with_only_target_xls = new Protein(myResidue.conflicted_residue.protein.proteinID,
-					myResidue.conflicted_residue.protein.gene, myResidue.conflicted_residue.protein.sequence);
+				conflicted_nodeView.setLockedValue(BasicVisualLexicon.NODE_X_LOCATION, 1.0);
+				conflicted_nodeView.setLockedValue(BasicVisualLexicon.NODE_Y_LOCATION, 0.0);
+				this.plotResidue(myResidue.conflicted_residue, conflicted_nodeView, myNetwork, conflicted_node, view);
 
-			new_protein_with_only_target_xls.intraLinks = this.getInterestedIntraLinks(myResidue.conflicted_residue);
-			new_protein_with_only_target_xls.interLinks = this.getInterestedInterLinks(myResidue.conflicted_residue);
+				Protein new_protein_with_only_target_xls = new Protein(myResidue.conflicted_residue.protein.proteinID,
+						myResidue.conflicted_residue.protein.gene, myResidue.conflicted_residue.protein.sequence);
 
-			plotInterLink(myNetwork, view, conflicted_node, new_protein_with_only_target_xls);
+				new_protein_with_only_target_xls.intraLinks = this
+						.getInterestedIntraLinks(myResidue.conflicted_residue);
+				new_protein_with_only_target_xls.interLinks = this
+						.getInterestedInterLinks(myResidue.conflicted_residue);
 
+				plotInterLink(myNetwork, view, conflicted_node, new_protein_with_only_target_xls);
+
+			}
 		}
 
 		// Add edge labels with the score
 		if (dependent_residues.size() > 1) {
 			for (int i = 0; i < dependent_residues.size(); i += 2) {
-				String edge_name = "RESIDUE" + (i + 1) + " - RESIDUE" + (i + 2);
+				// [Source: RPL18A (11)] [Target: RPL4 (400)]
+				String edge_name = "[Source: " + dependent_residues.get(i).protein.gene + " ("
+						+ dependent_residues.get(i).position + ")] [Target: "
+						+ dependent_residues.get(i + 1).protein.gene + " (" + dependent_residues.get(i + 1).position
+						+ ")]";
 				CyEdge new_edge = Util.getEdge(myNetwork, edge_name, false);
 
 				if (new_edge == null)
@@ -585,7 +608,7 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 
 				View<CyEdge> new_edgeView = view.getEdgeView(new_edge);
 				new_edgeView.setLockedValue(BasicVisualLexicon.EDGE_LABEL,
-						"Score: " + String.format("%.4f", dependent_residues.get(i).score));
+						"Score: " + String.format("%.5f", dependent_residues.get(i).score));
 
 				String tooltip = "<html><p>" + dependent_residues.get(i).protein.gene + " ["
 						+ dependent_residues.get(i).position + "] - " + dependent_residues.get(i + 1).protein.gene
@@ -611,18 +634,22 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 		}
 
 		// Conflicted_edge
-		String conflicted_edge_name = "RESIDUE" + (dependent_residues.size() + 1) + " - RESIDUE1";
-		CyEdge conflicted_edge = Util.getEdge(myNetwork, conflicted_edge_name, false);
+		if (myResidue.conflicted_residue != null) {
+			String conflicted_edge_name = "[Source: " + myResidue.protein.gene + " (" + myResidue.position
+					+ ")] [Target: " + myResidue.conflicted_residue.protein.gene + " ("
+					+ myResidue.conflicted_residue.position + ")]";
+			CyEdge conflicted_edge = Util.getEdge(myNetwork, conflicted_edge_name, false);
 
-		if (conflicted_edge != null) {
-			View<CyEdge> conflicted_edgeView = view.getEdgeView(conflicted_edge);
-			conflicted_edgeView.setLockedValue(BasicVisualLexicon.EDGE_LABEL,
-					"Score: " + String.format("%.4f", myResidue.conflicted_score));
-			
-			String tooltip = "<html><p>" + dependent_residues.get(0).protein.gene + " ["
-					+ dependent_residues.get(0).position + "] - " + myResidue.conflicted_residue.protein.gene
-					+ " [" + myResidue.conflicted_residue.position + "]</p></html>";
-			conflicted_edgeView.setLockedValue(BasicVisualLexicon.EDGE_TOOLTIP, tooltip);
+			if (conflicted_edge != null) {
+				View<CyEdge> conflicted_edgeView = view.getEdgeView(conflicted_edge);
+				conflicted_edgeView.setLockedValue(BasicVisualLexicon.EDGE_LABEL,
+						"Score: " + String.format("%.5f", myResidue.conflicted_score));
+
+				String tooltip = "<html><p>" + dependent_residues.get(0).protein.gene + " ["
+						+ dependent_residues.get(0).position + "] - " + myResidue.conflicted_residue.protein.gene + " ["
+						+ myResidue.conflicted_residue.position + "]</p></html>";
+				conflicted_edgeView.setLockedValue(BasicVisualLexicon.EDGE_TOOLTIP, tooltip);
+			}
 		}
 	}
 

@@ -1197,7 +1197,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		link_panel.add(transmem_neighbor_aa);
 		offset_y += 40;
 
-		enable_conflict = new JCheckBox("Consider conflict");
+		enable_conflict = new JCheckBox("Check conflict");
 		enable_conflict.setBackground(Color.WHITE);
 		enable_conflict.setSelected(Util.considerConflict);
 		enable_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));

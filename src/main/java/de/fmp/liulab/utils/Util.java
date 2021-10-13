@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.swing.AbstractListModel;
 import javax.swing.JLabel;
@@ -81,14 +82,15 @@ import de.fmp.liulab.task.ProcessProteinLocationTask;
  */
 public class Util {
 
-	public static String PROTEIN_SCALING_FACTOR_COLUMN_NAME = "scaling_factor";
-	public static String HORIZONTAL_EXPANSION_COLUMN_NAME = "is_horizontal_expansion";
-	public static String PROTEIN_DOMAIN_COLUMN = "domain_annotation";
-	public static String PREDICTED_PROTEIN_DOMAIN_COLUMN = "predicted_domains";
-	public static String CONFLICTED_PREDICTED_RESIDUES_COLUMN = "conflicted_residues";
-	public static String PROTEIN_SEQUENCE_COLUMN = "sequence";
-	public static String PTM_COLUMN = "ptms";
-	public static String MONOLINK_COLUMN = "monolinks";
+	private static String PROJECT_NAME = "p2l_";
+	public static String PROTEIN_SCALING_FACTOR_COLUMN_NAME = PROJECT_NAME + "scaling_factor";
+	public static String HORIZONTAL_EXPANSION_COLUMN_NAME = PROJECT_NAME + "is_horizontal_expansion";
+	public static String PROTEIN_DOMAIN_COLUMN = PROJECT_NAME + "domain_annotation";
+	public static String PREDICTED_PROTEIN_DOMAIN_COLUMN = PROJECT_NAME + "predicted_domains";
+	public static String CONFLICTED_PREDICTED_RESIDUES_COLUMN = PROJECT_NAME + "conflicted_residues";
+	public static String PROTEIN_SEQUENCE_COLUMN = PROJECT_NAME + "sequence";
+	public static String PTM_COLUMN = PROJECT_NAME + "ptms";
+	public static String MONOLINK_COLUMN = PROJECT_NAME + "monolinks";
 	public static String PROTEIN_LENGTH_A = "length_protein_a";
 	public static String PROTEIN_LENGTH_B = "length_protein_b";
 	public static String NODE_LABEL_POSITION = "NODE_LABEL_POSITION";
@@ -857,26 +859,29 @@ public class Util {
 		// Check if the node exists in the network
 		Optional<CyRow> isEdgePresent = null;
 
-		if (isSimilar) {
-			isEdgePresent = myNetwork.getDefaultEdgeTable().getAllRows().stream().filter(new Predicate<CyRow>() {
-				public boolean test(CyRow o) {
-					return o.get(CyNetwork.NAME, String.class).contains(edge_name);
-				}
-			}).findFirst();
+		try {
+			if (isSimilar) {
+				isEdgePresent = myNetwork.getDefaultEdgeTable().getAllRows().stream().filter(new Predicate<CyRow>() {
+					public boolean test(CyRow o) {
+						return o.get(CyNetwork.NAME, String.class).contains(edge_name);
+					}
+				}).findFirst();
 
-		} else {
-			isEdgePresent = myNetwork.getDefaultEdgeTable().getAllRows().stream().filter(new Predicate<CyRow>() {
+			} else {
+				isEdgePresent = myNetwork.getDefaultEdgeTable().getAllRows().stream().filter(new Predicate<CyRow>() {
 
-				public boolean test(CyRow o) {
-					return o.get(CyNetwork.NAME, String.class).equals(edge_name);
-				}
-			}).findFirst();
+					public boolean test(CyRow o) {
+						return o.get(CyNetwork.NAME, String.class).equals(edge_name);
+					}
+				}).findFirst();
 
-		}
-		if (isEdgePresent.isPresent()) {// Get node if exists
+			}
+			if (isEdgePresent.isPresent()) {// Get node if exists
 
-			CyRow _node_row = isEdgePresent.get();
-			_edge = myNetwork.getEdge(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
+				CyRow _node_row = isEdgePresent.get();
+				_edge = myNetwork.getEdge(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
+			}
+		} catch (Exception e) {
 		}
 
 		return _edge;
@@ -1413,17 +1418,21 @@ public class Util {
 		if (myNetwork == null)
 			return _node;
 
-		// Check if the node exists in the network
-		Optional<CyRow> isNodePresent = myNetwork.getDefaultNodeTable().getAllRows().stream()
-				.filter(new Predicate<CyRow>() {
-					public boolean test(CyRow o) {
-						return o.get(CyNetwork.NAME, String.class).equals(node_name);
-					}
-				}).findFirst();
+		try {
 
-		if (isNodePresent.isPresent()) {// Get node if exists
-			CyRow _node_row = isNodePresent.get();
-			_node = myNetwork.getNode(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
+			// Check if the node exists in the network
+			Optional<CyRow> isNodePresent = myNetwork.getDefaultNodeTable().getAllRows().stream()
+					.filter(new Predicate<CyRow>() {
+						public boolean test(CyRow o) {
+							return o.get(CyNetwork.NAME, String.class).equals(node_name);
+						}
+					}).findFirst();
+
+			if (isNodePresent.isPresent()) {// Get node if exists
+				CyRow _node_row = isNodePresent.get();
+				_node = myNetwork.getNode(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
+			}
+		} catch (Exception e) {
 		}
 
 		return _node;
@@ -1443,11 +1452,14 @@ public class Util {
 		if (myNetwork == null)
 			return ptn;
 
-		List<Protein> all_proteins = Util.proteinsMap.get(myNetwork.toString());
-		Optional<Protein> isPtnPresent = all_proteins.stream().filter(value -> value.gene.equals(node_name))
-				.findFirst();
-		if (isPtnPresent.isPresent()) {
-			ptn = isPtnPresent.get();
+		try {
+			List<Protein> all_proteins = Util.proteinsMap.get(myNetwork.toString());
+			Optional<Protein> isPtnPresent = all_proteins.stream().filter(value -> value.gene.equals(node_name))
+					.findFirst();
+			if (isPtnPresent.isPresent()) {
+				ptn = isPtnPresent.get();
+			}
+		} catch (Exception e) {
 		}
 
 		return ptn;
@@ -1467,17 +1479,20 @@ public class Util {
 		if (myNetwork == null)
 			return _node;
 
-		// Check if the node exists in the network
-		Optional<CyRow> isNodePresent = myNetwork.getDefaultNodeTable().getAllRows().stream()
-				.filter(new Predicate<CyRow>() {
-					public boolean test(CyRow o) {
-						return o.get(CyNetwork.SUID, Long.class).equals(node_suid);
-					}
-				}).findFirst();
+		try {
+			// Check if the node exists in the network
+			Optional<CyRow> isNodePresent = myNetwork.getDefaultNodeTable().getAllRows().stream()
+					.filter(new Predicate<CyRow>() {
+						public boolean test(CyRow o) {
+							return o.get(CyNetwork.SUID, Long.class).equals(node_suid);
+						}
+					}).findFirst();
 
-		if (isNodePresent.isPresent()) {// Get node if exists
-			CyRow _node_row = isNodePresent.get();
-			_node = myNetwork.getNode(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
+			if (isNodePresent.isPresent()) {// Get node if exists
+				CyRow _node_row = isNodePresent.get();
+				_node = myNetwork.getNode(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
+			}
+		} catch (Exception e) {
 		}
 
 		return _node;
@@ -2447,13 +2462,27 @@ public class Util {
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_BORDER_WIDTH, 0.0);
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_BORDER_TRANSPARENCY, 0.0);
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_BORDER_PAINT, Color.WHITE);
+		newResidueView.setLockedValue(BasicVisualLexicon.NODE_SELECTED_PAINT, Color.RED);
+		newResidueView.setLockedValue(BasicVisualLexicon.NODE_Z_LOCATION, 1.0);
+
+		setColorConflictResidue(residue, newResidueView);
+		setResideToolTip(residue, newResidueView);
+		plotResidueNodes(newResidueView, current_node, sourceNodeView, residue, center_position_source_node,
+				initial_position_source_node);
+	}
+
+	private static void setColorConflictResidue(Residue residue, View<CyNode> newResidueView) {
+
 		if (residue.isConflicted && residue.predicted_epoch <= ProcessProteinLocationTask.epochs)
 			newResidueView.setLockedValue(BasicVisualLexicon.NODE_FILL_COLOR, Color.RED);
 		else
 			newResidueView.setLockedValue(BasicVisualLexicon.NODE_FILL_COLOR, NodeBorderColor);
-		newResidueView.setLockedValue(BasicVisualLexicon.NODE_SELECTED_PAINT, Color.RED);
-		newResidueView.setLockedValue(BasicVisualLexicon.NODE_Z_LOCATION, 1.0);
 
+		newResidueView.setLockedValue(BasicVisualLexicon.NODE_VISIBLE, true);
+
+	}
+
+	private static void setResideToolTip(Residue residue, View<CyNode> newResidueView) {
 		String tooltip = "";
 		boolean isPredicted = residue.predicted_epoch != -1;
 
@@ -2475,24 +2504,10 @@ public class Util {
 		}
 
 		newResidueView.setLockedValue(BasicVisualLexicon.NODE_TOOLTIP, tooltip);
-
-		plotResidueNodes(netView, current_node, sourceNodeView, residue, center_position_source_node,
-				initial_position_source_node);
 	}
 
-	private static void plotResidueNodes(CyNetworkView netView, CyNode current_node, View<CyNode> sourceNodeView,
+	private static void plotResidueNodes(View<CyNode> newResidueView, CyNode current_node, View<CyNode> sourceNodeView,
 			Residue residue, double center_position_source_node, double initial_position_source_node) {
-
-		View<CyNode> newResidueView = netView.getNodeView(current_node);
-		while (newResidueView == null) {
-			netView.updateView();
-			try {
-				Thread.sleep(200);
-			} catch (InterruptedException e1) {
-				e1.printStackTrace();
-			}
-			newResidueView = netView.getNodeView(current_node);
-		}
 
 		double xl_pos_source;
 		double x_or_y_Pos_source;
@@ -3417,10 +3432,24 @@ public class Util {
 				myNetwork.getRow(_node).set(CyNetwork.NAME, node_name_added_by_app);
 				setResidueStyle(netView, _node, sourceNodeView, residue, xl_pos_source, center_position_source_node,
 						x_or_y_Pos_source, initial_position_source_node);
-			} else
-				plotResidueNodes(netView, _node, sourceNodeView, residue, center_position_source_node,
-						initial_position_source_node);
+			} else {
 
+				View<CyNode> newResidueView = netView.getNodeView(_node);
+				while (newResidueView == null) {
+					netView.updateView();
+					try {
+						Thread.sleep(200);
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
+					newResidueView = netView.getNodeView(_node);
+				}
+
+				setColorConflictResidue(residue, newResidueView);
+				setResideToolTip(residue, newResidueView);
+				plotResidueNodes(newResidueView, _node, sourceNodeView, residue, center_position_source_node,
+						initial_position_source_node);
+			}
 			countMonolink++;
 		}
 	}

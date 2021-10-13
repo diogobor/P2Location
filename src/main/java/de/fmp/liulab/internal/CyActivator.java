@@ -20,8 +20,10 @@ import org.cytoscape.application.swing.CySwingApplication;
 import org.cytoscape.application.swing.CytoPanelComponent;
 import org.cytoscape.model.CyNetworkFactory;
 import org.cytoscape.model.CyNetworkManager;
+import org.cytoscape.model.events.AboutToRemoveEdgesListener;
 import org.cytoscape.model.events.NetworkAddedListener;
 import org.cytoscape.model.events.NetworkDestroyedListener;
+import org.cytoscape.model.events.RemovedEdgesListener;
 import org.cytoscape.model.events.RowsSetListener;
 import org.cytoscape.property.CyProperty;
 import org.cytoscape.service.util.AbstractCyActivator;
@@ -235,6 +237,9 @@ public class CyActivator extends AbstractCyActivator {
 		registerService(bc, updateViewListener, SetCurrentNetworkListener.class, new Properties());
 		registerService(bc, updateViewListener, NetworkAddedListener.class, new Properties());
 		registerService(bc, updateViewListener, NetworkDestroyedListener.class, new Properties());
+		registerService(bc, updateViewListener, RemovedEdgesListener.class, new Properties());
+		registerService(bc, updateViewListener, AboutToRemoveEdgesListener.class, new Properties());
+		
 		// #####################
 
 		// #### 2 - PANEL (SETTINGS) ####
