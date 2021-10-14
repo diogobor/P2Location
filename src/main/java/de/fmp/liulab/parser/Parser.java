@@ -306,12 +306,12 @@ public class Parser {
 					protein_domain_name = "";
 
 				String[] cols_range = cols_topol_domains[i].replace(tag, "").split("\\.");
-				int start_index = Integer.parseInt(cols_range[0].trim());
+				int start_index = Integer.parseInt(cols_range[0].replaceAll("(\\D+)", "").trim());
 				int end_index = 0;
 				if (cols_range.length == 1) {
 					end_index = start_index;
 				} else {
-					end_index = Integer.parseInt(cols_range[2].trim());
+					end_index = Integer.parseInt(cols_range[2].replaceAll("(\\D+)", "").trim());
 				}
 				sb_domains.append(tag);
 				if (!(protein_domain_name.isBlank() || protein_domain_name.isEmpty())) {
