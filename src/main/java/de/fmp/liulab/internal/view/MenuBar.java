@@ -37,9 +37,9 @@ public class MenuBar implements ActionListener {
 
 		if (source == importNetwork) {
 			chooseNetwork = new JFileChooser();
-			chooseNetwork.setFileFilter(new ExtensionFileFilter("CSV file (*.csv)", "csv"));
 			if (domain_ptm_or_monolink == 0)
 				chooseNetwork.setFileFilter(new ExtensionFileFilter("Uniprot file (*.tab)", "tab"));
+			chooseNetwork.setFileFilter(new ExtensionFileFilter("CSV file (*.csv)", "csv"));
 			chooseNetwork.setFileSelectionMode(JFileChooser.FILES_ONLY);
 			chooseNetwork.setDialogTitle("Import file");
 

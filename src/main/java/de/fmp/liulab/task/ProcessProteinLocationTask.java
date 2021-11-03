@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Image;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
@@ -359,11 +360,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		logo_panel.setLayout(null);
 		mainPanel.add(logo_panel);
 
-		JLabel jLabelIcon = new JLabel();
-		jLabelIcon.setBounds(13, -95, 300, 330);
-		jLabelIcon.setIcon(new javax.swing.ImageIcon(getClass().getResource("/images/logo.png")));
-		logo_panel.add(jLabelIcon);
 
+		ImageIcon imageIcon = new javax.swing.ImageIcon(getClass().getResource("/images/logo.png")); // load the image to a imageIcon
+		Image image = imageIcon.getImage(); // transform it 
+		Image newimg = image.getScaledInstance(130, 130,  java.awt.Image.SCALE_SMOOTH); // scale it the smooth way  
+		imageIcon = new ImageIcon(newimg);  // transform it back
+
+		JLabel jLabelIcon = new JLabel();
+		jLabelIcon.setBounds(5, -25, 200, 200);
+		jLabelIcon.setIcon(imageIcon);
+		logo_panel.add(jLabelIcon);
+		
 		JLabel textLabel_status = new JLabel("Status:");
 		textLabel_status.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		textLabel_status.setBounds(10, offset_y, 50, 40);

@@ -142,11 +142,14 @@ public class Util {
 	public static boolean getEpochs = false;
 	public static Integer specCount = 5;
 	public static boolean getSpecCount = false;
+	public static boolean consider_domain_whole_ptn = true;
 	public static double threshold_score = 10;
 	public static boolean getThreshold_score = false;
-	public static Integer neighborAA = 5;
-	public static Integer transmemNeighborAA = 5;
+	public static Integer neighborAA = 3;
+	public static Integer transmemNeighborAA = 3;
+	public static double deltaScore = 0.5;
 	public static boolean considerConflict = true;
+	public static boolean fixDomainManually = true;
 
 	// Map<Network name,List<Protein>
 	public static Map<String, List<Protein>> proteinsMap = new HashMap<String, List<Protein>>();

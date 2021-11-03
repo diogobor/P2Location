@@ -101,7 +101,7 @@ public class Parser {
 							index = Arrays.asList(uniprot_header_lines).indexOf("Gene names  (ordered locus )");
 						if (index == -1)
 							throw new Exception("ERROR: 'Gene name' column has not been found in the file.");
-						
+
 						if (index < each_line_cols.length)
 							gene_name = each_line_cols[index];
 
@@ -230,7 +230,7 @@ public class Parser {
 
 				}
 			} catch (Exception e) {
-				if(e.getMessage().startsWith("ERROR: 'Gene name' column"))
+				if (e.getMessage().startsWith("ERROR: 'Gene name' column"))
 					throw new Exception("ERROR: 'Gene name' column has not been found in the file.");
 			}
 		}
@@ -292,9 +292,10 @@ public class Parser {
 
 	private String uniprotParser(String[] cols_topol_domains, String tag) {
 		StringBuilder sb_domains = new StringBuilder();
-		if (cols_topol_domains.length > 1) {
+		if (cols_topol_domains.length > 0) {
 			for (int i = 0; i < cols_topol_domains.length; i++) {
-
+				if (cols_topol_domains[i].equals(""))
+					continue;
 				String protein_domain_name = "";
 				// TRANSMEM 1..100
 				if ((i + 1) < cols_topol_domains.length
@@ -306,12 +307,12 @@ public class Parser {
 					protein_domain_name = "";
 
 				String[] cols_range = cols_topol_domains[i].replace(tag, "").split("\\.");
-				int start_index = Integer.parseInt(cols_range[0].replaceAll("(\\D+)", "").trim());
+				int start_index = Integer.parseInt(cols_range[0].replaceAll("(\\\\D+)", "").trim());
 				int end_index = 0;
 				if (cols_range.length == 1) {
 					end_index = start_index;
 				} else {
-					end_index = Integer.parseInt(cols_range[2].replaceAll("(\\D+)", "").trim());
+					end_index = Integer.parseInt(cols_range[2].replaceAll("(\\\\D+)", "").trim());
 				}
 				sb_domains.append(tag);
 				if (!(protein_domain_name.isBlank() || protein_domain_name.isEmpty())) {

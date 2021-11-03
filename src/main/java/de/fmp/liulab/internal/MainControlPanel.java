@@ -73,8 +73,12 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 	private static final long serialVersionUID = 8292806967891823933L;
 	private JPanel link_panel;
+	private JPanel filter_panel;
+	private JPanel option_panel;
+	private JPanel prediction_panel;
 	private JPanel display_prediction_panel;
-	private JPanel link_legend_panel;
+	private JPanel fix_conflict_panel;
+//	private JPanel link_legend_panel;
 	private JPanel node_panel;
 	private JPanel node_border_panel;
 	private JPanel pymol_panel;
@@ -85,6 +89,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JButton monolinkColorButton;
 	private static JButton borderNodeColorButton;
 	private static JCheckBox enable_epochs;
+	private static JCheckBox consider_domain_whole_ptn;
 	private static JCheckBox show_intra_link;
 	private static JCheckBox enable_score;
 	private static JCheckBox enable_specCount;
@@ -106,6 +111,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JSpinner spinner_font_size_node;
 	private static JSpinner spinner_opacity_node_border;
 	private static JSpinner spinner_width_node_border;
+	private static JSpinner spinner_deltaScore;
 
 	private static JComboBox epochCombobox;
 	private static Integer current_epoch;
@@ -368,20 +374,24 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 	}
 
-	/**
-	 * Method responsible for initializing buttons of link panel
-	 * 
-	 * @param offset_x     offset x
-	 * @param button_width button width
-	 */
-	private void init_link_color_buttons(int offset_x, int button_width) {
-
-		int offset_y = 20;
+	private void init_params() {
 
 		link_panel = new JPanel();
 		link_panel.setBackground(Color.WHITE);
-		link_panel.setBorder(BorderFactory.createTitledBorder("Predictor"));
+		link_panel.setBorder(BorderFactory.createTitledBorder("Parameters"));
 		link_panel.setLayout(null);
+	}
+
+	private void init_filter(int offset_x) {
+
+		int offset_y = 25;
+
+		filter_panel = new JPanel();
+		filter_panel.setBackground(Color.WHITE);
+		filter_panel.setBorder(BorderFactory.createTitledBorder("Filter"));
+		filter_panel.setBounds(10, offset_y, 290, 120);
+		filter_panel.setLayout(null);
+		link_panel.add(filter_panel);
 
 		SpinnerModel model_epochs = new SpinnerNumberModel(Util.epochs.intValue(), // initial
 				// value
@@ -403,7 +413,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			}
 		});
 		spinner_epochs.setToolTipText("Set a value between 0 and 100.");
-		link_panel.add(spinner_epochs);
+		filter_panel.add(spinner_epochs);
 		offset_y += 30;
 
 		SpinnerModel model_score = new SpinnerNumberModel(Util.threshold_score, // initial
@@ -426,7 +436,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			}
 		});
 		spinner_score.setToolTipText("Set a value between 0 and 100.");
-		link_panel.add(spinner_score);
+		filter_panel.add(spinner_score);
 		offset_y += 30;
 
 		SpinnerModel model_specCount = new SpinnerNumberModel(Util.specCount.intValue(), // initial
@@ -450,8 +460,111 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			}
 		});
 		spinner_specCount.setToolTipText("Set a value between 0 and 100.");
-		link_panel.add(spinner_specCount);
+		filter_panel.add(spinner_specCount);
+
+		this.init_filter_checkboxes();
+	}
+
+	private void init_filter_checkboxes() {
+
+		int offset_y = 20;
+		enable_epochs = new JCheckBox("Epochs:");
+		enable_epochs.setBackground(Color.WHITE);
+		enable_epochs.setSelected(Util.getEpochs);
+		enable_epochs.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+
+		if (Util.isWindows())
+			enable_epochs.setBounds(5, offset_y, 115, 20);
+		else
+			enable_epochs.setBounds(5, offset_y, 130, 20);
+
+		enable_epochs.addItemListener(new ItemListener() {
+			@Override
+			public void itemStateChanged(ItemEvent e) {
+				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
+					spinner_epochs.setEnabled(true);
+					Util.getEpochs = true;
+					P2LocationProps.setProperty("p2location.getEpochs", "true");
+
+				} else {
+					spinner_epochs.setEnabled(false);
+					Util.getEpochs = false;
+					P2LocationProps.setProperty("p2location.getEpochs", "false");
+				}
+			}
+		});
+		filter_panel.add(enable_epochs);
 		offset_y += 30;
+
+		enable_score = new JCheckBox("-Log(Score):");
+		enable_score.setBackground(Color.WHITE);
+		enable_score.setSelected(Util.getThreshold_score);
+		enable_score.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		if (Util.isWindows())
+			enable_score.setBounds(5, offset_y, 115, 20);
+		else
+			enable_score.setBounds(5, offset_y, 130, 20);
+
+		enable_score.addItemListener(new ItemListener() {
+			@Override
+			public void itemStateChanged(ItemEvent e) {
+				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
+					spinner_score.setEnabled(true);
+					Util.getThreshold_score = true;
+					P2LocationProps.setProperty("p2location.getThreshold_score", "true");
+
+				} else {
+					spinner_score.setEnabled(false);
+					Util.getThreshold_score = false;
+					P2LocationProps.setProperty("p2location.getThreshold_score", "false");
+				}
+			}
+		});
+		filter_panel.add(enable_score);
+		offset_y += 30;
+
+		enable_specCount = new JCheckBox("CSM(s):");
+		enable_specCount.setBackground(Color.WHITE);
+		enable_specCount.setSelected(Util.getSpecCount);
+		enable_specCount.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		if (Util.isWindows())
+			enable_specCount.setBounds(5, offset_y, 115, 20);
+		else
+			enable_specCount.setBounds(5, offset_y, 130, 20);
+
+		enable_specCount.addItemListener(new ItemListener() {
+			@Override
+			public void itemStateChanged(ItemEvent e) {
+				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
+					spinner_specCount.setEnabled(true);
+					Util.getSpecCount = true;
+					P2LocationProps.setProperty("p2location.getSpecCount", "true");
+
+				} else {
+					spinner_specCount.setEnabled(false);
+					Util.getSpecCount = false;
+					P2LocationProps.setProperty("p2location.getSpecCount", "false");
+				}
+			}
+		});
+		filter_panel.add(enable_specCount);
+	}
+
+	private void init_options(int offset_x) {
+
+		int offset_y = 25;
+
+		option_panel = new JPanel();
+		option_panel.setBackground(Color.WHITE);
+		option_panel.setBorder(BorderFactory.createTitledBorder("Option"));
+		option_panel.setBounds(10, offset_y + 130, 290, 125);
+		option_panel.setLayout(null);
+		link_panel.add(option_panel);
+
+		JLabel neighbor_aa = new JLabel("# Neighbor AA - Residue:");
+		neighbor_aa.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		neighbor_aa.setBounds(10, offset_y - 10, 150, 40);
+		option_panel.add(neighbor_aa);
 
 		SpinnerModel model_neighborAA = new SpinnerNumberModel(Util.neighborAA.intValue(), // initial
 				// value
@@ -459,6 +572,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 				255, // max
 				1); // step
 		spinner_neighborAA = new JSpinner(model_neighborAA);
+		spinner_neighborAA.setEnabled(false);
 		spinner_neighborAA.setBounds(offset_x, offset_y, 60, 20);
 		JComponent comp_neighborAA = spinner_neighborAA.getEditor();
 		JFormattedTextField field_neighborAA = (JFormattedTextField) comp_neighborAA.getComponent(0);
@@ -474,15 +588,21 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			}
 		});
 		spinner_neighborAA.setToolTipText("Set a value between 0 and 100.");
-		link_panel.add(spinner_neighborAA);
+		option_panel.add(spinner_neighborAA);
 		offset_y += 30;
-		
+
+		JLabel transmem_neighbor_aa = new JLabel("# Neighbor AA - Transmembrane:");
+		transmem_neighbor_aa.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		transmem_neighbor_aa.setBounds(10, offset_y - 10, 190, 40);
+		option_panel.add(transmem_neighbor_aa);
+
 		SpinnerModel model_transmem_neighborAA = new SpinnerNumberModel(Util.neighborAA.intValue(), // initial
 				// value
 				1, // min
 				255, // max
 				1); // step
 		spinner_transmem_neighborAA = new JSpinner(model_transmem_neighborAA);
+		spinner_transmem_neighborAA.setEnabled(false);
 		spinner_transmem_neighborAA.setBounds(offset_x, offset_y, 60, 20);
 		JComponent comp_transmem_neighborAA = spinner_transmem_neighborAA.getEditor();
 		JFormattedTextField field_transmem_neighborAA = (JFormattedTextField) comp_transmem_neighborAA.getComponent(0);
@@ -498,13 +618,91 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			}
 		});
 		spinner_transmem_neighborAA.setToolTipText("Set a value between 0 and 100.");
-		link_panel.add(spinner_transmem_neighborAA);
+		option_panel.add(spinner_transmem_neighborAA);
+		offset_y += 30;
 
-		// Checkbox Conflict -> add + 30
-		offset_y += 60;
+		consider_domain_whole_ptn = new JCheckBox("Consider domain for entire protein");
+		consider_domain_whole_ptn.setBackground(Color.WHITE);
+		consider_domain_whole_ptn.setSelected(Util.consider_domain_whole_ptn);
+		consider_domain_whole_ptn.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		consider_domain_whole_ptn.setBounds(5, offset_y, 220, 20);
+
+		consider_domain_whole_ptn.addItemListener(new ItemListener() {
+			@Override
+			public void itemStateChanged(ItemEvent e) {
+				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
+					Util.consider_domain_whole_ptn = true;
+					P2LocationProps.setProperty("p2location.consider_domain_whole_ptn", "true");
+					spinner_transmem_neighborAA.setEnabled(false);
+					spinner_neighborAA.setEnabled(false);
+
+				} else {
+					Util.consider_domain_whole_ptn = false;
+					P2LocationProps.setProperty("p2location.consider_domain_whole_ptn", "false");
+					spinner_transmem_neighborAA.setEnabled(true);
+					spinner_neighborAA.setEnabled(true);
+				}
+			}
+		});
+		option_panel.add(consider_domain_whole_ptn);
+	}
+
+	/**
+	 * Method responsible for initializing buttons of link panel
+	 * 
+	 * @param offset_x     offset x
+	 * @param button_width button width
+	 */
+	private void init_prediction(int offset_x) {
+
+		int offset_y = 20;
+		int button_width = 38;
+		int button_height = 15;
+
+		if (Util.isWindows()) {
+			button_width = 65;
+			button_height = 20;
+		}
+
+		prediction_panel = new JPanel();
+		prediction_panel.setBackground(Color.WHITE);
+		prediction_panel.setBorder(BorderFactory.createTitledBorder("Prediction"));
+		prediction_panel.setBounds(10, offset_y + 275, 290, 260);
+		prediction_panel.setLayout(null);
+		link_panel.add(prediction_panel);
+
+		enable_conflict = new JCheckBox("Fix conflicts manually");
+		enable_conflict.setBackground(Color.WHITE);
+		enable_conflict.setSelected(Util.fixDomainManually);
+		enable_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		if (Util.isWindows())
+			enable_conflict.setBounds(5, offset_y, 155, 20);
+		else
+			enable_conflict.setBounds(5, offset_y, 170, 20);
+
+		prediction_panel.add(enable_conflict);
+		offset_y += 30;
+		enable_conflict.addItemListener(new ItemListener() {
+			@Override
+			public void itemStateChanged(ItemEvent e) {
+				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
+					spinner_deltaScore.setEnabled(false);
+					Util.fixDomainManually = true;
+					P2LocationProps.setProperty("p2location.fixDomainManually", "true");
+
+				} else {
+					spinner_deltaScore.setEnabled(true);
+					Util.fixDomainManually = false;
+					P2LocationProps.setProperty("p2location.fixDomainManually", "false");
+				}
+			}
+		});
+
+		this.init_fix_conflict(offset_x, button_width + 20, button_height);
+		offset_y += 80;
 
 		processButton = new JButton("Run");
-		processButton.setBounds(offset_x + 5, offset_y, button_width, 15);
+		processButton.setBounds(offset_x + 5, offset_y, button_width, button_height);
 		processButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 		processButton.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
@@ -534,7 +732,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 										"Prediction has been done successfully!\nEpoch(s): " + real_epochs
 												+ "\n# Unknown Residue location: "
 												+ ProcessProteinLocationTask.number_unknown_residues.get(real_epochs),
-										"P2Location - Predict protein location", JOptionPane.INFORMATION_MESSAGE,
+										"P2Location - Information", JOptionPane.INFORMATION_MESSAGE,
 										new ImageIcon(getClass().getResource("/images/logo.png")));
 
 								List<String> epochsList = new ArrayList<String>();
@@ -555,112 +753,85 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 					} else {
 						JOptionPane.showMessageDialog(null, "No network has been loaded!",
-								"P2Location - Predict protein location", JOptionPane.WARNING_MESSAGE,
+								"P2Location - Alert", JOptionPane.WARNING_MESSAGE,
 								new ImageIcon(getClass().getResource("/images/logo.png")));
 					}
 				}
 			}
 		});
-		link_panel.add(processButton);
+		prediction_panel.add(processButton);
 		enable_disable_spinners(false);
+
+		this.init_display_prediction(offset_x, button_width + 20, button_height);
 
 	}
 
 	/**
-	 * Method responsible for initializing link style features
+	 * Method responsible for initializing display panel
 	 * 
 	 * @param offset_x     offset x
 	 * @param button_width button width
 	 */
-	private void init_link_style_features(int offset_x, int button_width) {
+	private void init_fix_conflict(int offset_x, int button_width, int button_height) {
 
-		int offset_y = 132;
+		int offset_y = 15;
+		fix_conflict_panel = new JPanel();
+		fix_conflict_panel.setBackground(Color.WHITE);
+		fix_conflict_panel.setBorder(BorderFactory.createTitledBorder("Fix conflicts automatically"));
+		fix_conflict_panel.setBounds(10, offset_y + 30, 270, 75);
+		fix_conflict_panel.setLayout(null);
+		prediction_panel.add(fix_conflict_panel);
 
-		JLabel opacity_edge_link = new JLabel("Opacity:");
-		opacity_edge_link.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		opacity_edge_link.setBounds(10, offset_y, 100, 40);
-		link_panel.add(opacity_edge_link);
-		offset_y += 30;
+		JLabel epochLabel = new JLabel("\u0394 score:");
+		epochLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		epochLabel.setBounds(10, offset_y, 150, 40);
+		fix_conflict_panel.add(epochLabel);
 
-		JLabel width_edge_link_label = new JLabel("Width:");
-		width_edge_link_label.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		width_edge_link_label.setBounds(10, offset_y, 100, 40);
-		link_panel.add(width_edge_link_label);
+		offset_y += 8;
+		offset_x -= 10;
 
-		offset_y = 145;
-		offset_x = 140;
-		if (Util.isWindows())
-			offset_x = 135;
-		SpinnerModel model_opacity_edge_link = new SpinnerNumberModel(Util.edge_link_opacity.intValue(), // initial
+		SpinnerModel model_deltaScore = new SpinnerNumberModel(Util.deltaScore, // initial
 				// value
 				0, // min
-				255, // max
-				1); // step
-		spinner_opacity_edge_link = new JSpinner(model_opacity_edge_link);
-		spinner_opacity_edge_link.setBounds(offset_x, offset_y, 60, 20);
-		JComponent comp_opacitiy_edge_link = spinner_opacity_edge_link.getEditor();
-		JFormattedTextField field_opacity_edge_link = (JFormattedTextField) comp_opacitiy_edge_link.getComponent(0);
-		DefaultFormatter formatter_opacity_edge_link = (DefaultFormatter) field_opacity_edge_link.getFormatter();
-		formatter_opacity_edge_link.setCommitsOnValidEdit(true);
-		spinner_opacity_edge_link.addChangeListener(new ChangeListener() {
-
-			@Override
-			public void stateChanged(ChangeEvent e) {
-				Util.edge_link_opacity = (Integer) spinner_opacity_edge_link.getValue();
-				P2LocationProps.setProperty("p2location.edge_link_opacity", Util.edge_link_opacity.toString());
-
-				if (myNetwork != null && netView != null) {
-					Util.updateEdgesStyle(myNetwork, netView);
-				}
-			}
-		});
-		spinner_opacity_edge_link.setToolTipText("Set a value between 0 (transparent) and 255 (opaque).");
-		link_panel.add(spinner_opacity_edge_link);
-		offset_y += 30;
-
-		SpinnerModel width_edge_link = new SpinnerNumberModel(Util.edge_link_width, // initial
-				// value
-				1, // min
-				10.1, // max
+				100, // max
 				0.1); // step
-		spinner_width_edge_link = new JSpinner(width_edge_link);
-		spinner_width_edge_link.setBounds(offset_x, offset_y, 60, 20);
-		JComponent comp_width_edge_link = spinner_width_edge_link.getEditor();
-		JFormattedTextField field_width_edge_link = (JFormattedTextField) comp_width_edge_link.getComponent(0);
-		DefaultFormatter formatter_width_edge_link = (DefaultFormatter) field_width_edge_link.getFormatter();
-		formatter_width_edge_link.setCommitsOnValidEdit(true);
-		spinner_width_edge_link.addChangeListener(new ChangeListener() {
+		spinner_deltaScore = new JSpinner(model_deltaScore);
+		spinner_deltaScore.setEnabled(false);
+		spinner_deltaScore.setBounds(offset_x, offset_y, 60, 20);
+		JComponent comp_deltaScore = spinner_deltaScore.getEditor();
+		JFormattedTextField field_deltaScore = (JFormattedTextField) comp_deltaScore.getComponent(0);
+		DefaultFormatter formatter_deltaScore = (DefaultFormatter) field_deltaScore.getFormatter();
+		formatter_deltaScore.setCommitsOnValidEdit(true);
+		spinner_deltaScore.addChangeListener(new ChangeListener() {
 
 			@Override
 			public void stateChanged(ChangeEvent e) {
-				Util.edge_link_width = (double) spinner_width_edge_link.getValue();
-				P2LocationProps.setProperty("p2location.edge_link_width", String.valueOf(Util.edge_link_width));
+				Util.deltaScore = (Double) spinner_deltaScore.getValue();
+				P2LocationProps.setProperty("p2location.deltaScore", String.valueOf(Util.deltaScore));
 
-				if (myNetwork != null && netView != null) {
-					Util.updateEdgesStyle(myNetwork, netView);
-				}
 			}
 		});
-		spinner_width_edge_link.setToolTipText("Set a value between 1 and 10.");
-		link_panel.add(spinner_width_edge_link);
+		spinner_deltaScore.setToolTipText("Set a value between 0 and 100.");
+		fix_conflict_panel.add(spinner_deltaScore);
 
 	}
 
 	/**
-	 * Method responsible for initializing log score panel
+	 * Method responsible for initializing display panel
 	 * 
-	 * @param offset_x       offset x
-	 * @param combobox_width button width
+	 * @param offset_x     offset x
+	 * @param button_width button width
 	 */
-	private void init_prediction_features(int offset_x, int combobox_width) {
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private void init_display_prediction(int offset_x, int button_width, int button_height) {
 
 		int offset_y = 25;
 		display_prediction_panel = new JPanel();
 		display_prediction_panel.setBackground(Color.WHITE);
 		display_prediction_panel.setBorder(BorderFactory.createTitledBorder("Display"));
-		display_prediction_panel.setBounds(10, offset_y + 195, 290, 115);
+		display_prediction_panel.setBounds(10, offset_y + 125, 270, 95);
 		display_prediction_panel.setLayout(null);
-		link_panel.add(display_prediction_panel);
+		prediction_panel.add(display_prediction_panel);
 
 		JLabel epochLabel = new JLabel("Epoch:");
 		epochLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
@@ -680,7 +851,11 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		// Create the combo box, select item at index 4.
 		// Indices start at 0, so 4 specifies the pig.
 		epochCombobox = new JComboBox(epochsList.toArray());
-		epochCombobox.setBounds(offset_x, offset_y, 70, 40);
+		int combobox_height = 40;
+		if (Util.isWindows())
+			combobox_height = 15;
+
+		epochCombobox.setBounds(offset_x, offset_y, 70, combobox_height);
 		epochCombobox.setSelectedIndex(epochsList.size() - 1);
 		epochCombobox.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -691,9 +866,11 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		display_prediction_panel.add(epochCombobox);
 		offset_y += 40;
 		offset_x += 5;
+		if (Util.isWindows())
+			offset_x -= 20;
 
 		display_epochButton = new JButton("Update");
-		display_epochButton.setBounds(offset_x, offset_y, combobox_width, 15);
+		display_epochButton.setBounds(offset_x, offset_y, button_width, button_height);
 		display_epochButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 		display_epochButton.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
@@ -786,102 +963,6 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		});
 		display_prediction_panel.add(display_epochButton);
 		enable_disableDisplayBox(false, false);
-
-//		JLabel score_interlink = new JLabel("Interlink:");
-//		score_interlink.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-//		score_interlink.setBounds(10, offset_y, 100, 40);
-//		display_prediction_panel.add(score_interlink);
-//		offset_y += 30;
-//
-//		JLabel score_combinedlink = new JLabel("PPI link:");
-//		score_combinedlink.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-//		score_combinedlink.setBounds(10, offset_y, 100, 40);
-//		display_prediction_panel.add(score_combinedlink);
-//
-//		offset_y = 20;
-//		offset_x -= 10;
-//		if (!Util.isWindows())// MacOS or Unix
-//			offset_x -= 5;
-//
-//		SpinnerModel model_intralink_spinner = new SpinnerNumberModel(Util.intralink_threshold_score, // initial
-//				// value
-//				0, // min
-//				500, // max
-//				0.1); // step
-//		spinner_score_intralink = new JSpinner(model_intralink_spinner);
-//		spinner_score_intralink.setBounds(offset_x, offset_y, 60, 20);
-//		JComponent comp_score_intra_link = spinner_score_intralink.getEditor();
-//		JFormattedTextField field_score_intra_link = (JFormattedTextField) comp_score_intra_link.getComponent(0);
-//		DefaultFormatter formatter_score_intra_link = (DefaultFormatter) field_score_intra_link.getFormatter();
-//		formatter_score_intra_link.setCommitsOnValidEdit(true);
-//		spinner_score_intralink.addChangeListener(new ChangeListener() {
-//
-//			@Override
-//			public void stateChanged(ChangeEvent e) {
-//				Util.intralink_threshold_score = (double) spinner_score_intralink.getValue();
-//				P2LocationProps.setProperty("p2location.intralink_threshold_score",
-//						String.valueOf(Util.intralink_threshold_score));
-//
-//				if (myNetwork != null && netView != null) {
-//					Util.updateEdgesStyle(myNetwork, netView);
-//				}
-//			}
-//		});
-//		display_prediction_panel.add(spinner_score_intralink);
-//		offset_y += 30;
-//
-//		SpinnerModel model_interlink_spinner = new SpinnerNumberModel(Util.interlink_threshold_score, // initial
-//				// value
-//				0, // min
-//				500, // max
-//				0.1); // step
-//		spinner_score_interlink = new JSpinner(model_interlink_spinner);
-//		spinner_score_interlink.setBounds(offset_x, offset_y, 60, 20);
-//		JComponent comp_score_inter_link = spinner_score_interlink.getEditor();
-//		JFormattedTextField field_score_inter_link = (JFormattedTextField) comp_score_inter_link.getComponent(0);
-//		DefaultFormatter formatter_score_inter_link = (DefaultFormatter) field_score_inter_link.getFormatter();
-//		formatter_score_inter_link.setCommitsOnValidEdit(true);
-//		spinner_score_interlink.addChangeListener(new ChangeListener() {
-//
-//			@Override
-//			public void stateChanged(ChangeEvent e) {
-//				Util.interlink_threshold_score = (double) spinner_score_interlink.getValue();
-//				P2LocationProps.setProperty("p2location.interlink_threshold_score",
-//						String.valueOf(Util.interlink_threshold_score));
-//
-//				if (myNetwork != null && netView != null) {
-//					Util.updateEdgesStyle(myNetwork, netView);
-//				}
-//			}
-//		});
-//		display_prediction_panel.add(spinner_score_interlink);
-//		offset_y += 30;
-//
-//		SpinnerModel model_combinedlink_spinner = new SpinnerNumberModel(Util.combinedlink_threshold_score, // initial
-//				// value
-//				0, // min
-//				500, // max
-//				0.1); // step
-//		spinner_score_combinedlink = new JSpinner(model_combinedlink_spinner);
-//		spinner_score_combinedlink.setBounds(offset_x, offset_y, 60, 20);
-//		JComponent comp_score_combined_link = spinner_score_combinedlink.getEditor();
-//		JFormattedTextField field_score_combined_link = (JFormattedTextField) comp_score_combined_link.getComponent(0);
-//		DefaultFormatter formatter_score_combined_link = (DefaultFormatter) field_score_combined_link.getFormatter();
-//		formatter_score_combined_link.setCommitsOnValidEdit(true);
-//		spinner_score_combinedlink.addChangeListener(new ChangeListener() {
-//
-//			@Override
-//			public void stateChanged(ChangeEvent e) {
-//				Util.combinedlink_threshold_score = (double) spinner_score_combinedlink.getValue();
-//				P2LocationProps.setProperty("p2location.combinedlink_threshold_score",
-//						String.valueOf(Util.combinedlink_threshold_score));
-//				if (myNetwork != null && netView != null) {
-//					Util.filterUnmodifiedEdges(myNetwork, netView);
-//				}
-//
-//			}
-//		});
-//		display_prediction_panel.add(spinner_score_combinedlink);
 	}
 
 	public static void enable_disable_predictBox(boolean enable) {
@@ -966,261 +1047,6 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		for (CyNode cyNode : allNodes) {
 			myNetwork.getRow(cyNode).set(CyNetwork.SELECTED, false);
 		}
-	}
-
-	/**
-	 * Method responsible for initializing legends of the links
-	 * 
-	 * @param offset_x     offset x
-	 * @param button_width button width
-	 */
-	private void init_link_edge_labels_features(int offset_x, int button_width) {
-
-		int offset_y = 40;
-		link_legend_panel = new JPanel();
-		link_legend_panel.setBackground(Color.WHITE);
-		link_legend_panel.setBorder(BorderFactory.createTitledBorder("Edge labels"));
-		link_legend_panel.setBounds(10, 315, 230, 115);
-		link_legend_panel.setLayout(null);
-		link_panel.add(link_legend_panel);
-
-		JLabel font_size_links = new JLabel("Font size:");
-		font_size_links.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		font_size_links.setBounds(10, offset_y, 100, 40);
-		link_legend_panel.add(font_size_links);
-		offset_y += 30;
-
-		JLabel opacity_edge_label = new JLabel("Opacity:");
-		opacity_edge_label.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		opacity_edge_label.setBounds(10, offset_y, 100, 40);
-		link_legend_panel.add(opacity_edge_label);
-
-		offset_y = 50;
-		offset_x -= 10;
-		if (!Util.isWindows())// MacOS or Unix
-			offset_x -= 5;
-
-		SpinnerModel model_link = new SpinnerNumberModel(Util.edge_label_font_size.intValue(), // initial value
-				0, // min
-				100, // max
-				1); // step
-		spinner_font_size_link_legend = new JSpinner(model_link);
-		spinner_font_size_link_legend.setBounds(offset_x, offset_y, 60, 20);
-		JComponent comp_link = spinner_font_size_link_legend.getEditor();
-		JFormattedTextField field_link = (JFormattedTextField) comp_link.getComponent(0);
-		DefaultFormatter formatter_link = (DefaultFormatter) field_link.getFormatter();
-		formatter_link.setCommitsOnValidEdit(true);
-		spinner_font_size_link_legend.addChangeListener(new ChangeListener() {
-
-			@Override
-			public void stateChanged(ChangeEvent e) {
-				Util.edge_label_font_size = (Integer) spinner_font_size_link_legend.getValue();
-				P2LocationProps.setProperty("p2location.edge_label_font_size", Util.edge_label_font_size.toString());
-
-				if (myNetwork != null && netView != null) {
-					Util.updateEdgesStyle(myNetwork, netView);
-				}
-			}
-		});
-		link_legend_panel.add(spinner_font_size_link_legend);
-		offset_y += 30;
-
-		SpinnerModel model_opacity_edge_label = new SpinnerNumberModel(Util.edge_label_opacity.intValue(), // initial
-																											// value
-				0, // min
-				255, // max
-				1); // step
-		spinner_opacity_edge_label = new JSpinner(model_opacity_edge_label);
-		spinner_opacity_edge_label.setBounds(offset_x, offset_y, 60, 20);
-		JComponent comp_opacitiy_edge_label = spinner_opacity_edge_label.getEditor();
-		JFormattedTextField field_opacity_edge_label = (JFormattedTextField) comp_opacitiy_edge_label.getComponent(0);
-		DefaultFormatter formatter_opacity_edge_label = (DefaultFormatter) field_opacity_edge_label.getFormatter();
-		formatter_opacity_edge_label.setCommitsOnValidEdit(true);
-		spinner_opacity_edge_label.addChangeListener(new ChangeListener() {
-
-			@Override
-			public void stateChanged(ChangeEvent e) {
-				Util.edge_label_opacity = (Integer) spinner_opacity_edge_label.getValue();
-				P2LocationProps.setProperty("p2location.edge_label_opacity", Util.edge_label_opacity.toString());
-
-				if (myNetwork != null && netView != null) {
-					Util.updateEdgesStyle(myNetwork, netView);
-				}
-			}
-		});
-		spinner_opacity_edge_label.setToolTipText("Set a value between 0 (transparent) and 255 (opaque).");
-		link_legend_panel.add(spinner_opacity_edge_label);
-
-		offset_y = 25;
-		show_links_legend = new JCheckBox("Display");
-		show_links_legend.setBackground(Color.WHITE);
-		show_links_legend.setSelected(Util.showLinksLegend);
-		show_links_legend.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		show_links_legend.setBounds(5, offset_y, 200, 20);
-
-		if (!Util.showIntraLinks && !Util.showInterLinks) {
-			show_links_legend.setEnabled(false);
-		} else {
-			show_links_legend.setEnabled(true);
-		}
-
-		if (Util.showLinksLegend) {
-			spinner_font_size_link_legend.setEnabled(true);
-			spinner_opacity_edge_label.setEnabled(true);
-		} else {
-			spinner_font_size_link_legend.setEnabled(false);
-			spinner_opacity_edge_label.setEnabled(false);
-		}
-		show_links_legend.addItemListener(new ItemListener() {
-			@Override
-			public void itemStateChanged(ItemEvent e) {
-				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
-					spinner_font_size_link_legend.setEnabled(true);
-					spinner_opacity_edge_label.setEnabled(true);
-					Util.showLinksLegend = true;
-					P2LocationProps.setProperty("p2location.showLinksLegend", "true");
-				} else {
-					spinner_font_size_link_legend.setEnabled(false);
-					spinner_opacity_edge_label.setEnabled(false);
-					Util.showLinksLegend = false;
-					P2LocationProps.setProperty("p2location.showLinksLegend", "false");
-				}
-
-				if (myNetwork != null && netView != null) {
-					Util.updateEdgesStyle(myNetwork, netView);
-				}
-			}
-		});
-		link_legend_panel.add(show_links_legend);
-	}
-
-	/**
-	 * Method responsible for initializing check boxes of link colors
-	 * 
-	 * @param offset_x     offset x
-	 * @param button_width button width
-	 */
-	private void init_link_check_boxes_colors(int offset_x, int button_width) {
-
-		int offset_y = 20;
-		enable_epochs = new JCheckBox("Epochs:");
-		enable_epochs.setBackground(Color.WHITE);
-		enable_epochs.setSelected(Util.getEpochs);
-		enable_epochs.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-
-		if (Util.isWindows())
-			enable_epochs.setBounds(5, offset_y, 115, 20);
-		else
-			enable_epochs.setBounds(5, offset_y, 130, 20);
-
-		enable_epochs.addItemListener(new ItemListener() {
-			@Override
-			public void itemStateChanged(ItemEvent e) {
-				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
-					spinner_epochs.setEnabled(true);
-					Util.getEpochs = true;
-					P2LocationProps.setProperty("p2location.getEpochs", "true");
-
-				} else {
-					spinner_epochs.setEnabled(false);
-					Util.getEpochs = false;
-					P2LocationProps.setProperty("p2location.getEpochs", "false");
-				}
-			}
-		});
-		link_panel.add(enable_epochs);
-		offset_y += 30;
-
-		enable_score = new JCheckBox("-Log(Score):");
-		enable_score.setBackground(Color.WHITE);
-		enable_score.setSelected(Util.getThreshold_score);
-		enable_score.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		if (Util.isWindows())
-			enable_score.setBounds(5, offset_y, 115, 20);
-		else
-			enable_score.setBounds(5, offset_y, 130, 20);
-
-		enable_score.addItemListener(new ItemListener() {
-			@Override
-			public void itemStateChanged(ItemEvent e) {
-				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
-					spinner_score.setEnabled(true);
-					Util.getThreshold_score = true;
-					P2LocationProps.setProperty("p2location.getThreshold_score", "true");
-
-				} else {
-					spinner_score.setEnabled(false);
-					Util.getThreshold_score = false;
-					P2LocationProps.setProperty("p2location.getThreshold_score", "false");
-				}
-			}
-		});
-		link_panel.add(enable_score);
-		offset_y += 30;
-
-		enable_specCount = new JCheckBox("CSM(s):");
-		enable_specCount.setBackground(Color.WHITE);
-		enable_specCount.setSelected(Util.getSpecCount);
-		enable_specCount.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		if (Util.isWindows())
-			enable_specCount.setBounds(5, offset_y, 115, 20);
-		else
-			enable_specCount.setBounds(5, offset_y, 130, 20);
-
-		enable_specCount.addItemListener(new ItemListener() {
-			@Override
-			public void itemStateChanged(ItemEvent e) {
-				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
-					spinner_specCount.setEnabled(true);
-					Util.getSpecCount = true;
-					P2LocationProps.setProperty("p2location.getSpecCount", "true");
-
-				} else {
-					spinner_specCount.setEnabled(false);
-					Util.getSpecCount = false;
-					P2LocationProps.setProperty("p2location.getSpecCount", "false");
-				}
-			}
-		});
-		link_panel.add(enable_specCount);
-		offset_y += 20;
-
-		JLabel neighbor_aa = new JLabel("# Neighbor AA - Residue:");
-		neighbor_aa.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		neighbor_aa.setBounds(10, offset_y, 150, 40);
-		link_panel.add(neighbor_aa);
-		offset_y += 30;
-		
-		JLabel transmem_neighbor_aa = new JLabel("# Neighbor AA - Transmembrane:");
-		transmem_neighbor_aa.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		transmem_neighbor_aa.setBounds(10, offset_y, 190, 40);
-		link_panel.add(transmem_neighbor_aa);
-		offset_y += 40;
-
-		enable_conflict = new JCheckBox("Check conflict");
-		enable_conflict.setBackground(Color.WHITE);
-		enable_conflict.setSelected(Util.considerConflict);
-		enable_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		if (Util.isWindows())
-			enable_conflict.setBounds(5, offset_y, 115, 20);
-		else
-			enable_conflict.setBounds(5, offset_y, 130, 20);
-
-		enable_conflict.addItemListener(new ItemListener() {
-			@Override
-			public void itemStateChanged(ItemEvent e) {
-				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
-					Util.considerConflict = true;
-					P2LocationProps.setProperty("p2location.considerConflict", "true");
-
-				} else {
-					Util.considerConflict = false;
-					P2LocationProps.setProperty("p2location.considerConflict", "false");
-				}
-			}
-		});
-		link_panel.add(enable_conflict);
-
 	}
 
 	/**
@@ -1481,19 +1307,20 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		setLayout(new GridBagLayout());
 		this.setBackground(Color.WHITE);
 
-		int button_width = 38;
 		int offset_x = 205;// MacOS and Unix
 		int ipdax = 300;// MacOS and Unix
 		if (Util.isWindows()) {
-			offset_x = 195;
+			offset_x = 200;
 			ipdax = 250;
 		}
 
-		this.init_link_color_buttons(offset_x, button_width);
+		this.init_params();
+		this.init_filter(offset_x);
+		this.init_options(offset_x);
+		this.init_prediction(offset_x);
+
 //		this.init_link_style_features(offset_x, button_width);
-		this.init_prediction_features(offset_x, button_width + 20);
 //		this.init_link_edge_labels_features(offset_x, button_width);
-		this.init_link_check_boxes_colors(offset_x, button_width);
 
 		this.add(link_panel, new GridBagConstraints(0, 0, 1, 1, 1.0, 1.0, GridBagConstraints.NORTH,
 				GridBagConstraints.BOTH, new Insets(5, 0, 0, 0), ipdax, 440));

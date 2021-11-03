@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Image;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -16,8 +17,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -110,7 +109,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 	private boolean isCurrentNode_modified = false;
 
 	private Protein myProtein;
-	private ArrayList<PTM> myPTMs;
+//	private ArrayList<PTM> myPTMs;
 	private ArrayList<CrossLink> myMonolinks;
 
 	// Window
@@ -118,7 +117,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 	private JPanel mainPanel;
 	private JPanel protein_panel;
 	private JPanel domain_panel;
-	private JPanel ptm_panel;
+//	private JPanel ptm_panel;
 	private JLabel textLabel_status_result;
 	private String[] columnNamesDomainTable = { "Domain(*)", "Start Residue(*)", "End Residue(*)", "e-value", "Color" };
 	private final Class[] columnClassDomainTable = new Class[] { String.class, Integer.class, Integer.class,
@@ -130,7 +129,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 
 	private String[] columnNamesPTMTable = { "PTM", "Residue", "Position" };
 	private final Class[] columnClassPTMTable = new Class[] { String.class, String.class, Integer.class };
-	private DefaultTableModel ptmTableDataModel;
+//	private DefaultTableModel ptmTableDataModel;
 	private static JTable mainProteinPTMTable;
 	private static JList rowHeaderPTMTable;
 	private static JScrollPane proteinPTMTableScrollPanel;
@@ -139,15 +138,15 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 
 	private Thread pfamThread;
 	private Thread pyMOLThread;
-	private Thread uniprotThread;
+//	private Thread uniprotThread;
 	private JButton proteinDomainServerButton;
-	private JButton proteinPTMServerButton;
+//	private JButton proteinPTMServerButton;
 	private static Thread applyLayoutThread;
 	private static JButton okButton;
 
 	private boolean IsCommandLine;
 
-	private JButton pyMOLButton;
+//	private JButton pyMOLButton;
 
 	/**
 	 * Constructor
@@ -180,19 +179,19 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		Util.init_availableProteinDomainColorsMap();
 
 		if (mainFrame == null)
-			mainFrame = new JFrameWithoutMaxAndMinButton(new JFrame(), "Predict Location Protein - Single Node", 0);
+			mainFrame = new JFrameWithoutMaxAndMinButton(new JFrame(), "P2Location - Single Node", 0);
 
 		mainFrame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		Dimension appSize = null;
-
+		
 		if (Util.isWindows()) {
-			appSize = new Dimension(540, 615);
+			appSize = new Dimension(540, 465);
 		} else if (Util.isMac()) {
-			appSize = new Dimension(520, 585);
+			appSize = new Dimension(520, 435);
 		} else {
-			appSize = new Dimension(520, 610);
+			appSize = new Dimension(520, 460);
 		}
-
+		
 		mainFrame.setSize(appSize);
 		mainFrame.setResizable(false);
 
@@ -360,15 +359,15 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		Util.setNodeDomainColors(taskMonitor, myProtein, nodeView, myNetwork, node, vgFactory, lexicon);
 		taskMonitor.setProgress(0.75);
 
-		if (Util.showPTMs) {
-			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting post-translational modifications...");
-			getPTMs(node);
-
-			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Setting post-translational modifications to node...");
-			Util.setNodePTMs(taskMonitor, myNetwork, netView, node, style, handleFactory, bendFactory, lexicon, myPTMs,
-					false);
-			taskMonitor.setProgress(0.85);
-		}
+//		if (Util.showPTMs) {
+//			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting post-translational modifications...");
+//			getPTMs(node);
+//
+//			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Setting post-translational modifications to node...");
+//			Util.setNodePTMs(taskMonitor, myNetwork, netView, node, style, handleFactory, bendFactory, lexicon, myPTMs,
+//					false);
+//			taskMonitor.setProgress(0.85);
+//		}
 
 		if (Util.showMonolinkedPeptides) {
 			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting monolinks...");
@@ -446,10 +445,10 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		Util.setNodeStyles(myNetwork, node, netView, style);
 		taskMonitor.setProgress(0.2);
 
-		if (Util.showPTMs) {
-			Util.setNodePTMs(taskMonitor, myNetwork, netView, node, style, handleFactory, bendFactory, lexicon, myPTMs,
-					true);
-		}
+//		if (Util.showPTMs) {
+//			Util.setNodePTMs(taskMonitor, myNetwork, netView, node, style, handleFactory, bendFactory, lexicon, myPTMs,
+//					true);
+//		}
 
 		if (Util.showMonolinkedPeptides) {
 			Util.setMonolinksToNode(taskMonitor, myNetwork, netView, node, style, handleFactory, bendFactory, lexicon,
@@ -467,25 +466,25 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 	 * 
 	 * @param node
 	 */
-	private void getPTMs(CyNode node) {
-
-		boolean hasPTMs = false;
-
-		String network_name = myNetwork.toString();
-		if (Util.ptmsMap.containsKey(network_name)) {
-
-			Map<Long, List<PTM>> all_ptms = Util.ptmsMap.get(network_name);
-
-			if (all_ptms.containsKey(node.getSUID())) {
-				hasPTMs = true;
-				myPTMs = (ArrayList<PTM>) all_ptms.get(node.getSUID());
-			}
-		}
-
-		if (!hasPTMs) {
-			myPTMs = new ArrayList<PTM>();
-		}
-	}
+//	private void getPTMs(CyNode node) {
+//
+//		boolean hasPTMs = false;
+//
+//		String network_name = myNetwork.toString();
+//		if (Util.ptmsMap.containsKey(network_name)) {
+//
+//			Map<Long, List<PTM>> all_ptms = Util.ptmsMap.get(network_name);
+//
+//			if (all_ptms.containsKey(node.getSUID())) {
+//				hasPTMs = true;
+//				myPTMs = (ArrayList<PTM>) all_ptms.get(node.getSUID());
+//			}
+//		}
+//
+//		if (!hasPTMs) {
+//			myPTMs = new ArrayList<PTM>();
+//		}
+//	}
 
 	/**
 	 * Method responsible for getting the protein sequence of a respective node with
@@ -874,12 +873,19 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		logo_panel.setLayout(null);
 		mainPanel.add(logo_panel);
 
+		ImageIcon imageIcon = new javax.swing.ImageIcon(getClass().getResource("/images/logo.png")); // load the image
+																										// to a
+																										// imageIcon
+		Image image = imageIcon.getImage(); // transform it
+		Image newimg = image.getScaledInstance(130, 130, java.awt.Image.SCALE_SMOOTH); // scale it the smooth way
+		imageIcon = new ImageIcon(newimg); // transform it back
+
 		JLabel jLabelIcon = new JLabel();
 		if (Util.isWindows())
-			jLabelIcon.setBounds(70, -75, 300, 300);
+			jLabelIcon.setBounds(60, -25, 200, 200);
 		else
-			jLabelIcon.setBounds(55, -75, 300, 300);
-		jLabelIcon.setIcon(new javax.swing.ImageIcon(getClass().getResource("/images/logo.png")));
+			jLabelIcon.setBounds(45, -25, 200, 200);
+		jLabelIcon.setIcon(imageIcon);
 		logo_panel.add(jLabelIcon);
 
 		if (Util.isWindows())
@@ -887,15 +893,15 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		else
 			offset_y -= 25;
 
-		JLabel textLabel_PyMOL = new JLabel("Visualize structure (PyMOL):");
-		textLabel_PyMOL.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		if (Util.isWindows())
-			textLabel_PyMOL.setBounds(265, offset_y, 180, 40);
-		else if (Util.isMac())
-			textLabel_PyMOL.setBounds(290, offset_y, 180, 40);
-		else
-			textLabel_PyMOL.setBounds(292, offset_y, 180, 40);
-		mainPanel.add(textLabel_PyMOL);
+//		JLabel textLabel_PyMOL = new JLabel("Visualize structure (PyMOL):");
+//		textLabel_PyMOL.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+//		if (Util.isWindows())
+//			textLabel_PyMOL.setBounds(265, offset_y, 180, 40);
+//		else if (Util.isMac())
+//			textLabel_PyMOL.setBounds(290, offset_y, 180, 40);
+//		else
+//			textLabel_PyMOL.setBounds(292, offset_y, 180, 40);
+//		mainPanel.add(textLabel_PyMOL);
 
 		if (Util.isWindows())
 			offset_y += 5;
@@ -916,15 +922,15 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		textLabel_required_fields.setBounds(20, offset_y, 150, 50);
 		mainPanel.add(textLabel_required_fields);
 
-		if (Util.isWindows())
-			offset_y += 43;
-		else
-			offset_y += 40;
-
-		JLabel textLabel_search_for_ptms = new JLabel("Search for PTMs:");
-		textLabel_search_for_ptms.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		textLabel_search_for_ptms.setBounds(10, offset_y, 100, 40);
-		mainPanel.add(textLabel_search_for_ptms);
+//		if (Util.isWindows())
+//			offset_y += 43;
+//		else
+//			offset_y += 40;
+//
+//		JLabel textLabel_search_for_ptms = new JLabel("Search for PTMs:");
+//		textLabel_search_for_ptms.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+//		textLabel_search_for_ptms.setBounds(10, offset_y, 100, 40);
+//		mainPanel.add(textLabel_search_for_ptms);
 
 	}
 
@@ -1030,89 +1036,89 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		});
 		mainPanel.add(proteinDomainServerButton);
 
-		Icon iconPyMOLBtn = new ImageIcon(getClass().getResource("/images/pyMOL_logo.png"));
-		pyMOLButton = new JButton(iconPyMOLBtn);
-		if (Util.isWindows())
-			pyMOLButton.setBounds(455, 160, 30, 30);
-		else
-			pyMOLButton.setBounds(480, 160, 30, 30);
-
-		pyMOLButton.setEnabled(true);
-		pyMOLButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-		pyMOLButton.setToolTipText("Open PyMOL");
-
-		pyMOLButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent ae) {
-				taskMonitor.setTitle("Visualize protein structure");
-				pyMOLButton.setEnabled(false);
-
-				try {
-
-					pyMOLThread = new Thread() {
-						public void run() {
-
-							String msgINFO = "";
-
-							if (myProtein.intraLinks.size() == 0) {
-								msgINFO = "There is no myProtein.intraLinks";
-								textLabel_status_result.setText(msgINFO + ".");
-								taskMonitor.showMessage(TaskMonitor.Level.WARN,
-										msgINFO + " to protein: " + (String) myCurrentRow.getRaw(CyNetwork.NAME));
-
-								if (pyMOLButton != null)
-									pyMOLButton.setEnabled(true);
-								return;
-							}
-
-							if (textLabel_status_result != null)
-								textLabel_status_result.setText("Getting PDB information from Uniprot...");
-							taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting PDB information from Uniprot...");
-
-							Protein ptn = Util.getPDBidFromUniprot(myCurrentRow, taskMonitor);
-							List<PDB> pdbIds = ptn.pdbIds;
-							if (pdbIds.size() > 0) {
-								PDB pdbID = pdbIds.get(0);
-
-								if (pdbIds.size() > 1) {
-
-									// Open a window to select only one PDB
-									getPDBInformation(pdbIds, msgINFO, taskMonitor, ptn, null, true, "", false, false,
-											(String) myCurrentRow.getRaw(CyNetwork.NAME), false);
-
-									try {
-										pyMOLThread.join();
-									} catch (InterruptedException e) {
-										e.printStackTrace();
-									}
-								}
-
-								try {
-									processPDBFile(msgINFO, taskMonitor, pdbID, ptn);
-								} catch (Exception e) {
-									taskMonitor.showMessage(TaskMonitor.Level.ERROR, e.getMessage());
-								}
-
-							} else {
-
-								textLabel_status_result.setText("ERROR: Check Task History.");
-								taskMonitor.showMessage(TaskMonitor.Level.ERROR,
-										"There is no PDB for the protein: " + ptn.proteinID);
-
-								if (pyMOLButton != null)
-									pyMOLButton.setEnabled(true);
-								return;
-							}
-
-						}
-					};
-
-					pyMOLThread.start();
-
-				} catch (Exception exception) {
-				}
-			}
-		});
-		mainPanel.add(pyMOLButton);
+//		Icon iconPyMOLBtn = new ImageIcon(getClass().getResource("/images/pyMOL_logo.png"));
+//		pyMOLButton = new JButton(iconPyMOLBtn);
+//		if (Util.isWindows())
+//			pyMOLButton.setBounds(455, 160, 30, 30);
+//		else
+//			pyMOLButton.setBounds(480, 160, 30, 30);
+//
+//		pyMOLButton.setEnabled(true);
+//		pyMOLButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+//		pyMOLButton.setToolTipText("Open PyMOL");
+//
+//		pyMOLButton.addActionListener(new ActionListener() {
+//			public void actionPerformed(ActionEvent ae) {
+//				taskMonitor.setTitle("Visualize protein structure");
+//				pyMOLButton.setEnabled(false);
+//
+//				try {
+//
+//					pyMOLThread = new Thread() {
+//						public void run() {
+//
+//							String msgINFO = "";
+//
+//							if (myProtein.intraLinks.size() == 0) {
+//								msgINFO = "There is no intra links";
+//								textLabel_status_result.setText(msgINFO + ".");
+//								taskMonitor.showMessage(TaskMonitor.Level.WARN,
+//										msgINFO + " to protein: " + (String) myCurrentRow.getRaw(CyNetwork.NAME));
+//
+//								if (pyMOLButton != null)
+//									pyMOLButton.setEnabled(true);
+//								return;
+//							}
+//
+//							if (textLabel_status_result != null)
+//								textLabel_status_result.setText("Getting PDB information from Uniprot...");
+//							taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting PDB information from Uniprot...");
+//
+//							Protein ptn = Util.getPDBidFromUniprot(myCurrentRow, taskMonitor);
+//							List<PDB> pdbIds = ptn.pdbIds;
+//							if (pdbIds.size() > 0) {
+//								PDB pdbID = pdbIds.get(0);
+//
+//								if (pdbIds.size() > 1) {
+//
+//									// Open a window to select only one PDB
+//									getPDBInformation(pdbIds, msgINFO, taskMonitor, ptn, null, true, "", false, false,
+//											(String) myCurrentRow.getRaw(CyNetwork.NAME), false);
+//
+//									try {
+//										pyMOLThread.join();
+//									} catch (InterruptedException e) {
+//										e.printStackTrace();
+//									}
+//								}
+//
+//								try {
+//									processPDBFile(msgINFO, taskMonitor, pdbID, ptn);
+//								} catch (Exception e) {
+//									taskMonitor.showMessage(TaskMonitor.Level.ERROR, e.getMessage());
+//								}
+//
+//							} else {
+//
+//								textLabel_status_result.setText("ERROR: Check Task History.");
+//								taskMonitor.showMessage(TaskMonitor.Level.ERROR,
+//										"There is no PDB for the protein: " + ptn.proteinID);
+//
+//								if (pyMOLButton != null)
+//									pyMOLButton.setEnabled(true);
+//								return;
+//							}
+//
+//						}
+//					};
+//
+//					pyMOLThread.start();
+//
+//				} catch (Exception exception) {
+//				}
+//			}
+//		});
+//		mainPanel.add(pyMOLButton);
 
 		// ######## DOMAIN TABLE #########
 
@@ -1258,190 +1264,190 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 
 		// ######## END DOMAIN TABLE #########
 
-		proteinPTMServerButton = new JButton(iconBtn);
-		if (Util.isWindows())
-			proteinPTMServerButton.setBounds(108, 368, 30, 30);
-		else
-			proteinPTMServerButton.setBounds(113, 355, 30, 30);
-		proteinPTMServerButton.setEnabled(true);
-		proteinPTMServerButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-		proteinPTMServerButton.setToolTipText("Connect to Uniprot server");
-
-		proteinPTMServerButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent ae) {
-				taskMonitor.setTitle("Looking for PTMs");
-				proteinPTMServerButton.setEnabled(false);
-				try {
-
-					textLabel_status_result.setText("Accessing Uniprot database...");
-					taskMonitor.showMessage(TaskMonitor.Level.INFO, "Accessing Uniprot database...");
-					uniprotThread = new Thread() {
-						public void run() {
-							taskMonitor.setTitle("Looking for PTMs");
-
-							textLabel_status_result.setText("Getting protein information...");
-							taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting protein information...");
-							myPTMs = Util.getPTMs(myCurrentRow, taskMonitor);
-
-							taskMonitor.setProgress(0.4);
-							if (myPTMs.size() > 0)
-								textLabel_status_result.setText("Done!");
-							else {
-								textLabel_status_result.setText("WARNING: Check Task History.");
-								taskMonitor.showMessage(TaskMonitor.Level.WARN, "No ptm has been found for '"
-										+ myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME)
-										+ "'.");
-							}
-
-							Object[][] data = null;
-							if (myPTMs.size() > 0)
-								data = new Object[myPTMs.size()][3];
-							else
-								data = new Object[1][3];
-							ptmTableDataModel.setDataVector(data, columnNamesPTMTable);
-
-							int countPtnDomain = 0;
-							for (PTM domain : myPTMs) {
-								ptmTableDataModel.setValueAt(domain.name, countPtnDomain, 0);
-								ptmTableDataModel.setValueAt(domain.residue, countPtnDomain, 1);
-								ptmTableDataModel.setValueAt(domain.position, countPtnDomain, 2);
-								countPtnDomain++;
-							}
-
-							if (myPTMs.size() > 0)
-								setTableProperties(myPTMs.size(), 1);
-							else
-								setTableProperties(1, 1);
-							proteinPTMServerButton.setEnabled(true);
-						}
-					};
-
-					uniprotThread.start();
-
-				} catch (Exception exception) {
-				}
-			}
-		});
-		mainPanel.add(proteinPTMServerButton);
+//		proteinPTMServerButton = new JButton(iconBtn);
+//		if (Util.isWindows())
+//			proteinPTMServerButton.setBounds(108, 368, 30, 30);
+//		else
+//			proteinPTMServerButton.setBounds(113, 355, 30, 30);
+//		proteinPTMServerButton.setEnabled(true);
+//		proteinPTMServerButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+//		proteinPTMServerButton.setToolTipText("Connect to Uniprot server");
+//
+//		proteinPTMServerButton.addActionListener(new ActionListener() {
+//			public void actionPerformed(ActionEvent ae) {
+//				taskMonitor.setTitle("Looking for PTMs");
+//				proteinPTMServerButton.setEnabled(false);
+//				try {
+//
+//					textLabel_status_result.setText("Accessing Uniprot database...");
+//					taskMonitor.showMessage(TaskMonitor.Level.INFO, "Accessing Uniprot database...");
+//					uniprotThread = new Thread() {
+//						public void run() {
+//							taskMonitor.setTitle("Looking for PTMs");
+//
+//							textLabel_status_result.setText("Getting protein information...");
+//							taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting protein information...");
+//							myPTMs = Util.getPTMs(myCurrentRow, taskMonitor);
+//
+//							taskMonitor.setProgress(0.4);
+//							if (myPTMs.size() > 0)
+//								textLabel_status_result.setText("Done!");
+//							else {
+//								textLabel_status_result.setText("WARNING: Check Task History.");
+//								taskMonitor.showMessage(TaskMonitor.Level.WARN, "No ptm has been found for '"
+//										+ myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME)
+//										+ "'.");
+//							}
+//
+//							Object[][] data = null;
+//							if (myPTMs.size() > 0)
+//								data = new Object[myPTMs.size()][3];
+//							else
+//								data = new Object[1][3];
+//							ptmTableDataModel.setDataVector(data, columnNamesPTMTable);
+//
+//							int countPtnDomain = 0;
+//							for (PTM domain : myPTMs) {
+//								ptmTableDataModel.setValueAt(domain.name, countPtnDomain, 0);
+//								ptmTableDataModel.setValueAt(domain.residue, countPtnDomain, 1);
+//								ptmTableDataModel.setValueAt(domain.position, countPtnDomain, 2);
+//								countPtnDomain++;
+//							}
+//
+//							if (myPTMs.size() > 0)
+//								setTableProperties(myPTMs.size(), 1);
+//							else
+//								setTableProperties(1, 1);
+//							proteinPTMServerButton.setEnabled(true);
+//						}
+//					};
+//
+//					uniprotThread.start();
+//
+//				} catch (Exception exception) {
+//				}
+//			}
+//		});
+//		mainPanel.add(proteinPTMServerButton);
 
 		// ######## PTM TABLE ################
 
-		Object[][] ptmDataObj = new Object[1][3];
-		// create table model with data
-		ptmTableDataModel = new DefaultTableModel(ptmDataObj, columnNamesPTMTable) {
-			/**
-			 * 
-			 */
-			private static final long serialVersionUID = 1L;
-
-			@Override
-			public boolean isCellEditable(int row, int column) {
-				return true;
-			}
-
-			@Override
-			public Class<?> getColumnClass(int columnIndex) {
-				return columnClassPTMTable[columnIndex];
-			}
-
-			@Override
-			public void setValueAt(Object data, int row, int column) {
-				if (column == 1)
-					super.setValueAt(data.toString().toUpperCase().charAt(0), row, column);
-				else
-					super.setValueAt(data, row, column);
-			}
-
-		};
-
-		getPTMs(node); // Fill in myPTMs collection based on the main Map
-						// (Util.ptmsMap)
-
-		mainProteinPTMTable = new JTable(ptmTableDataModel);
-		// Create the scroll pane and add the table to it.
-		proteinPTMTableScrollPanel = new JScrollPane();
-
-		if (Util.isWindows())
-			proteinPTMTableScrollPanel.setBounds(8, 20, 485, 90);
-		else
-			proteinPTMTableScrollPanel.setBounds(8, 20, 485, 90);
-		proteinPTMTableScrollPanel.setViewportView(mainProteinPTMTable);
-		proteinPTMTableScrollPanel.setRowHeaderView(rowHeaderPTMTable);
-
-		ptm_panel = new JPanel();
-		ptm_panel.setBorder(BorderFactory.createTitledBorder("Post-translational modifications"));
-		if (Util.isWindows())
-			ptm_panel.setBounds(10, 405, 503, 120);
-		else
-			ptm_panel.setBounds(10, 395, 503, 120);
-		ptm_panel.setLayout(null);
-		mainPanel.add(ptm_panel);
-
-		ptm_panel.add(proteinPTMTableScrollPanel);
-
-		if (myPTMs != null && myPTMs.size() > 0) {
-			ptmDataObj = new Object[myPTMs.size()][5];
-			ptmTableDataModel.setDataVector(ptmDataObj, columnNamesPTMTable);
-
-			int countPTM = 0;
-			for (PTM ptm : myPTMs) {
-				ptmTableDataModel.setValueAt(ptm.name, countPTM, 0);
-				ptmTableDataModel.setValueAt(ptm.residue, countPTM, 1);
-				ptmTableDataModel.setValueAt(ptm.position, countPTM, 2);
-				countPTM++;
-			}
-			setTableProperties(myPTMs.size(), 1);
-		} else {
-			setTableProperties(1, 1);
-		}
-
-		Action insertLineToTableActionPTMTable = new AbstractAction("insertLineToPTMTable") {
-			/**
-			 * 
-			 */
-			private static final long serialVersionUID = 1L;
-
-			public void actionPerformed(ActionEvent evt) {
-				ptmTableDataModel.addRow(new Object[] { "" });
-				Util.updateRowHeader(ptmTableDataModel.getRowCount(), mainProteinPTMTable, rowHeaderPTMTable,
-						proteinPTMTableScrollPanel);
-				textLabel_status_result.setText("PTM table: row has been inserted.");
-			}
-		};
-
-		KeyStroke keyStrokeInsertLinePTMTable = KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.CTRL_DOWN_MASK);
-		mainProteinPTMTable.getActionMap().put("insertLineToPTMTable", insertLineToTableActionPTMTable);
-		mainProteinPTMTable.getInputMap(JTable.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(keyStrokeInsertLinePTMTable,
-				"insertLineToPTMTable");
-
-		Action deleteLineToPTMTableAction = new AbstractAction("deleteLineToPTMTable") {
-			/**
-			 * 
-			 */
-			private static final long serialVersionUID = 1L;
-
-			public void actionPerformed(ActionEvent evt) {
-
-				if (mainProteinPTMTable.getSelectedRow() != -1) {
-
-					int input = JOptionPane.showConfirmDialog(null, "Do you confirm the removal of the line "
-							+ (mainProteinPTMTable.getSelectedRow() + 1) + "?");
-					// 0=yes, 1=no, 2=cancel
-					if (input == 0) {
-						// remove selected row from the model
-						ptmTableDataModel.removeRow(mainProteinPTMTable.getSelectedRow());
-						Util.updateRowHeader(ptmTableDataModel.getRowCount(), mainProteinPTMTable, rowHeaderPTMTable,
-								proteinPTMTableScrollPanel);
-						textLabel_status_result.setText("PTM table: row has been deleted.");
-					}
-				}
-			}
-		};
-
-		KeyStroke keyStrokeDeleteLinePTM = KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK);
-		mainProteinPTMTable.getActionMap().put("deleteLineToPTMTable", deleteLineToPTMTableAction);
-		mainProteinPTMTable.getInputMap(JTable.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(keyStrokeDeleteLinePTM,
-				"deleteLineToPTMTable");
+//		Object[][] ptmDataObj = new Object[1][3];
+//		// create table model with data
+//		ptmTableDataModel = new DefaultTableModel(ptmDataObj, columnNamesPTMTable) {
+//			/**
+//			 * 
+//			 */
+//			private static final long serialVersionUID = 1L;
+//
+//			@Override
+//			public boolean isCellEditable(int row, int column) {
+//				return true;
+//			}
+//
+//			@Override
+//			public Class<?> getColumnClass(int columnIndex) {
+//				return columnClassPTMTable[columnIndex];
+//			}
+//
+//			@Override
+//			public void setValueAt(Object data, int row, int column) {
+//				if (column == 1)
+//					super.setValueAt(data.toString().toUpperCase().charAt(0), row, column);
+//				else
+//					super.setValueAt(data, row, column);
+//			}
+//
+//		};
+//
+//		getPTMs(node); // Fill in myPTMs collection based on the main Map
+//						// (Util.ptmsMap)
+//
+//		mainProteinPTMTable = new JTable(ptmTableDataModel);
+//		// Create the scroll pane and add the table to it.
+//		proteinPTMTableScrollPanel = new JScrollPane();
+//
+//		if (Util.isWindows())
+//			proteinPTMTableScrollPanel.setBounds(8, 20, 485, 90);
+//		else
+//			proteinPTMTableScrollPanel.setBounds(8, 20, 485, 90);
+//		proteinPTMTableScrollPanel.setViewportView(mainProteinPTMTable);
+//		proteinPTMTableScrollPanel.setRowHeaderView(rowHeaderPTMTable);
+//
+//		ptm_panel = new JPanel();
+//		ptm_panel.setBorder(BorderFactory.createTitledBorder("Post-translational modifications"));
+//		if (Util.isWindows())
+//			ptm_panel.setBounds(10, 405, 503, 120);
+//		else
+//			ptm_panel.setBounds(10, 395, 503, 120);
+//		ptm_panel.setLayout(null);
+//		mainPanel.add(ptm_panel);
+//
+//		ptm_panel.add(proteinPTMTableScrollPanel);
+//
+//		if (myPTMs != null && myPTMs.size() > 0) {
+//			ptmDataObj = new Object[myPTMs.size()][5];
+//			ptmTableDataModel.setDataVector(ptmDataObj, columnNamesPTMTable);
+//
+//			int countPTM = 0;
+//			for (PTM ptm : myPTMs) {
+//				ptmTableDataModel.setValueAt(ptm.name, countPTM, 0);
+//				ptmTableDataModel.setValueAt(ptm.residue, countPTM, 1);
+//				ptmTableDataModel.setValueAt(ptm.position, countPTM, 2);
+//				countPTM++;
+//			}
+//			setTableProperties(myPTMs.size(), 1);
+//		} else {
+//			setTableProperties(1, 1);
+//		}
+//
+//		Action insertLineToTableActionPTMTable = new AbstractAction("insertLineToPTMTable") {
+//			/**
+//			 * 
+//			 */
+//			private static final long serialVersionUID = 1L;
+//
+//			public void actionPerformed(ActionEvent evt) {
+//				ptmTableDataModel.addRow(new Object[] { "" });
+//				Util.updateRowHeader(ptmTableDataModel.getRowCount(), mainProteinPTMTable, rowHeaderPTMTable,
+//						proteinPTMTableScrollPanel);
+//				textLabel_status_result.setText("PTM table: row has been inserted.");
+//			}
+//		};
+//
+//		KeyStroke keyStrokeInsertLinePTMTable = KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.CTRL_DOWN_MASK);
+//		mainProteinPTMTable.getActionMap().put("insertLineToPTMTable", insertLineToTableActionPTMTable);
+//		mainProteinPTMTable.getInputMap(JTable.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(keyStrokeInsertLinePTMTable,
+//				"insertLineToPTMTable");
+//
+//		Action deleteLineToPTMTableAction = new AbstractAction("deleteLineToPTMTable") {
+//			/**
+//			 * 
+//			 */
+//			private static final long serialVersionUID = 1L;
+//
+//			public void actionPerformed(ActionEvent evt) {
+//
+//				if (mainProteinPTMTable.getSelectedRow() != -1) {
+//
+//					int input = JOptionPane.showConfirmDialog(null, "Do you confirm the removal of the line "
+//							+ (mainProteinPTMTable.getSelectedRow() + 1) + "?");
+//					// 0=yes, 1=no, 2=cancel
+//					if (input == 0) {
+//						// remove selected row from the model
+//						ptmTableDataModel.removeRow(mainProteinPTMTable.getSelectedRow());
+//						Util.updateRowHeader(ptmTableDataModel.getRowCount(), mainProteinPTMTable, rowHeaderPTMTable,
+//								proteinPTMTableScrollPanel);
+//						textLabel_status_result.setText("PTM table: row has been deleted.");
+//					}
+//				}
+//			}
+//		};
+//
+//		KeyStroke keyStrokeDeleteLinePTM = KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK);
+//		mainProteinPTMTable.getActionMap().put("deleteLineToPTMTable", deleteLineToPTMTableAction);
+//		mainProteinPTMTable.getInputMap(JTable.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(keyStrokeDeleteLinePTM,
+//				"deleteLineToPTMTable");
 
 		// ######## END PTM TABLE ############
 
@@ -1450,11 +1456,11 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		okButton.setText("OK");
 
 		if (Util.isWindows()) {
-			okButton.setBounds(30, 535, 220, 25);
+			okButton.setBounds(30, 375, 220, 25);
 		} else if (Util.isMac()) {
-			okButton.setBounds(30, 520, 220, 25);
+			okButton.setBounds(30, 360, 220, 25);
 		} else {
-			okButton.setBounds(30, 525, 220, 25);
+			okButton.setBounds(30, 365, 220, 25);
 		}
 
 		okButton.setEnabled(true);
@@ -1495,15 +1501,15 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 							taskMonitor.showMessage(TaskMonitor.Level.WARN, e2.getMessage());
 						}
 
-						if (Util.showPTMs) {
-							try {
-								getNodePTMsFromTable();
-								taskMonitor.setProgress(0.4);
-							} catch (Exception e2) {
-								textLabel_status_result.setText(e2.getMessage());
-								taskMonitor.showMessage(TaskMonitor.Level.WARN, e2.getMessage());
-							}
-						}
+//						if (Util.showPTMs) {
+//							try {
+//								getNodePTMsFromTable();
+//								taskMonitor.setProgress(0.4);
+//							} catch (Exception e2) {
+//								textLabel_status_result.setText(e2.getMessage());
+//								taskMonitor.showMessage(TaskMonitor.Level.WARN, e2.getMessage());
+//							}
+//						}
 
 						textLabel_status_result.setText("Setting protein domains to node...");
 						taskMonitor.showMessage(TaskMonitor.Level.INFO, "Setting protein domains to node...");
@@ -1516,14 +1522,14 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 						textLabel_status_result.setText("Setting ptms to node...");
 						taskMonitor.showMessage(TaskMonitor.Level.INFO, "Setting ptms to node...");
 
-						if (Util.showPTMs) {
-							Util.setNodePTMs(taskMonitor, myNetwork, netView, node, style, handleFactory, bendFactory,
-									lexicon, myPTMs, false);
-							taskMonitor.setProgress(0.90);
-
-							update_ptms_table(taskMonitor, myPTMs);
-							taskMonitor.setProgress(0.92);
-						}
+//						if (Util.showPTMs) {
+//							Util.setNodePTMs(taskMonitor, myNetwork, netView, node, style, handleFactory, bendFactory,
+//									lexicon, myPTMs, false);
+//							taskMonitor.setProgress(0.90);
+//
+//							update_ptms_table(taskMonitor, myPTMs);
+//							taskMonitor.setProgress(0.92);
+//						}
 
 						if (Util.showMonolinkedPeptides) {
 							taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting monolinks...");
@@ -1571,11 +1577,11 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		cancelButton.setText("Cancel");
 
 		if (Util.isWindows()) {
-			cancelButton.setBounds(265, 535, 220, 25);
+			cancelButton.setBounds(265, 375, 220, 25);
 		} else if (Util.isMac()) {
-			cancelButton.setBounds(265, 520, 220, 25);
+			cancelButton.setBounds(265, 360, 220, 25);
 		} else {
-			cancelButton.setBounds(265, 525, 220, 25);
+			cancelButton.setBounds(265, 365, 220, 25);
 		}
 
 		cancelButton.addMouseListener(new MouseAdapter() {
@@ -1592,9 +1598,9 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		restoreStyleButton.setText("Restore style");
 
 		if (Util.isWindows()) {
-			restoreStyleButton.setBounds(390, 195, 120, 25);
+			restoreStyleButton.setBounds(390, 170, 120, 25);
 		} else {
-			restoreStyleButton.setBounds(390, 190, 120, 25);
+			restoreStyleButton.setBounds(390, 165, 120, 25);
 		}
 
 		restoreStyleButton.addMouseListener(new MouseAdapter() {
@@ -1925,7 +1931,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 			if (textLabel_status_result != null) {
 
 				textLabel_status_result.setText("ERROR: Check Task History.");
-				pyMOLButton.setEnabled(true);
+//				pyMOLButton.setEnabled(true);
 				return;
 
 			} else {
@@ -1941,7 +1947,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		if (textLabel_status_result != null) {
 
 			textLabel_status_result.setText("Done!");
-			pyMOLButton.setEnabled(true);
+//			pyMOLButton.setEnabled(true);
 		}
 
 	}
@@ -1974,7 +1980,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 				if (textLabel_status_result != null) {
 
 					textLabel_status_result.setText("ERROR: Check Task History.");
-					pyMOLButton.setEnabled(true);
+//					pyMOLButton.setEnabled(true);
 				}
 
 				taskMonitor.showMessage(TaskMonitor.Level.ERROR, "There is no PDB for the protein: " + ptn.proteinID);
@@ -1989,7 +1995,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 			if (textLabel_status_result != null) {
 
 				textLabel_status_result.setText("ERROR: Check Task History.");
-				pyMOLButton.setEnabled(true);
+//				pyMOLButton.setEnabled(true);
 			} else {
 				JOptionPane.showMessageDialog(null, "Error creating PDB file.", "P2Location - Alert",
 						JOptionPane.ERROR_MESSAGE);
@@ -2040,7 +2046,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 			if (textLabel_status_result != null) {
 
 				textLabel_status_result.setText("ERROR: Check Task History.");
-				pyMOLButton.setEnabled(true);
+//				pyMOLButton.setEnabled(true);
 			} else {
 				JOptionPane.showMessageDialog(null, "Error creating PyMOL script file.", "P2Location - Alert",
 						JOptionPane.ERROR_MESSAGE);
@@ -2056,7 +2062,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 			if (textLabel_status_result != null) {
 
 				textLabel_status_result.setText("Done!");
-				pyMOLButton.setEnabled(true);
+//				pyMOLButton.setEnabled(true);
 			}
 
 		}
@@ -2243,30 +2249,30 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 	 * 
 	 * @throws Exception
 	 */
-	private void getNodePTMsFromTable() throws Exception {
-
-		myPTMs = new ArrayList<PTM>();
-
-		for (int row = 0; row < ptmTableDataModel.getRowCount(); row++) {
-
-			String description = ptmTableDataModel.getValueAt(row, 0) != null
-					? ptmTableDataModel.getValueAt(row, 0).toString()
-					: "";
-
-			char residue = ptmTableDataModel.getValueAt(row, 1) != null
-					? ptmTableDataModel.getValueAt(row, 1).toString().charAt(0)
-					: "".charAt(0);
-			int position = ptmTableDataModel.getValueAt(row, 2) != null ? (int) ptmTableDataModel.getValueAt(row, 2)
-					: 0;
-
-			myPTMs.add(new PTM(description, residue, position));
-		}
-
-		if (myPTMs.size() == 0) {
-			throw new Exception("WARNING: No ptm has been found.");
-		}
-
-	}
+//	private void getNodePTMsFromTable() throws Exception {
+//
+//		myPTMs = new ArrayList<PTM>();
+//
+//		for (int row = 0; row < ptmTableDataModel.getRowCount(); row++) {
+//
+//			String description = ptmTableDataModel.getValueAt(row, 0) != null
+//					? ptmTableDataModel.getValueAt(row, 0).toString()
+//					: "";
+//
+//			char residue = ptmTableDataModel.getValueAt(row, 1) != null
+//					? ptmTableDataModel.getValueAt(row, 1).toString().charAt(0)
+//					: "".charAt(0);
+//			int position = ptmTableDataModel.getValueAt(row, 2) != null ? (int) ptmTableDataModel.getValueAt(row, 2)
+//					: 0;
+//
+//			myPTMs.add(new PTM(description, residue, position));
+//		}
+//
+//		if (myPTMs.size() == 0) {
+//			throw new Exception("WARNING: No ptm has been found.");
+//		}
+//
+//	}
 
 	/**
 	 * Get all domains assigned on the Table
