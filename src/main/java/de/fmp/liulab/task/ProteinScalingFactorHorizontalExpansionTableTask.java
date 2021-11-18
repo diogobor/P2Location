@@ -207,6 +207,55 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			}
 		}
 
+		// ######## SUBCELLULAR LOCATION ########
+		if (nodeTable.getColumn(Util.SUBCELLULAR_LOCATION_COLUMN) == null) {
+			try {
+				nodeTable.createColumn(Util.SUBCELLULAR_LOCATION_COLUMN, String.class, false);
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					row.set(Util.SUBCELLULAR_LOCATION_COLUMN, "");
+				}
+
+			} catch (IllegalArgumentException e) {
+				try {
+					for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+						if (row.get(Util.SUBCELLULAR_LOCATION_COLUMN, String.class) == null)
+							row.set(Util.SUBCELLULAR_LOCATION_COLUMN, "");
+					}
+				} catch (Exception e2) {
+				}
+			} catch (Exception e) {
+			}
+
+		} else { // The column exists, but it's necessary to check the cells
+			try {
+
+				// Check if proteinDomainsMap has been initialized
+				boolean proteinsMapOK = true;
+				if (Util.proteinsMap == null)
+					proteinsMapOK = false;
+
+				// Initialize protein domain colors map if LoadProteinDomainTask has not been
+				// initialized
+				Util.init_availableProteinDomainColorsMap();
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					if (row.get(Util.SUBCELLULAR_LOCATION_COLUMN, String.class) == null)
+						row.set(Util.SUBCELLULAR_LOCATION_COLUMN, "");
+					else {
+						String nodeName = row.get(CyNetwork.NAME, String.class);
+						String location = row.get(Util.SUBCELLULAR_LOCATION_COLUMN, String.class);
+
+						if (!(location.isBlank() || location.isEmpty()) && proteinsMapOK) {
+
+							updateProteinMapWithSubcellularLocation(nodeName, location, taskMonitor);
+						}
+					}
+				}
+			} catch (Exception e) {
+			}
+		}
+
 		// ######## PROTEIN DOMAINS ########
 		if (nodeTable.getColumn(Util.PROTEIN_DOMAIN_COLUMN) == null) {
 			try {
@@ -446,7 +495,7 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			}
 		}
 
-		Util.updateProteins(taskMonitor, myNetwork, null, true);
+		Util.updateProteins(taskMonitor, myNetwork, null, true, true);
 
 		isProcessing = false;
 	}
@@ -473,7 +522,36 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 				_myProtein.sequence = proteinSequence;
 				ProcessProteinLocationTask.addReactionSites(_myProtein);
 			} else {
-				_myProtein = new Protein(nodeName, nodeName, proteinSequence);
+				_myProtein = new Protein(nodeName, nodeName, proteinSequence, "");
+				ProcessProteinLocationTask.addReactionSites(_myProtein);
+				proteinList.add(_myProtein);
+			}
+		}
+	}
+
+	/**
+	 * Method responsible for updating protein map with sequence
+	 * 
+	 * @param nodeName    nome name
+	 * @param location    protein sequence
+	 * @param taskMonitor task monitor
+	 */
+	private void updateProteinMapWithSubcellularLocation(String nodeName, String location, TaskMonitor taskMonitor) {
+
+		if (!(location.isBlank() || location.isEmpty())) {
+
+			// Update proteinsMap
+			List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+			Optional<Protein> isPtnPresent = proteinList.stream().filter(value -> value.gene.equals(nodeName))
+					.findFirst();
+
+			Protein _myProtein;
+			if (isPtnPresent.isPresent()) {
+				_myProtein = isPtnPresent.get();
+				_myProtein.location = location;
+				ProcessProteinLocationTask.addReactionSites(_myProtein);
+			} else {
+				_myProtein = new Protein(nodeName, nodeName, "", location);
 				ProcessProteinLocationTask.addReactionSites(_myProtein);
 				proteinList.add(_myProtein);
 			}

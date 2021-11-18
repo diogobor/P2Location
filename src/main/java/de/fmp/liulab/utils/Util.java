@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.swing.AbstractListModel;
 import javax.swing.JLabel;
@@ -89,6 +89,7 @@ public class Util {
 	public static String PREDICTED_PROTEIN_DOMAIN_COLUMN = PROJECT_NAME + "predicted_domains";
 	public static String CONFLICTED_PREDICTED_RESIDUES_COLUMN = PROJECT_NAME + "conflicted_residues";
 	public static String PROTEIN_SEQUENCE_COLUMN = PROJECT_NAME + "sequence";
+	public static String SUBCELLULAR_LOCATION_COLUMN = PROJECT_NAME + "subcellular_location";
 	public static String PTM_COLUMN = PROJECT_NAME + "ptms";
 	public static String MONOLINK_COLUMN = PROJECT_NAME + "monolinks";
 	public static String PROTEIN_LENGTH_A = "length_protein_a";
@@ -964,7 +965,7 @@ public class Util {
 	 * @param myNetwork   current network
 	 */
 	public static void updateProteins(TaskMonitor taskMonitor, CyNetwork myNetwork, JLabel textLabel_status_result,
-			boolean getXLs) {
+			boolean getXLs, boolean updateResiduesLocation) {
 
 		if (taskMonitor != null)
 			taskMonitor.setTitle("Updating proteins");
@@ -988,6 +989,7 @@ public class Util {
 
 			fillProteinDomainColumns(myNetwork, protein, node);
 			fillProteinSequenceColumn(myNetwork, protein, node);
+			fillSubcellularLocationColumn(myNetwork, protein, node);
 			fillConflictedResiduesColumn(myNetwork, protein, node);
 
 			/**
@@ -1003,7 +1005,7 @@ public class Util {
 					textLabel_status_result);
 		}
 
-		if (getXLs)
+		if (updateResiduesLocation)
 			updateAllXLLocationBasedOnProteinDomains(taskMonitor, myNetwork, textLabel_status_result);
 
 	}
@@ -1025,6 +1027,43 @@ public class Util {
 
 		addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, list_residues,
 				CONFLICTED_PREDICTED_RESIDUES_COLUMN);
+	}
+	
+	/**
+	 * Method responsible for filling subcellular location column
+	 * 
+	 * @param myNetwork current network
+	 * @param protein   current protein
+	 * @param node      current node
+	 */
+	private static void fillSubcellularLocationColumn(CyNetwork myNetwork, final Protein protein, CyNode node) {
+
+		if (myNetwork.getRow(node).get(SUBCELLULAR_LOCATION_COLUMN, String.class) != null)
+			myNetwork.getRow(node).set(SUBCELLULAR_LOCATION_COLUMN, protein.location);
+		else {
+			// Create Scaling factor protein column
+			CyTable nodeTable = myNetwork.getDefaultNodeTable();
+			if (nodeTable.getColumn(SUBCELLULAR_LOCATION_COLUMN) == null) {
+				try {
+					nodeTable.createColumn(SUBCELLULAR_LOCATION_COLUMN, String.class, false);
+
+					CyRow row = myNetwork.getRow(node);
+					row.set(SUBCELLULAR_LOCATION_COLUMN, protein.location);
+
+				} catch (IllegalArgumentException e) {
+					try {
+						CyRow row = myNetwork.getRow(node);
+						row.set(SUBCELLULAR_LOCATION_COLUMN, protein.location);
+
+					} catch (Exception e2) {
+					}
+				} catch (Exception e) {
+				}
+			} else {
+				CyRow row = myNetwork.getRow(node);
+				row.set(SUBCELLULAR_LOCATION_COLUMN, protein.location);
+			}
+		}
 	}
 
 	/**
@@ -3293,7 +3332,13 @@ public class Util {
 		nodeView.setLockedValue(BasicVisualLexicon.NODE_LABEL_FONT_SIZE, Util.node_label_font_size);
 		nodeView.setLockedValue(BasicVisualLexicon.NODE_SELECTED_PAINT, new Color(131, 131, 131, 70));
 		nodeView.setLockedValue(BasicVisualLexicon.NODE_BORDER_WIDTH, Util.node_border_width);
-		nodeView.setLockedValue(BasicVisualLexicon.NODE_BORDER_PAINT, Util.NodeBorderColor);
+
+		String node_name = myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME).toString();
+		Protein ptn = Util.getProtein(myNetwork, node_name);
+		if (ptn.isConflictedDomain)
+			nodeView.setLockedValue(BasicVisualLexicon.NODE_BORDER_PAINT, Color.red);
+		else
+			nodeView.setLockedValue(BasicVisualLexicon.NODE_BORDER_PAINT, Util.NodeBorderColor);
 		nodeView.setLockedValue(BasicVisualLexicon.NODE_SHAPE, NodeShapeVisualProperty.ROUND_RECTANGLE);
 
 		// ######################### NODE_LABEL_POSITION ######################
@@ -3917,6 +3962,7 @@ public class Util {
 	 * @param rowHeader        row header of the table
 	 * @param tableScrollPanel scroll panel of the table
 	 */
+	@SuppressWarnings({ "rawtypes", "serial", "unchecked" })
 	public static void updateRowHeader(int number_lines, JTable mainTable, JList rowHeader,
 			JScrollPane tableScrollPanel) {
 
@@ -5349,5 +5395,36 @@ public class Util {
 		value = value * factor;
 		long tmp = Math.round(value);
 		return (double) tmp / factor;
+	}
+
+	/**
+	 * Method responsible for looking for a key into the map
+	 * 
+	 * @param map            map
+	 * @param keyToBeChecked key to be checked
+	 * @return true if key is into the map
+	 */
+	public static boolean isKeyPresent(Map<Integer, Integer> map, int keyToBeChecked) {
+		// Get the iterator over the HashMap
+		Iterator<Map.Entry<Integer, Integer>> iterator = map.entrySet().iterator();
+
+		// flag to store result
+		boolean isKeyPresent = false;
+
+		// Iterate over the HashMap
+		while (iterator.hasNext()) {
+
+			// Get the entry at this iteration
+			Map.Entry<Integer, Integer> entry = iterator.next();
+
+			// Check if this key is the required key
+			if (keyToBeChecked == entry.getKey()) {
+
+				isKeyPresent = true;
+				break;
+			}
+		}
+
+		return isKeyPresent;
 	}
 }

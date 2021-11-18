@@ -26,8 +26,8 @@ public class LoadProteinDomainsCommandTask extends CyRESTAbstractTask {
 	private CyNetwork myNetwork;
 	private Parser parserFile;
 
-	private String[] columnNames = { "Node Name", "Domain(s)" };
-	private final Class[] columnClass = new Class[] { String.class, String.class };
+	private String[] columnNames = { "Node Name", "Sequence", "Topological Domain(s)", "Subcellular location" };
+	private final Class[] columnClass = new Class[] { String.class, String.class, String.class, String.class };
 
 	@ProvidesTitle
 	public String getTitle() {
@@ -70,7 +70,7 @@ public class LoadProteinDomainsCommandTask extends CyRESTAbstractTask {
 	 * Method responsible for initializing table model of protein domains
 	 */
 	private void init_table_data_model_protein_domains() {
-		Object[][] data = new Object[1][2];
+		Object[][] data = new Object[1][columnNames.length];
 		// create table model with data
 		ProcessProteinLocationTask.tableDataModel = new DefaultTableModel(data, columnNames) {
 			/**

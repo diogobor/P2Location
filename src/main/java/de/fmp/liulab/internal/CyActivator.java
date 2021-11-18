@@ -126,7 +126,7 @@ public class CyActivator extends AbstractCyActivator {
 		// ### 3.2 - LOAD ####
 
 		ProcessProteinLocationTaskFactory myProcessProteinLocationTaskFactory = new ProcessProteinLocationTaskFactory(
-				cyApplicationManager, vmmServiceRef, customChartListener);
+				cyApplicationManager, vmmServiceRef);
 
 		LoadProteinLocationAction myProteinLocationAction = new LoadProteinLocationAction(dialogTaskManager,
 				myProcessProteinLocationTaskFactory);
@@ -156,7 +156,7 @@ public class CyActivator extends AbstractCyActivator {
 
 		// ### 5.2 - LOAD ####
 		TaskFactory myLoadProteinDomainsFactory = new ProcessProteinLocationTaskFactory(cyApplicationManager,
-				vmmServiceRef, customChartListener);
+				vmmServiceRef);
 
 		LoadProteinDomainsAction myLoadProteinDomainsAction = new LoadProteinDomainsAction(dialogTaskManager,
 				myLoadProteinDomainsFactory);

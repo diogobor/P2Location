@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +52,6 @@ import org.cytoscape.model.CyNetwork;
 import org.cytoscape.model.CyNode;
 import org.cytoscape.model.CyRow;
 import org.cytoscape.view.model.VisualLexicon;
-import org.cytoscape.view.presentation.customgraphics.CyCustomGraphics2Factory;
 import org.cytoscape.view.vizmap.VisualMappingManager;
 import org.cytoscape.view.vizmap.VisualStyle;
 import org.cytoscape.work.AbstractTask;
@@ -78,8 +76,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 	private CyApplicationManager cyApplicationManager;
 	private static CyNetwork myNetwork;
-//	private CyCustomGraphics2Factory<?> vgFactory;
-
 	public static VisualLexicon lexicon;
 	public static VisualStyle style;
 
@@ -93,9 +89,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	// Table
 	private static JTable mainProteinDomainTable;
 	public static DefaultTableModel tableDataModel;
-	private static String[] columnNames = { "Node Name", "Sequence", "Domain(s)" };
+	private static String[] columnNames = { "Node Name", "Sequence", "Topological Domain(s)", "Subcellular location" };
 	@SuppressWarnings("rawtypes")
-	private final Class[] columnClass = new Class[] { String.class, String.class, String.class };
+	private final Class[] columnClass = new Class[] { String.class, String.class, String.class, String.class };
 	private String rowstring, value;
 	private Clipboard clipboard;
 	private StringSelection stsel;
@@ -120,6 +116,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 	public static Thread disposeMainJFrameThread;
 
+	private final static String TRANSMEMBRANE = "transmem";
+	private final static String UNKNOWN_DOMAIN = "###";
+	private final static String INNER_MEMBRANE = "IMM";
+	private final static String OUTER_MEMBRANE = "OMM";
+	private final static String INTERMEMBRANE = "intermembrane";
+	private final static String CYTOSOL = "cytoplasmic";
+	private final static String MATRIX = "matrix";
 	private final static String UNKNOWN_RESIDUE = "UK";
 	private boolean predictLocation = false;
 	private boolean updateAnnotationDomain = false;
@@ -134,6 +137,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	// Map<Protein - Node SUID, Protein
 	private static Map<Long, Protein> proteinsMap = new HashMap<Long, Protein>();
 
+	// OMM / IMM prediction
+	private String predicted_protein_domain_name;
+
 	/**
 	 * /** Constructor
 	 * 
@@ -143,16 +149,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 */
 	@SuppressWarnings("static-access")
 	public ProcessProteinLocationTask(CyApplicationManager cyApplicationManager,
-			final VisualMappingManager vmmServiceRef, @SuppressWarnings("rawtypes") CyCustomGraphics2Factory vgFactory,
-			boolean predictLocation, boolean updateAnnotationDomain) {
+			final VisualMappingManager vmmServiceRef, boolean predictLocation, boolean updateAnnotationDomain) {
 
 		this.predictLocation = predictLocation;
 		this.updateAnnotationDomain = updateAnnotationDomain;
 		this.menuBar.domain_ptm_or_monolink = 0;
 		this.cyApplicationManager = cyApplicationManager;
 		this.myNetwork = cyApplicationManager.getCurrentNetwork();
-//		this.vgFactory = vgFactory;
-
 		this.style = vmmServiceRef.getCurrentVisualStyle();
 		// Get the current Visual Lexicon
 		this.lexicon = cyApplicationManager.getCurrentRenderingEngine().getVisualLexicon();
@@ -360,17 +363,18 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		logo_panel.setLayout(null);
 		mainPanel.add(logo_panel);
 
-
-		ImageIcon imageIcon = new javax.swing.ImageIcon(getClass().getResource("/images/logo.png")); // load the image to a imageIcon
-		Image image = imageIcon.getImage(); // transform it 
-		Image newimg = image.getScaledInstance(130, 130,  java.awt.Image.SCALE_SMOOTH); // scale it the smooth way  
-		imageIcon = new ImageIcon(newimg);  // transform it back
+		ImageIcon imageIcon = new javax.swing.ImageIcon(getClass().getResource("/images/logo.png")); // load the image
+																										// to a
+																										// imageIcon
+		Image image = imageIcon.getImage(); // transform it
+		Image newimg = image.getScaledInstance(130, 130, java.awt.Image.SCALE_SMOOTH); // scale it the smooth way
+		imageIcon = new ImageIcon(newimg); // transform it back
 
 		JLabel jLabelIcon = new JLabel();
 		jLabelIcon.setBounds(5, -25, 200, 200);
 		jLabelIcon.setIcon(imageIcon);
 		logo_panel.add(jLabelIcon);
-		
+
 		JLabel textLabel_status = new JLabel("Status:");
 		textLabel_status.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		textLabel_status.setBounds(10, offset_y, 50, 40);
@@ -383,7 +387,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 */
 	private void initTableScreen() {
 
-		Object[][] data = new Object[1][3];
+		Object[][] data = new Object[1][columnNames.length];
 		// create table model with data
 		tableDataModel = new DefaultTableModel(data, columnNames) {
 			/**
@@ -715,9 +719,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				} else {
 					Object[][] data = null;
 					if (proteinsMap.size() > 0)
-						data = new Object[proteinsMap.size()][3];
+						data = new Object[proteinsMap.size()][columnNames.length];
 					else
-						data = new Object[1][3];
+						data = new Object[1][columnNames.length];
 
 					tableDataModel.setDataVector(data, columnNames);
 					int countPtnDomain = 0;
@@ -839,9 +843,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				} else {
 					Object[][] data = null;
 					if (proteinsMap.size() > 0)
-						data = new Object[proteinsMap.size()][3];
+						data = new Object[proteinsMap.size()][columnNames.length];
 					else
-						data = new Object[1][3];
+						data = new Object[1][columnNames.length];
 
 					tableDataModel.setDataVector(data, columnNames);
 					int countPtnDomain = 0;
@@ -941,7 +945,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								all_knownResidues = getAllKnownResidues();
 								ComputeNewResidues(taskMonitor, all_knownResidues, true);
 							}
-							Util.updateProteins(taskMonitor, myNetwork, textLabel_status_result, false);
+							Util.updateProteins(taskMonitor, myNetwork, textLabel_status_result, false, false);
 						}
 
 						taskMonitor.setProgress(1.0);
@@ -1145,6 +1149,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				ptn.pdbIds = myProtein.pdbIds;
 				ptn.proteinID = myProtein.proteinID;
 				ptn.sequence = myProtein.sequence;
+				ptn.location = myProtein.location;
 				addReactionSites(ptn);
 			} else {
 				addReactionSites(myProtein);
@@ -1247,6 +1252,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			String sequence = tableDataModel.getValueAt(row, 1) != null ? tableDataModel.getValueAt(row, 1).toString()
 					: "";
 
+			String location = tableDataModel.getValueAt(row, 3) != null ? tableDataModel.getValueAt(row, 3).toString()
+					: "";
+
 			if (gene.isEmpty() || gene.isBlank()) {
 				sbError.append("ERROR: Row: " + (row + 1) + " - Gene is empty.");
 			} else {
@@ -1255,12 +1263,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					Protein ptn = proteinsMap.get(current_node.getSUID());
 					if (ptn == null) {
-						ptn = new Protein(gene, gene, sequence, proteinDomains);
+						ptn = new Protein(gene, gene, sequence, location, proteinDomains);
 						proteinsMap.put(current_node.getSUID(), ptn);
 
 					} else {
 						if (!(sequence.isBlank() || sequence.isEmpty()))
 							ptn.sequence = sequence;
+						if (!(location.isBlank() || location.isEmpty()))
+							ptn.location = location;
 						if (proteinDomains.size() > 0)
 							ptn.domains = proteinDomains;
 					}
@@ -1334,7 +1344,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		String[] data_to_be_stored = sb_data_to_be_stored.toString().split("\n");
 
 		Object[][] data = new Object[data_to_be_stored.length][2];
-		String[] columnNames = { "Node Name", "Sequence", "Domain(s)" };
+		String[] columnNames = { "Node Name", "Sequence", "Topological Domain(s)", "Subcellular location" };
 		tableDataModel.setDataVector(data, columnNames);
 
 		for (String line : data_to_be_stored) {
@@ -1354,9 +1364,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	public static void setTableProperties(int number_lines) {
 		if (mainProteinDomainTable != null) {
 			mainProteinDomainTable.setPreferredScrollableViewportSize(new Dimension(490, 90));
-			mainProteinDomainTable.getColumnModel().getColumn(0).setPreferredWidth(50);
+			mainProteinDomainTable.getColumnModel().getColumn(0).setPreferredWidth(90);
 			mainProteinDomainTable.getColumnModel().getColumn(1).setPreferredWidth(100);
 			mainProteinDomainTable.getColumnModel().getColumn(2).setPreferredWidth(150);
+			mainProteinDomainTable.getColumnModel().getColumn(3).setPreferredWidth(150);
 			mainProteinDomainTable.setFillsViewportHeight(true);
 			mainProteinDomainTable.setAutoCreateRowSorter(true);
 
@@ -1408,7 +1419,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				final String trString = (String) (clipboard.getContents(this).getTransferData(DataFlavor.stringFlavor));
 				final StringTokenizer st1 = new StringTokenizer(trString, "\n");
 
-				Object[][] data = new Object[st1.countTokens()][3];
+				Object[][] data = new Object[st1.countTokens()][columnNames.length];
 				tableDataModel.setDataVector(data, columnNames);
 
 				int i = 0;
@@ -1430,29 +1441,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				ex.printStackTrace();
 			}
 		}
-	}
-
-	private boolean isKeyPresent(Map<Integer, Integer> map, int keyToBeChecked) {
-		// Get the iterator over the HashMap
-		Iterator<Map.Entry<Integer, Integer>> iterator = map.entrySet().iterator();
-
-		// flag to store result
-		boolean isKeyPresent = false;
-
-		// Iterate over the HashMap
-		while (iterator.hasNext()) {
-
-			// Get the entry at this iteration
-			Map.Entry<Integer, Integer> entry = iterator.next();
-
-			// Check if this key is the required key
-			if (keyToBeChecked == entry.getKey()) {
-
-				isKeyPresent = true;
-			}
-		}
-
-		return isKeyPresent;
 	}
 
 	/**
@@ -1512,7 +1500,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	/**
 	 * Method responsible for starting the prediction location process
 	 * 
-	 * @param taskMonitor
+	 * @param taskMonitor current task monitor
 	 */
 	private void processLocation(TaskMonitor taskMonitor) {
 
@@ -1521,6 +1509,494 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		epochs = 1;
 		int old_number_uk_residues = 0;
 		number_unknown_residues = new HashMap<Integer, Integer>();
+
+		processRoundLocation(taskMonitor, old_number_uk_residues);
+		annotatePredictedLocation(taskMonitor, epochs);
+
+		if (Util.consider_domain_whole_ptn) {
+			do {
+				UnifyProteinDomains(taskMonitor);
+
+				// Call again the process to predict domains just to check if there is an
+				// unknown domain
+				processRoundLocation(taskMonitor, old_number_uk_residues);
+			} while (checkConflictProteinDomains());
+		}
+	}
+
+	/**
+	 * Method responsible for checking the conflict protein domains
+	 * 
+	 * @return true if there is conflict
+	 */
+	private boolean checkConflictProteinDomains() {
+		boolean isThereConflictProteinDomains = false;
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		for (Protein protein : allProteins) {
+
+			if (!protein.isConflictedDomain && protein.domains != null && protein.domains.size() > 1) {
+
+				for (int i = 0; i < protein.domains.size() - 1; i++) {
+
+					if (!protein.domains.get(i).name.toLowerCase().contains(TRANSMEMBRANE)) {
+						if (!protein.domains.get(i).name.toLowerCase()
+								.equals(protein.domains.get(i + 1).name.toLowerCase())
+								&& !protein.domains.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
+							isThereConflictProteinDomains = true;
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		return isThereConflictProteinDomains;
+	}
+
+	/**
+	 * Method responsible for unifying different locations
+	 * 
+	 * @param taskMonitor current task monitor
+	 */
+	private void UnifyProteinDomains(TaskMonitor taskMonitor) {
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		List<String> unique_domain = new ArrayList<String>();
+
+		boolean isThereTransmem = false;
+		for (Protein protein : allProteins) {
+
+			isThereTransmem = false;
+			protein.isConflictedDomain = false;
+			if (protein.domains == null)
+				continue;
+
+			Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+				@Override
+				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+				}
+			});
+
+			for (ProteinDomain domain : protein.domains) {
+
+				if (!domain.name.toLowerCase().contains(TRANSMEMBRANE))
+					unique_domain.add(domain.name);
+				else
+					isThereTransmem = true;
+			}
+
+			unique_domain = unique_domain.stream().distinct().collect(Collectors.toList());
+			if (!isThereTransmem && unique_domain.size() == 1) {// There is no Transmembrane domain and there is more
+																// than one domain
+
+				for (Residue residue : protein.reactionSites) {
+					residue.location = protein.domains.get(0).name;
+					residue.predictedLocation = protein.domains.get(0).name;
+				}
+
+				boolean isPredicted = true;
+				if (protein.domains.get(0).startId == 1 && protein.domains.get(0).endId == protein.sequence.length())
+					isPredicted = false;
+				ProteinDomain unifiedDomain = new ProteinDomain(protein.domains.get(0).name, 1,
+						protein.sequence.length(), isPredicted, protein.domains.get(0).eValue);
+				protein.domains.clear();
+				protein.domains.add(unifiedDomain);
+
+			} else if (isThereTransmem) {
+
+				unique_domain.clear();
+
+				// There is only Transmembrane domain
+				if (protein.domains.size() == 1)
+					continue;
+
+				for (int i = 0; i < protein.domains.size() - 1; i++) {
+
+					if (!protein.domains.get(i).name.toLowerCase().contains(TRANSMEMBRANE)) {
+						if (!protein.domains.get(i).name.toLowerCase()
+								.equals(protein.domains.get(i + 1).name.toLowerCase())
+								&& !protein.domains.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
+							protein.isConflictedDomain = true;
+							break;
+						} else {
+							int offset = protein.domains.get(i + 1).startId - protein.domains.get(i).endId + 1;
+							UnifyResiduesDomains(protein, offset, true);
+						}
+					}
+				}
+
+			} else
+				protein.isConflictedDomain = true;
+
+			unique_domain.clear();
+		}
+
+		predict_IMM_OMM_domains();
+
+		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
+	}
+
+	/**
+	 * Method responsible for predicting missed domains based on the 'Transmembrane'
+	 * information
+	 */
+	private void predict_IMM_OMM_domains() {
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		int count_transmem = 0;
+		List<String> unique_domain = new ArrayList<String>();
+
+		int count_protein = 0;
+		try {
+
+			for (Protein protein : allProteins.stream().filter(value -> !value.isPredictedTransmem)
+					.collect(Collectors.toList())) {
+
+				if (protein.domains == null)
+					continue;
+
+				Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+					@Override
+					public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+						return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+					}
+				});
+
+				unique_domain.clear();
+				count_transmem = 0;
+				List<ProteinDomain> new_domain_list = new ArrayList<ProteinDomain>();
+
+				for (ProteinDomain domain : protein.domains) {
+
+					if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
+						count_transmem++;
+					else
+						unique_domain.add(domain.name);
+				}
+
+				unique_domain = unique_domain.stream().distinct().collect(Collectors.toList());
+
+				if (count_transmem > 0 && unique_domain.size() > 0) {
+
+					List<ProteinDomain> transmemDomains = protein.domains.stream()
+							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
+							.collect(Collectors.toList());
+					Collections.sort(transmemDomains, new Comparator<ProteinDomain>() {
+						@Override
+						public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+							return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+						}
+					});
+
+					int indexOfLastDomain = protein.domains.indexOf(Collections.max(protein.domains));
+					int startDomain = 1;
+					predicted_protein_domain_name = "";
+					for (int i = 0; i < protein.domains.size(); i++) {
+
+						ProteinDomain current_domain = protein.domains.get(i);
+
+						ProteinDomain last_new_domain = null;
+						if (new_domain_list.size() > 0)
+							last_new_domain = new_domain_list.get(new_domain_list.size() - 1);
+
+						if (current_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+
+							if (new_domain_list.size() == 0
+									|| last_new_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+								if (current_domain.startId != 1) {
+									ProteinDomain new_domain = new ProteinDomain(UNKNOWN_DOMAIN, startDomain,
+											current_domain.startId - 1, true, "predicted");
+									new_domain_list.add(new_domain);
+									predicted_protein_domain_name = "";
+								}
+							}
+							new_domain_list.add(current_domain);
+							startDomain = current_domain.endId + 1;
+							transmemDomains.remove(current_domain);
+							continue;
+
+						}
+
+						ProteinDomain next_transmem = transmemDomains.size() > 0
+								? transmemDomains.get(transmemDomains.indexOf(Collections.min(transmemDomains)))
+								: null;
+
+						if (next_transmem == null) {
+							// update range
+							current_domain.startId = last_new_domain.endId + 1;
+							new_domain_list.add(current_domain);
+							startDomain = current_domain.endId + 1;
+							continue;
+						}
+
+						// e.g [IMS | Transmem | ??? ]
+						if (current_domain.startId < next_transmem.startId) {
+							predicted_protein_domain_name = current_domain.name;
+							i = protein.domains.indexOf(next_transmem) - 1;
+
+							current_domain.startId = startDomain;
+							current_domain.endId = next_transmem.startId - 1;
+
+							startDomain = next_transmem.endId + 1;
+							transmemDomains.remove(next_transmem);
+
+						} else {
+
+							// e.g [??? | Transmem | IMS ]
+							predicted_protein_domain_name = current_domain.name;
+
+							if (current_domain.equals(protein.domains.get(indexOfLastDomain))) {
+
+								// It is the last domain
+								current_domain.endId = protein.sequence.length();
+								current_domain.startId = next_transmem.endId + 1;
+							}
+
+							startDomain = 1;
+							addPredictedOMMorIMMDomain(new_domain_list, protein, next_transmem, startDomain);
+							startDomain = next_transmem.endId + 1;
+						}
+						current_domain.isPredicted = true;
+						new_domain_list.add(current_domain);
+						protein.isPredictedTransmem = true;
+					}
+
+					Collections.sort(new_domain_list, new Comparator<ProteinDomain>() {
+						@Override
+						public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+							return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+						}
+					});
+
+					ProteinDomain last_domain = new_domain_list
+							.get(new_domain_list.indexOf(Collections.max(new_domain_list)));
+					if (last_domain.endId < protein.sequence.length()) {
+
+						// It is necessary to add the last domain
+						if (last_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+
+							if (predicted_protein_domain_name.isEmpty() || predicted_protein_domain_name.isBlank()) {
+								ProteinDomain new_domain = new ProteinDomain(UNKNOWN_DOMAIN, startDomain,
+										protein.sequence.length(), true, "predicted");
+								new_domain_list.add(new_domain);
+							} else {
+								addPredictedOMMorIMMDomain(new_domain_list, protein,
+										new ProteinDomain(TRANSMEMBRANE.toUpperCase(), protein.sequence.length() + 1,
+												-1, true, "predicted"),
+										startDomain);
+							}
+						} else// Update range of the last domain
+							last_domain.endId = protein.sequence.length();
+
+					}
+
+					new_domain_list = new_domain_list.stream().distinct().collect(Collectors.toList());
+
+					// Check if exists unknown domains (name == '###')
+					if (new_domain_list.stream().filter(value -> value.name.equals(UNKNOWN_DOMAIN))
+							.collect(Collectors.toList()).size() > 0) {
+
+						for (int i = 0; i < new_domain_list.size(); i++) {
+							ProteinDomain domain = new_domain_list.get(i);
+
+							boolean isForward = false;
+							if (domain.name.equals(UNKNOWN_DOMAIN)) {
+
+								predicted_protein_domain_name = "";
+								int j = i + 1;
+								for (; j < new_domain_list.size(); j++) {
+									ProteinDomain next_domain = new_domain_list.get(j);
+
+									if (!next_domain.name.toLowerCase().contains(TRANSMEMBRANE)
+											&& !next_domain.name.equals(UNKNOWN_DOMAIN)) {
+										predicted_protein_domain_name = next_domain.name;
+										isForward = true;
+										break;
+									}
+								}
+
+								if (isForward) {
+									for (int count_reverse = j; count_reverse >= i; count_reverse--) {
+
+										ProteinDomain previous_domain = new_domain_list.get(count_reverse);
+										if (previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+
+											if (protein.location.equals(OUTER_MEMBRANE)) {
+												if (predicted_protein_domain_name.toLowerCase()
+														.contains(INTERMEMBRANE)) {
+
+													predicted_protein_domain_name = "TOPO_DOM - Cytoplasmic";
+
+												} else if (predicted_protein_domain_name.toLowerCase()
+														.contains(CYTOSOL)) {
+
+													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
+
+												}
+											} else if (protein.location.equals(INNER_MEMBRANE)) {
+												if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
+
+													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
+
+												} else if (predicted_protein_domain_name.toLowerCase()
+														.contains(INTERMEMBRANE)) {
+
+													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial matrix";
+
+												}
+											} else
+												predicted_protein_domain_name = "";
+										}
+									}
+								} else if (i > 0) {
+
+									j = i - 1;
+									for (; j >= 0; j--) {
+										ProteinDomain previous_domain = new_domain_list.get(j);
+
+										if (!previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)
+												&& !previous_domain.name.equals(UNKNOWN_DOMAIN)) {
+											predicted_protein_domain_name = previous_domain.name;
+											break;
+										}
+									}
+
+									for (int count_reverse = i - 1; count_reverse >= j; count_reverse--) {
+
+										ProteinDomain previous_domain = new_domain_list.get(count_reverse);
+										if (previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+
+											if (protein.location.equals(OUTER_MEMBRANE)) {
+												if (predicted_protein_domain_name.toLowerCase()
+														.contains(INTERMEMBRANE)) {
+
+													predicted_protein_domain_name = "TOPO_DOM - Cytoplasmic";
+
+												} else if (predicted_protein_domain_name.toLowerCase()
+														.contains(CYTOSOL)) {
+
+													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
+
+												}
+											} else if (protein.location.equals(INNER_MEMBRANE)) {
+												if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
+
+													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
+
+												} else if (predicted_protein_domain_name.toLowerCase()
+														.contains(INTERMEMBRANE)) {
+
+													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial matrix";
+
+												}
+											} else
+												predicted_protein_domain_name = "";
+										}
+									}
+								}
+
+								domain.name = predicted_protein_domain_name;
+
+							}
+						}
+
+					}
+
+					protein.domains = new_domain_list;
+					updateResiduesLocation(protein);
+				}
+
+				count_protein++;
+			}
+		} catch (Exception e) {
+			System.out.println(count_protein);
+		}
+
+	}
+
+	/**
+	 * Method responsible for updating the residue location of a specific protein
+	 * 
+	 * @param protein current proteinF
+	 */
+	private void updateResiduesLocation(Protein protein) {
+
+		for (ProteinDomain domain : protein.domains) {
+
+			List<Residue> current_residues = protein.reactionSites.stream()
+					.filter(value -> value.position >= domain.startId && value.position <= domain.endId)
+					.collect(Collectors.toList());
+
+			for (Residue residue : current_residues) {
+				if (!residue.isConflicted) {
+					residue.location = domain.name;
+					residue.predictedLocation = domain.name;
+				}
+			}
+		}
+
+	}
+
+	/**
+	 * Method responsible for adding new protein domain based on 'transmem'
+	 * information: IMM or OMM
+	 * 
+	 * @param new_domain_list current new domain list
+	 * @param current_protein current protein
+	 * @param next_transmem   next transmembrane domain
+	 * @param startDomain     start of new protein domain
+	 */
+	private void addPredictedOMMorIMMDomain(List<ProteinDomain> new_domain_list, Protein current_protein,
+			ProteinDomain next_transmem, int startDomain) {
+
+		ProteinDomain new_predicted_domain = null;
+		if (current_protein.location.equals(OUTER_MEMBRANE)) {
+			if (predicted_protein_domain_name.toLowerCase().contains(INTERMEMBRANE)) {
+
+				new_predicted_domain = new ProteinDomain("TOPO_DOM - Cytoplasmic", startDomain,
+						next_transmem.startId - 1, true, "predicted");
+				predicted_protein_domain_name = CYTOSOL;
+
+			} else if (predicted_protein_domain_name.toLowerCase().contains(CYTOSOL)) {
+
+				new_predicted_domain = new ProteinDomain("TOPO_DOM - Mitochondrial intermembrane", startDomain,
+						next_transmem.startId - 1, true, "predicted");
+				predicted_protein_domain_name = INTERMEMBRANE;
+
+			}
+		} else if (current_protein.location.equals(INNER_MEMBRANE)) {
+			if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
+
+				new_predicted_domain = new ProteinDomain("TOPO_DOM - Mitochondrial intermembrane", startDomain,
+						next_transmem.startId - 1, true, "predicted");
+				predicted_protein_domain_name = INTERMEMBRANE;
+
+			} else if (predicted_protein_domain_name.toLowerCase().contains(INTERMEMBRANE)) {
+
+				new_predicted_domain = new ProteinDomain("TOPO_DOM - Mitochondrial matrix", startDomain,
+						next_transmem.startId - 1, true, "predicted");
+				predicted_protein_domain_name = MATRIX;
+
+			}
+		} else
+			predicted_protein_domain_name = "";
+
+		if (new_predicted_domain != null)
+			new_domain_list.add(new_predicted_domain);
+	}
+
+	/**
+	 * Method responsible for processing and predicting all locations
+	 * 
+	 * @param taskMonitor            current task monitor
+	 * @param old_number_uk_residues old number of unknown residue
+	 */
+	private void processRoundLocation(TaskMonitor taskMonitor, int old_number_uk_residues) {
 		do {
 
 			OrganizeResidueCompartment(taskMonitor);
@@ -1552,8 +2028,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 			epochs++;
 		} while (compartments.containsKey(UNKNOWN_RESIDUE));
-
-		annotatePredictedLocation(taskMonitor, epochs);
 	}
 
 	/**
@@ -1701,7 +2175,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										if (!(isKnownResidues && res.score == 0))
 											saveConflict = false;
 
-										if (res.predictedLocation.contains("TRANSMEM")) {
+										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 											Protein current_ptn_rs = res.protein;
 											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
 													value -> value.position >= (res.position - Util.transmemNeighborAA)
@@ -1711,7 +2185,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 											if (neighbors.size() > 0) {
 												for (Residue neighbor : neighbors) {
-													if (!neighbor.predictedLocation.contains("TRANSMEM")) {
+													if (!neighbor.predictedLocation.toLowerCase()
+															.contains(TRANSMEMBRANE)) {
 														res.score = score;
 														current_uk_residues.add(res);
 														crossLink.location = res.location;
@@ -1731,7 +2206,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									} else {
 										saveConflict = false;
 
-										if (residue.predictedLocation.contains("TRANSMEM")) {
+										if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 											Protein current_ptn_rs = residue.protein;
 											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
 													value -> value.startId <= (res.position + Util.transmemNeighborAA)
@@ -1741,7 +2216,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 											if (neighbors.size() > 0) {
 												for (ProteinDomain neighbor : neighbors) {
-													if (!neighbor.name.contains("TRANSMEM")) {
+													if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
 														res.score = score;
 														crossLink.location = res.location;
 														saveConflict = false;
@@ -1807,7 +2282,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										if (!(isKnownResidues && res.score == 0))
 											saveConflict = false;
 
-										if (res.predictedLocation.contains("TRANSMEM")) {
+										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 											Protein current_ptn_rs = res.protein;
 											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
 													value -> value.position >= (res.position - Util.transmemNeighborAA)
@@ -1817,7 +2292,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 											if (neighbors.size() > 0) {
 												for (Residue neighbor : neighbors) {
-													if (!neighbor.predictedLocation.contains("TRANSMEM")) {
+													if (!neighbor.predictedLocation.toLowerCase()
+															.contains(TRANSMEMBRANE)) {
 														res.score = score;
 														current_uk_residues.add(res);
 														crossLink.location = res.location;
@@ -1837,7 +2313,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									} else {
 										saveConflict = false;
 
-										if (residue.predictedLocation.contains("TRANSMEM")) {
+										if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 											Protein current_ptn_rs = residue.protein;
 											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
 													value -> value.startId >= (res.position - Util.transmemNeighborAA)
@@ -1846,7 +2322,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 											if (neighbors.size() > 0) {
 												for (ProteinDomain neighbor : neighbors) {
-													if (!neighbor.name.contains("TRANSMEM")) {
+													if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
 														res.score = score;
 														crossLink.location = res.location;
 														saveConflict = false;
@@ -1927,7 +2403,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										if (!(isKnownResidues && res.score == 0))
 											saveConflict = false;
 
-										if (res.predictedLocation.contains("TRANSMEM")) {
+										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 											Protein current_ptn_rs = res.protein;
 											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
 													value -> value.position >= (res.position - Util.transmemNeighborAA)
@@ -1937,7 +2413,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 											if (neighbors.size() > 0) {
 												for (Residue neighbor : neighbors) {
-													if (!neighbor.predictedLocation.contains("TRANSMEM")) {
+													if (!neighbor.predictedLocation.toLowerCase()
+															.contains(TRANSMEMBRANE)) {
 														res.score = score;
 														current_uk_residues.add(res);
 														crossLink.location = res.location;
@@ -1957,7 +2434,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									} else {
 										saveConflict = false;
 
-										if (residue.predictedLocation.contains("TRANSMEM")) {
+										if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 											Protein current_ptn_rs = residue.protein;
 											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
 													value -> value.startId <= (res.position + Util.transmemNeighborAA)
@@ -1967,7 +2444,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 											if (neighbors.size() > 0) {
 												for (ProteinDomain neighbor : neighbors) {
-													if (!neighbor.name.contains("TRANSMEM")) {
+													if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
 														res.score = score;
 														crossLink.location = res.location;
 														saveConflict = false;
@@ -2033,7 +2510,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										if (!(isKnownResidues && res.score == 0))
 											saveConflict = false;
 
-										if (res.predictedLocation.contains("TRANSMEM")) {
+										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 											Protein current_ptn_rs = res.protein;
 											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
 													value -> value.position >= (res.position - Util.transmemNeighborAA)
@@ -2043,7 +2520,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 											if (neighbors.size() > 0) {
 												for (Residue neighbor : neighbors) {
-													if (!neighbor.predictedLocation.contains("TRANSMEM")) {
+													if (!neighbor.predictedLocation.toLowerCase()
+															.contains(TRANSMEMBRANE)) {
 														res.score = score;
 														current_uk_residues.add(res);
 														crossLink.location = res.location;
@@ -2063,7 +2541,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									} else {
 										saveConflict = false;
 
-										if (residue.predictedLocation.contains("TRANSMEM")) {
+										if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 											Protein current_ptn_rs = residue.protein;
 											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
 													value -> value.startId <= (res.position + Util.transmemNeighborAA)
@@ -2073,7 +2551,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 											if (neighbors.size() > 0) {
 												for (ProteinDomain neighbor : neighbors) {
-													if (!neighbor.name.contains("TRANSMEM")) {
+													if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
 														res.score = score;
 														crossLink.location = res.location;
 														saveConflict = false;
@@ -2176,8 +2654,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	}
 
 	/**
-	 * Method responsible for updating the annotation of all proteins according to
-	 * the new predicted annotations
+	 * Method responsible for updating the annotation domain of all proteins
+	 * according to the new predicted annotations
 	 */
 	private void annotatePredictedLocation(TaskMonitor taskMonitor, int epoch) {
 
@@ -2275,7 +2753,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		// Annotate neighbor amino acids based on predicted location
 		AnnotateNeighborAminoAcids();
 
-		Util.updateProteins(taskMonitor, myNetwork, null, true);
+		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
 	}
 
 	/**
@@ -2317,13 +2795,52 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			}
 		}
 
-		UnifyProteinDomains();// E.g. Domain[216-722] and Domain[217-723] => Domain[216-723]
+		UnifyResiduesDomainsFromAllProteins();// E.g. Domain[216-722] and Domain[217-723] => Domain[216-723]
+	}
+
+	/**
+	 * Method responsible for merging similar protein domains with different ranges
+	 * 
+	 * @param protein  current protein
+	 * @param delta_aa delta number of amino acids
+	 */
+	private void UnifyResiduesDomains(Protein protein, int delta_aa, boolean forceUnification) {
+
+		for (ProteinDomain domain : protein.domains) {
+
+			if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
+				continue;
+
+			// e.g. Domain[716-722] and Domain[717-723] => Domain[716-723] -> delta == 0
+			// e.g. Domain[136-142] and Domain[144-150] => Domain[136-150] -> delta == 2
+			List<ProteinDomain> candidates_domains = protein.domains.stream()
+					.filter(value -> value.startId >= domain.startId - delta_aa
+							&& value.startId <= domain.endId + delta_aa && value.endId >= domain.endId
+							&& value.name.equals(domain.name))
+					.collect(Collectors.toList());
+
+			if (candidates_domains.size() > 0) {
+				for (ProteinDomain expandDomain : candidates_domains) {
+					if (domain.equals(expandDomain))
+						continue;
+
+					if (forceUnification || domain.isPredicted) {
+						domain.endId = expandDomain.endId;
+						expandDomain.startId = domain.startId;
+						expandDomain.isPredicted = true;
+						expandDomain.eValue = "predicted";
+					}
+				}
+			}
+		}
+
+		protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
 	}
 
 	/**
 	 * Method responsible for merging similar protein domains with different ranges
 	 */
-	private void UnifyProteinDomains() {
+	private void UnifyResiduesDomainsFromAllProteins() {
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
 
@@ -2332,30 +2849,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			if (protein.domains == null)
 				continue;
 
-			for (ProteinDomain domain : protein.domains) {
-
-				// e.g. Domain[716-722] and Domain[717-723] => Domain[716-723]
-				List<ProteinDomain> candidates_domains = protein.domains.stream()
-						.filter(value -> value.startId >= domain.startId && value.startId <= domain.endId
-								&& value.endId >= domain.endId && value.name.equals(domain.name))
-						.collect(Collectors.toList());
-
-				if (candidates_domains.size() > 0) {
-					for (ProteinDomain expandDomain : candidates_domains) {
-						if (domain.equals(expandDomain))
-							continue;
-
-						if (domain.isPredicted) {
-							domain.endId = expandDomain.endId;
-							expandDomain.startId = domain.startId;
-							expandDomain.isPredicted = true;
-							expandDomain.eValue = "predicted";
-						}
-					}
-				}
-			}
-
-			protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
+			UnifyResiduesDomains(protein, 0, false);
 		}
 	}
 

@@ -17,9 +17,9 @@ public class Parser {
 
 	private ReaderWriterTextFile parserFile;
 	private List<String> qtdParser = new ArrayList<String>();
-	private String[] columnNames = { "Node Name", "Sequence", "Domain(s)" };
+	private String[] columnNames = { "Node Name", "Sequence", "Topological Domain(s)", "Subcellular location" };
 	private String[] columnNamesPTMTable = { "Node Name", "PTM(s)" };
-	private String[] columnNamesMonolinksTable = { "Node Name", "Sequence", "Monolink(s)" };
+//	private String[] columnNamesMonolinksTable = { "Node Name", "Sequence", "Monolink(s)" };
 
 	/**
 	 * UNIPROT lines
@@ -80,6 +80,7 @@ public class Parser {
 
 					String gene_name = "";
 					String sequence = "";
+					String location = "";
 					StringBuilder domainsSB = new StringBuilder();
 
 					if (isUniprot) {
@@ -176,6 +177,11 @@ public class Parser {
 							sequence = each_line_cols[index];
 						}
 
+						index = Arrays.asList(uniprot_header_lines).indexOf("Subcellular location");
+						if (index != -1) {
+							location = each_line_cols[index];
+						}
+
 					} else {
 						int firstComma = line.indexOf(',');
 						gene_name = line.substring(0, firstComma);
@@ -190,7 +196,9 @@ public class Parser {
 						sb_data_to_be_stored.append("\t");
 						sb_data_to_be_stored.append(sequence);
 						sb_data_to_be_stored.append("\t");
-						sb_data_to_be_stored.append(domainsSB).append("\n");
+						sb_data_to_be_stored.append(domainsSB);
+						sb_data_to_be_stored.append("\t");
+						sb_data_to_be_stored.append(location).append("\n");
 					}
 				}
 				// #### Load PTMs #####
@@ -241,13 +249,15 @@ public class Parser {
 		int countPtnDomain = 0;
 		String[] data_to_be_stored = sb_data_to_be_stored.toString().split("\n");
 
-		Object[][] data = new Object[data_to_be_stored.length][3];
+		Object[][] data = new Object[data_to_be_stored.length][columnNamesPTMTable.length];
 		if (domain_ptm_or_monolink == 1)
 			LoadPTMsTask.ptmTableDataModel.setDataVector(data, columnNamesPTMTable);
 //		else if (domain_ptm_or_monolink == 2)
 //			LoadProteinLocationTask.monolinkTableDataModel.setDataVector(data, columnNamesMonolinksTable);
-		else
+		else {
+			data = new Object[data_to_be_stored.length][columnNames.length];
 			ProcessProteinLocationTask.tableDataModel.setDataVector(data, columnNames);
+		}
 
 		for (String line : data_to_be_stored) {
 			try {
@@ -271,6 +281,7 @@ public class Parser {
 					} else {
 						ProcessProteinLocationTask.tableDataModel.setValueAt(cols_line[1], countPtnDomain, 1);
 						ProcessProteinLocationTask.tableDataModel.setValueAt(cols_line[2], countPtnDomain, 2);
+						ProcessProteinLocationTask.tableDataModel.setValueAt(cols_line[3], countPtnDomain, 3);
 					}
 				}
 

@@ -18,6 +18,9 @@ public class Residue {
 	public List<Residue> history_residues;
 	public boolean isConflicted = false;
 
+	public int getPosition() {
+        return position;
+    }
 	/**
 	 * Constructor
 	 * 

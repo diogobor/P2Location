@@ -340,17 +340,16 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 
 			if (netView == null)
 				return;
-			if (cyApplicationManager.getCurrentRenderingEngine() == null)
-				return;
-
 			// Load network and netview to P2Location setting to update the edges plot
 			MainControlPanel.myNetwork = myNetwork;
 			MainControlPanel.netView = netView;
 			MainControlPanel.style = this.style;
 			MainControlPanel.handleFactory = this.handleFactory;
 			MainControlPanel.bendFactory = this.bendFactory;
-			MainControlPanel.lexicon = cyApplicationManager.getCurrentRenderingEngine().getVisualLexicon();
 
+			if (cyApplicationManager.getCurrentRenderingEngine() == null)
+				return;
+			MainControlPanel.lexicon = cyApplicationManager.getCurrentRenderingEngine().getVisualLexicon();
 			MainSingleNodeTask.lexicon = cyApplicationManager.getCurrentRenderingEngine().getVisualLexicon();
 			MainSingleNodeTask.style = this.style;
 
@@ -448,6 +447,7 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 		MainControlPanel.enable_disableDisplayBox(false, false);
 		MainControlPanel.enable_disable_spinners(false);
 		MainControlPanel.unselectCheckboxes();
+		MainControlPanel.myNetwork = null;
 	}
 
 	@Override

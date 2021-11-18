@@ -581,7 +581,8 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 				this.plotResidue(myResidue.conflicted_residue, conflicted_nodeView, myNetwork, conflicted_node, view);
 
 				Protein new_protein_with_only_target_xls = new Protein(myResidue.conflicted_residue.protein.proteinID,
-						myResidue.conflicted_residue.protein.gene, myResidue.conflicted_residue.protein.sequence);
+						myResidue.conflicted_residue.protein.gene, myResidue.conflicted_residue.protein.sequence,
+						myResidue.conflicted_residue.location);
 
 				new_protein_with_only_target_xls.intraLinks = this
 						.getInterestedIntraLinks(myResidue.conflicted_residue);
@@ -616,7 +617,8 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 				new_edgeView.setLockedValue(BasicVisualLexicon.EDGE_TOOLTIP, tooltip);
 
 				Protein new_protein_with_only_target_xls = new Protein(dependent_residues.get(i).protein.proteinID,
-						dependent_residues.get(i).protein.gene, dependent_residues.get(i).protein.sequence);
+						dependent_residues.get(i).protein.gene, dependent_residues.get(i).protein.sequence,
+						dependent_residues.get(i).protein.location);
 
 				new_protein_with_only_target_xls.intraLinks = this.getInterestedIntraLinks(dependent_residues.get(i));
 				new_protein_with_only_target_xls.interLinks = this.getInterestedInterLinks(dependent_residues.get(i));

@@ -78,7 +78,6 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private JPanel prediction_panel;
 	private JPanel display_prediction_panel;
 	private JPanel fix_conflict_panel;
-//	private JPanel link_legend_panel;
 	private JPanel node_panel;
 	private JPanel node_border_panel;
 	private JPanel pymol_panel;
@@ -728,10 +727,13 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 								if (ProcessProteinLocationTask.epochs > 1)
 									real_epochs = ProcessProteinLocationTask.epochs - 1;
 
+								int uk_residue_location = 0;
+								if (Util.isKeyPresent(ProcessProteinLocationTask.number_unknown_residues, real_epochs))
+									uk_residue_location = ProcessProteinLocationTask.number_unknown_residues
+											.get(real_epochs);
 								JOptionPane.showMessageDialog(null,
 										"Prediction has been done successfully!\nEpoch(s): " + real_epochs
-												+ "\n# Unknown Residue location: "
-												+ ProcessProteinLocationTask.number_unknown_residues.get(real_epochs),
+												+ "\n# Unknown Residue location: " + uk_residue_location,
 										"P2Location - Information", JOptionPane.INFORMATION_MESSAGE,
 										new ImageIcon(getClass().getResource("/images/logo.png")));
 
@@ -752,9 +754,8 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 						enable_disable_predictBox(false);
 
 					} else {
-						JOptionPane.showMessageDialog(null, "No network has been loaded!",
-								"P2Location - Alert", JOptionPane.WARNING_MESSAGE,
-								new ImageIcon(getClass().getResource("/images/logo.png")));
+						JOptionPane.showMessageDialog(null, "No network has been loaded!", "P2Location - Alert",
+								JOptionPane.WARNING_MESSAGE, new ImageIcon(getClass().getResource("/images/logo.png")));
 					}
 				}
 			}
