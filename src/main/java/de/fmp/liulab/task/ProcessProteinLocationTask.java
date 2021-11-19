@@ -1629,7 +1629,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					}
 				}
 
-			} else
+			} else if (unique_domain.size() > 0)
 				protein.isConflictedDomain = true;
 
 			unique_domain.clear();
@@ -1637,6 +1637,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		predict_IMM_OMM_domains();
 
+		Util.updateXLStatus(taskMonitor, myNetwork, textLabel_status_result);
 		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
 	}
 
@@ -1696,6 +1697,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					int indexOfLastDomain = protein.domains.indexOf(Collections.max(protein.domains));
 					int startDomain = 1;
 					predicted_protein_domain_name = "";
+
 					for (int i = 0; i < protein.domains.size(); i++) {
 
 						ProteinDomain current_domain = protein.domains.get(i);
@@ -1758,7 +1760,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							}
 
 							startDomain = 1;
-							addPredictedOMMorIMMDomain(new_domain_list, protein, next_transmem, startDomain);
+							addPredictedDomainBasedOnOMMorIMMDomain(new_domain_list, protein, next_transmem,
+									startDomain);
 							startDomain = next_transmem.endId + 1;
 						}
 						current_domain.isPredicted = true;
@@ -1785,7 +1788,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										protein.sequence.length(), true, "predicted");
 								new_domain_list.add(new_domain);
 							} else {
-								addPredictedOMMorIMMDomain(new_domain_list, protein,
+								addPredictedDomainBasedOnOMMorIMMDomain(new_domain_list, protein,
 										new ProteinDomain(TRANSMEMBRANE.toUpperCase(), protein.sequence.length() + 1,
 												-1, true, "predicted"),
 										startDomain);
@@ -1820,40 +1823,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									}
 								}
 
-								if (isForward) {
-									for (int count_reverse = j; count_reverse >= i; count_reverse--) {
-
-										ProteinDomain previous_domain = new_domain_list.get(count_reverse);
-										if (previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
-
-											if (protein.location.equals(OUTER_MEMBRANE)) {
-												if (predicted_protein_domain_name.toLowerCase()
-														.contains(INTERMEMBRANE)) {
-
-													predicted_protein_domain_name = "TOPO_DOM - Cytoplasmic";
-
-												} else if (predicted_protein_domain_name.toLowerCase()
-														.contains(CYTOSOL)) {
-
-													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
-
-												}
-											} else if (protein.location.equals(INNER_MEMBRANE)) {
-												if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
-
-													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
-
-												} else if (predicted_protein_domain_name.toLowerCase()
-														.contains(INTERMEMBRANE)) {
-
-													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial matrix";
-
-												}
-											} else
-												predicted_protein_domain_name = "";
-										}
-									}
-								} else if (i > 0) {
+								if (!isForward && i > 0) {
 
 									j = i - 1;
 									for (; j >= 0; j--) {
@@ -1865,49 +1835,36 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											break;
 										}
 									}
-
-									for (int count_reverse = i - 1; count_reverse >= j; count_reverse--) {
-
-										ProteinDomain previous_domain = new_domain_list.get(count_reverse);
-										if (previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
-
-											if (protein.location.equals(OUTER_MEMBRANE)) {
-												if (predicted_protein_domain_name.toLowerCase()
-														.contains(INTERMEMBRANE)) {
-
-													predicted_protein_domain_name = "TOPO_DOM - Cytoplasmic";
-
-												} else if (predicted_protein_domain_name.toLowerCase()
-														.contains(CYTOSOL)) {
-
-													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
-
-												}
-											} else if (protein.location.equals(INNER_MEMBRANE)) {
-												if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
-
-													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
-
-												} else if (predicted_protein_domain_name.toLowerCase()
-														.contains(INTERMEMBRANE)) {
-
-													predicted_protein_domain_name = "TOPO_DOM - Mitochondrial matrix";
-
-												}
-											} else
-												predicted_protein_domain_name = "";
-										}
-									}
 								}
 
+								// Set 'predicted_protein_domain_name' based on 'Transmem' info
+								predictDomainBasedOnOMMorIMM(count_protein, j, new_domain_list, protein, isForward);
 								domain.name = predicted_protein_domain_name;
 
 							}
 						}
-
 					}
 
 					protein.domains = new_domain_list;
+
+					//Update protein domain status
+					if (protein.domains.size() > 1) {
+						
+						protein.isConflictedDomain = false;
+
+						for (int i = 0; i < protein.domains.size() - 1; i++) {
+
+							if (!protein.domains.get(i).name.toLowerCase().contains(TRANSMEMBRANE)) {
+								if (!protein.domains.get(i).name.toLowerCase()
+										.equals(protein.domains.get(i + 1).name.toLowerCase())
+										&& !protein.domains.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
+									protein.isConflictedDomain = true;
+									break;
+								}
+							}
+						}
+					}
+
 					updateResiduesLocation(protein);
 				}
 
@@ -1917,6 +1874,65 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			System.out.println(count_protein);
 		}
 
+	}
+
+	/**
+	 * Method responsible for setting 'predicted_protein_domain_name' based on
+	 * Transmem info
+	 * 
+	 * @param i               current i
+	 * @param j               current j
+	 * @param new_domain_list new domain list
+	 * @param protein         current protein
+	 * @param isForward       search forward or backward
+	 */
+	private void predictDomainBasedOnOMMorIMM(int i, int j, List<ProteinDomain> new_domain_list, Protein protein,
+			boolean isForward) {
+
+		int count_reverse = 0;
+		int limit = 0;
+		if (isForward) {
+			count_reverse = j;
+			limit = i;
+		} else {
+			count_reverse = i - 1;
+			limit = j;
+		}
+
+		for (; count_reverse >= limit; count_reverse--) {
+
+			ProteinDomain previous_domain = new_domain_list.get(count_reverse);
+			if (previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+
+				if (protein.location.equals(OUTER_MEMBRANE)) {
+					if (predicted_protein_domain_name.toLowerCase().contains(INTERMEMBRANE)) {
+
+						predicted_protein_domain_name = "TOPO_DOM - Cytoplasmic";
+
+					} else if (predicted_protein_domain_name.toLowerCase().contains(CYTOSOL)) {
+
+						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
+
+					}
+				} else if (protein.location.equals(INNER_MEMBRANE)) {
+					if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
+
+						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
+
+					} else if (predicted_protein_domain_name.toLowerCase().contains(INTERMEMBRANE)) {
+
+						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial matrix";
+
+					}
+				} else {
+
+					if (predicted_protein_domain_name.toLowerCase().contains(CYTOSOL))
+						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
+					else
+						predicted_protein_domain_name = "";
+				}
+			}
+		}
 	}
 
 	/**
@@ -1951,7 +1967,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * @param next_transmem   next transmembrane domain
 	 * @param startDomain     start of new protein domain
 	 */
-	private void addPredictedOMMorIMMDomain(List<ProteinDomain> new_domain_list, Protein current_protein,
+	private void addPredictedDomainBasedOnOMMorIMMDomain(List<ProteinDomain> new_domain_list, Protein current_protein,
 			ProteinDomain next_transmem, int startDomain) {
 
 		ProteinDomain new_predicted_domain = null;
@@ -1983,8 +1999,15 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				predicted_protein_domain_name = MATRIX;
 
 			}
-		} else
-			predicted_protein_domain_name = "";
+		} else {
+			if (predicted_protein_domain_name.toLowerCase().contains(CYTOSOL)) {
+
+				new_predicted_domain = new ProteinDomain("TOPO_DOM - Mitochondrial intermembrane", startDomain,
+						next_transmem.startId - 1, true, "predicted");
+				predicted_protein_domain_name = INTERMEMBRANE;
+			} else
+				predicted_protein_domain_name = "";
+		}
 
 		if (new_predicted_domain != null)
 			new_domain_list.add(new_predicted_domain);

@@ -354,6 +354,48 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			}
 		}
 
+		// ######## CONFLICTED PROTEIN DOMAINS ########
+		if (nodeTable.getColumn(Util.CONFLICTED_PROTEIN_DOMAINS_COLUMN) == null) {
+			try {
+				nodeTable.createColumn(Util.CONFLICTED_PROTEIN_DOMAINS_COLUMN, Boolean.class, false);
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					row.set(Util.CONFLICTED_PROTEIN_DOMAINS_COLUMN, false);
+				}
+
+			} catch (IllegalArgumentException e) {
+			} catch (Exception e) {
+			}
+
+		} else { // The column exists, but it's necessary to check the cells
+			try {
+
+				// Check if proteinDomainsMap has been initialized
+				boolean proteinDomainsMapOK = true;
+				if (Util.proteinsMap == null)
+					proteinDomainsMapOK = false;
+
+				// Initialize protein domain colors map if LoadProteinDomainTask has not been
+				// initialized
+				Util.init_availableProteinDomainColorsMap();
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					if (row.get(Util.CONFLICTED_PROTEIN_DOMAINS_COLUMN, Boolean.class) == null)
+						row.set(Util.CONFLICTED_PROTEIN_DOMAINS_COLUMN, false);
+					else {
+
+						Boolean conflictedDomain = row.get(Util.CONFLICTED_PROTEIN_DOMAINS_COLUMN, Boolean.class);
+						if (conflictedDomain && proteinDomainsMapOK) {
+
+							String nodeName = row.get(CyNetwork.NAME, String.class);
+							updateConflictedDomains(taskMonitor, nodeName, conflictedDomain);
+						}
+					}
+				}
+			} catch (Exception e) {
+			}
+		}
+
 		// ######## CONFLICTED PREDICTED RESIDUES ########
 		if (nodeTable.getColumn(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN) == null) {
 			try {
@@ -556,6 +598,38 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 				proteinList.add(_myProtein);
 			}
 		}
+	}
+
+	/**
+	 * Method responsible for updating conflicted protein domains based on table
+	 * information
+	 * 
+	 * @param taskMonitor      task monitor
+	 * @param nodeName         current node name
+	 * @param conflictedDomain isConflicted Domain or not
+	 */
+	private void updateConflictedDomains(TaskMonitor taskMonitor, String nodeName, Boolean conflictedDomain) {
+
+		if (myNetwork == null || Util.proteinsMap == null)
+			return;
+
+		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+
+		if (proteinList != null) {
+			Optional<Protein> isPtnPresent = proteinList.stream().filter(value -> value.gene.equals(nodeName))
+					.findFirst();
+
+			if (isPtnPresent.isPresent()) {
+				Protein _myProtein = isPtnPresent.get();
+				_myProtein.isConflictedDomain = conflictedDomain;
+
+			}
+
+			else {
+				taskMonitor.showMessage(TaskMonitor.Level.WARN, "WARNING: Node " + nodeName + " has not been found.\n");
+			}
+		}
+
 	}
 
 	/**

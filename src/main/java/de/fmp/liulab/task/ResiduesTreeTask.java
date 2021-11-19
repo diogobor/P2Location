@@ -150,7 +150,7 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 			return;
 
 		if (myResidue.conflicted_residue == null)
-			throw new Exception("There is no conflicted residue.");
+			throw new Exception("There are no conflicting residues.");
 
 		CyNetwork myNetwork = myNetFactory.createNetwork();
 
@@ -645,7 +645,7 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 			if (conflicted_edge != null) {
 				View<CyEdge> conflicted_edgeView = view.getEdgeView(conflicted_edge);
 				conflicted_edgeView.setLockedValue(BasicVisualLexicon.EDGE_LABEL,
-						"Score: " + String.format("%.5f", myResidue.conflicted_score));
+						"Score: " + String.format("%.5f", -Math.log10(myResidue.conflicted_score)));
 
 				String tooltip = "<html><p>" + dependent_residues.get(0).protein.gene + " ["
 						+ dependent_residues.get(0).position + "] - " + myResidue.conflicted_residue.protein.gene + " ["

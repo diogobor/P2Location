@@ -88,6 +88,7 @@ public class Util {
 	public static String PROTEIN_DOMAIN_COLUMN = PROJECT_NAME + "domain_annotation";
 	public static String PREDICTED_PROTEIN_DOMAIN_COLUMN = PROJECT_NAME + "predicted_domains";
 	public static String CONFLICTED_PREDICTED_RESIDUES_COLUMN = PROJECT_NAME + "conflicted_residues";
+	public static String CONFLICTED_PROTEIN_DOMAINS_COLUMN = PROJECT_NAME + "conflicted_protein_domains";
 	public static String PROTEIN_SEQUENCE_COLUMN = PROJECT_NAME + "sequence";
 	public static String SUBCELLULAR_LOCATION_COLUMN = PROJECT_NAME + "subcellular_location";
 	public static String PTM_COLUMN = PROJECT_NAME + "ptms";
@@ -959,6 +960,47 @@ public class Util {
 	}
 
 	/**
+	 * Method responsible for updating residues status: isConflicted true or false
+	 * 
+	 * @param taskMonitor             task monitor
+	 * @param myNetwork               current network
+	 * @param textLabel_status_result text label status
+	 */
+	public static void updateXLStatus(TaskMonitor taskMonitor, CyNetwork myNetwork, JLabel textLabel_status_result) {
+
+		if (taskMonitor != null)
+			taskMonitor.setTitle("Updating residues information");
+
+		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
+			return;
+
+		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		if (proteinList == null || proteinList.size() == 0)
+			return;
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_rows = proteinList.size();
+
+		for (final Protein protein : proteinList) {
+
+			if (protein.reactionSites == null || protein.reactionSites.size() == 0)
+				continue;
+
+			for (Residue residue : protein.reactionSites) {
+
+				if (residue.isConflicted && residue.conflicted_residue == null)
+					residue.isConflicted = false;
+			}
+
+			summary_processed++;
+			progressBar(summary_processed, old_progress, total_rows, "Updating residues information: ", taskMonitor,
+					textLabel_status_result);
+
+		}
+	}
+
+	/**
 	 * Update Protein domain column
 	 * 
 	 * @param taskMonitor task monitor
@@ -1028,7 +1070,7 @@ public class Util {
 		addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, list_residues,
 				CONFLICTED_PREDICTED_RESIDUES_COLUMN);
 	}
-	
+
 	/**
 	 * Method responsible for filling subcellular location column
 	 * 
@@ -1133,6 +1175,52 @@ public class Util {
 					PREDICTED_PROTEIN_DOMAIN_COLUMN);
 
 			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, list_original_domains, PROTEIN_DOMAIN_COLUMN);
+		}
+
+		updateProteinDomainsConflictedStatus(myNetwork, node, protein, CONFLICTED_PROTEIN_DOMAINS_COLUMN);
+
+	}
+
+	/**
+	 * Method responsible for updating protein domain conflict status
+	 * 
+	 * @param myNetwork  current network
+	 * @param node       current node
+	 * @param protein    current protein
+	 * @param columnName column name
+	 */
+	private static void updateProteinDomainsConflictedStatus(CyNetwork myNetwork, CyNode node, final Protein protein,
+			String columnName) {
+
+		if (myNetwork.getRow(node).get(columnName, Boolean.class) != null) {
+			if (protein.isConflictedDomain)
+				myNetwork.getRow(node).set(columnName, true);
+			else
+				myNetwork.getRow(node).set(columnName, false);
+		} else {
+			// Create protein domain status
+			CyTable nodeTable = myNetwork.getDefaultNodeTable();
+			if (nodeTable.getColumn(columnName) == null) {
+				try {
+					nodeTable.createColumn(columnName, Boolean.class, false);
+
+					CyRow row = myNetwork.getRow(node);
+					if (protein.isConflictedDomain)
+						row.set(columnName, true);
+					else
+						myNetwork.getRow(node).set(columnName, false);
+
+				} catch (IllegalArgumentException e) {
+				} catch (Exception e) {
+				}
+
+			} else {
+				CyRow row = myNetwork.getRow(node);
+				if (protein.isConflictedDomain)
+					row.set(columnName, true);
+				else
+					myNetwork.getRow(node).set(columnName, false);
+			}
 		}
 
 	}
@@ -3335,7 +3423,7 @@ public class Util {
 
 		String node_name = myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME).toString();
 		Protein ptn = Util.getProtein(myNetwork, node_name);
-		if (ptn.isConflictedDomain)
+		if (ptn != null && ptn.isConflictedDomain)
 			nodeView.setLockedValue(BasicVisualLexicon.NODE_BORDER_PAINT, Color.red);
 		else
 			nodeView.setLockedValue(BasicVisualLexicon.NODE_BORDER_PAINT, Util.NodeBorderColor);

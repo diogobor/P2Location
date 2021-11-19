@@ -1091,7 +1091,10 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 				domainTableDataModel.setValueAt(domain.name, countPtnDomain, 0);
 				domainTableDataModel.setValueAt(domain.startId, countPtnDomain, 1);
 				domainTableDataModel.setValueAt(domain.endId, countPtnDomain, 2);
-				domainTableDataModel.setValueAt(domain.eValue, countPtnDomain, 3);
+				if(domain.isPredicted)
+					domainTableDataModel.setValueAt("predicted", countPtnDomain, 3);
+				else
+					domainTableDataModel.setValueAt(domain.eValue, countPtnDomain, 3);
 				Color color = domain.color;
 				if (color != null) {
 
