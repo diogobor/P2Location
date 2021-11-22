@@ -1635,7 +1635,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			unique_domain.clear();
 		}
 
-		predict_IMM_OMM_domains();
+		predictDomainsBasedOnTransmemInfo();
 
 		Util.updateXLStatus(taskMonitor, myNetwork, textLabel_status_result);
 		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
@@ -1645,7 +1645,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * Method responsible for predicting missed domains based on the 'Transmembrane'
 	 * information
 	 */
-	private void predict_IMM_OMM_domains() {
+	private void predictDomainsBasedOnTransmemInfo() {
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
 
@@ -1847,9 +1847,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					protein.domains = new_domain_list;
 
-					//Update protein domain status
+					// Update protein domain status
 					if (protein.domains.size() > 1) {
-						
+
 						protein.isConflictedDomain = false;
 
 						for (int i = 0; i < protein.domains.size() - 1; i++) {
@@ -2277,10 +2277,24 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									}
 
 									if (saveConflict) {
-										res.isConflicted = true;
-										res.conflicted_residue = residue;
-										res.predictedLocation = "UK";
-										res.conflicted_score = score;
+
+										boolean isValid = false;
+
+										if (Util.getThreshold_score) {
+											if (Util.threshold_score >= -Math.log10(crossLink.score)) {
+												isValid = true;
+												crossLink.location = "";
+											}
+										} else {
+											isValid = true;
+										}
+
+										if (!isValid) {
+											res.isConflicted = true;
+											res.conflicted_residue = residue;
+											res.predictedLocation = "UK";
+											res.conflicted_score = score;
+										}
 									}
 								}
 							}
@@ -2383,10 +2397,24 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									}
 
 									if (saveConflict) {
-										res.isConflicted = true;
-										res.conflicted_residue = residue;
-										res.predictedLocation = "UK";
-										res.conflicted_score = score;
+
+										boolean isValid = false;
+
+										if (Util.getThreshold_score) {
+											if (Util.threshold_score >= -Math.log10(crossLink.score)) {
+												isValid = true;
+												crossLink.location = "";
+											}
+										} else {
+											isValid = true;
+										}
+
+										if (!isValid) {
+											res.isConflicted = true;
+											res.conflicted_residue = residue;
+											res.predictedLocation = "UK";
+											res.conflicted_score = score;
+										}
 									}
 								}
 							}
@@ -2505,10 +2533,24 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									}
 
 									if (saveConflict) {
-										res.isConflicted = true;
-										res.conflicted_residue = residue;
-										res.predictedLocation = "UK";
-										res.conflicted_score = score;
+
+										boolean isValid = false;
+
+										if (Util.getThreshold_score) {
+											if (Util.threshold_score >= -Math.log10(crossLink.score)) {
+												isValid = true;
+												crossLink.location = "";
+											}
+										} else {
+											isValid = true;
+										}
+
+										if (!isValid) {
+											res.isConflicted = true;
+											res.conflicted_residue = residue;
+											res.predictedLocation = "UK";
+											res.conflicted_score = score;
+										}
 									}
 								}
 							}
@@ -2612,10 +2654,24 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									}
 
 									if (saveConflict) {
-										res.isConflicted = true;
-										res.conflicted_residue = residue;
-										res.predictedLocation = "UK";
-										res.conflicted_score = score;
+
+										boolean isValid = false;
+
+										if (Util.getThreshold_score) {
+											if (Util.threshold_score >= -Math.log10(crossLink.score)) {
+												isValid = true;
+												crossLink.location = "";
+											}
+										} else {
+											isValid = true;
+										}
+
+										if (!isValid) {
+											res.isConflicted = true;
+											res.conflicted_residue = residue;
+											res.predictedLocation = "UK";
+											res.conflicted_score = score;
+										}
 									}
 								}
 							}
