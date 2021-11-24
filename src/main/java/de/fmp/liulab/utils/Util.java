@@ -2,11 +2,16 @@ package de.fmp.liulab.utils;
 
 import java.awt.Color;
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -4506,6 +4511,159 @@ public class Util {
 			Collections.sort(ptmsServer);
 		}
 		return ptmsServer;
+	}
+
+	/**
+	 * Method responsible for predicting transmem regions
+	 * 
+	 * @param protein_sequence protein sequence
+	 */
+	public static void predictTransmemRegions(String protein_sequence) {
+
+		String jobID = callTMHMM_webservice(protein_sequence);
+
+		while (!checkJobID_status(jobID))
+			;
+
+		String data_link_url = getTransmemDataLinkFromTMHMM(jobID);
+		String response = connectTMHMM_website(data_link_url);
+
+		System.out.println(response);
+	}
+
+	/**
+	 * Method responsible for getting transmem data link from TMHMM website
+	 * 
+	 * @param jobID job id
+	 * @return url
+	 */
+	private static String getTransmemDataLinkFromTMHMM(String jobID) {
+
+		String url = "https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi?jobid=" + jobID + "&wait=20";
+		String response = connectTMHMM_website(url);
+		int data_index = response.indexOf("\">data</A> for plot<br>");
+
+		String data_link = "";
+		if (data_index != -1) {
+			data_link = response.subSequence(data_index - 51, data_index).toString();
+			data_link = "https://services.healthtech.dtu.dk/" + data_link;
+		}
+		return data_link;
+	}
+
+	/**
+	 * Method responsible for connecting to TMHMM website
+	 * 
+	 * @param jobID job id attribute
+	 * @return return the website as string
+	 */
+	private static String connectTMHMM_website(String _url) {
+		try {
+
+			final URL url = new URL(_url);
+			final HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("GET");
+			connection.setRequestProperty("Accept", "text/html");
+			connection.setRequestProperty("Accept-Language", "en-US");
+			connection.setRequestProperty("Connection", "close");
+			connection.setDoOutput(true);
+			connection.setReadTimeout(1000);
+			connection.setConnectTimeout(1000);
+			connection.connect();
+
+			if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+				// Get Response
+				InputStream inputStream = connection.getErrorStream(); // first check for error.
+				if (inputStream == null) {
+					inputStream = connection.getInputStream();
+				}
+				BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
+				String line;
+				StringBuilder response = new StringBuilder();
+				int total_lines = connection.getContentLength();
+
+				int old_progress = 0;
+				int summary_processed = 0;
+				while ((line = rd.readLine()) != null) {
+					response.append(line);
+					response.append('\r');
+
+					summary_processed += line.toCharArray().length + 1;
+					progressBar(summary_processed, old_progress, total_lines, "Downloading transmem regions: ", null,
+							null);
+
+				}
+				rd.close();
+				String responseString = response.toString();
+				return responseString;
+			}
+		} catch (Exception e) {
+
+			System.out.println("ERROR: Error to call TMHMM web service:" + e.getMessage());
+		}
+
+		return "";
+	}
+
+	/**
+	 * Check the status of the TMHMM response website
+	 * 
+	 * @param jobID job id attribute
+	 * @return true if it worked
+	 */
+	private static boolean checkJobID_status(String jobID) {
+
+		boolean isFinished = false;
+
+		String url = "https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi?jobid=" + jobID + "&wait=20";
+		String response = connectTMHMM_website(url);
+		int status_index = response.indexOf("<TITLE>TMHMM result</TITLE>");
+
+		if (status_index != -1) {
+			isFinished = true;
+		}
+		return isFinished;
+
+	}
+
+	/**
+	 * Method responsible for calling TMHMM web service
+	 * 
+	 * @param protein_sequence protein sequence
+	 * @return job ID
+	 */
+	private static String callTMHMM_webservice(String protein_sequence) {
+		String jobID = "";
+
+		try {
+			// Set header
+			Map<String, String> headers = new HashMap<>();
+			headers.put("User-Agent",
+					"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36");
+			HttpPostMultipart multipart = new HttpPostMultipart(
+					"https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi", "utf-8", headers);
+			// Add form field
+			multipart.addFormField("seqfile", null);
+			multipart.addFormField("configfile", "/var/www/html/services/TMHMM-2.0/webface.cf");
+			multipart.addFormField("outform", "-noshort");
+			multipart.addFormField("SEQ", protein_sequence);
+			multipart.addFormField("version", null);
+			String response = multipart.finish();
+
+			int jobid_index = response.indexOf("name=\"jobid\" value=\"");
+
+			if (jobid_index != -1) {
+
+				response = response.subSequence(jobid_index, jobid_index + 50).toString();
+				jobID = response.replaceAll("name=\"jobid\" value=\"", "").replaceAll("\">", "").replaceAll("<i", "")
+						.replaceAll("\\n\\t", "").trim();
+			}
+		} catch (Exception e) {
+
+			System.out.println("ERROR: Error to call TMHMM web service:" + e.getMessage());
+		}
+
+		return jobID;
 	}
 
 	/**

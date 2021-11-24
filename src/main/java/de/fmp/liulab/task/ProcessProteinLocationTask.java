@@ -2286,7 +2286,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 												crossLink.location = "";
 											}
 										} else {
-											isValid = true;
+											isValid = false;
 										}
 
 										if (!isValid) {
@@ -2406,7 +2406,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 												crossLink.location = "";
 											}
 										} else {
-											isValid = true;
+											isValid = false;
 										}
 
 										if (!isValid) {
@@ -2542,7 +2542,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 												crossLink.location = "";
 											}
 										} else {
-											isValid = true;
+											isValid = false;
 										}
 
 										if (!isValid) {
@@ -2663,7 +2663,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 												crossLink.location = "";
 											}
 										} else {
-											isValid = true;
+											isValid = false;
 										}
 
 										if (!isValid) {

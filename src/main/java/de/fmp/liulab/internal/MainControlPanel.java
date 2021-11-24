@@ -763,6 +763,18 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		prediction_panel.add(processButton);
 		enable_disable_spinners(false);
 
+		// ####### TEMP #########
+		JButton predictTransmemButton = new JButton("Predict Transmem Regions");
+		predictTransmemButton.setBounds(offset_x - 190, offset_y, button_width + 140, button_height);
+		predictTransmemButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+		predictTransmemButton.addMouseListener(new MouseAdapter() {
+			public void mouseClicked(MouseEvent e) {
+				Util.predictTransmemRegions("MFRIEGLAPKLDPEEMKRKMREDVISSIRNFLIYVALLRVTPFILKKLDSI");
+			}
+		});
+		prediction_panel.add(predictTransmemButton);
+		// #####################
+		
 		this.init_display_prediction(offset_x, button_width + 20, button_height);
 
 	}

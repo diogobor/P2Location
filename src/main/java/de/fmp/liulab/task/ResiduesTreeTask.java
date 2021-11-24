@@ -345,13 +345,32 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 
 		for (CyEdge edge : myNetwork.getAdjacentEdgeIterable(node, CyEdge.Type.ANY)) {
 
-			CyNode sourceNode = myNetwork.getEdge(edge.getSUID()).getSource();
 			CyNode targetNode = myNetwork.getEdge(edge.getSUID()).getTarget();
+			CyNode sourceNode = myNetwork.getEdge(edge.getSUID()).getSource();
 
-			if (sourceNode.getSUID() == targetNode.getSUID()) {// It's intralink
+			String source_node_name = myNetwork.getDefaultNodeTable().getRow(sourceNode.getSUID())
+					.getRaw(CyNetwork.NAME).toString();
+			String protein_source_name = source_node_name.replaceAll(pattern, "$4").trim();
+			String res_source_pos = source_node_name.replaceAll(pattern, "$6").trim();
+
+			String target_node_name = myNetwork.getDefaultNodeTable().getRow(targetNode.getSUID())
+					.getRaw(CyNetwork.NAME).toString();
+			String protein_target_name = target_node_name.replaceAll(pattern, "$4").trim();
+			String res_target_pos = target_node_name.replaceAll(pattern, "$6").trim();
+
+			boolean changePosToCheckXL = false;
+			if (protein_source_name.equals(protein_target_name)) {
 				IsIntraLink = true;
 				current_crosslinks = protein.intraLinks;
-			} else {// It's interlink
+
+				if (Integer.parseInt(res_source_pos) > Integer.parseInt(res_target_pos)) {
+					String _tmp = res_target_pos;
+					res_target_pos = res_source_pos;
+					res_source_pos = _tmp;
+					changePosToCheckXL = true;
+				}
+
+			} else {
 				IsIntraLink = false;
 				current_crosslinks = checkTargetProteins(protein, sourceNode);
 			}
@@ -394,23 +413,13 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 			initial_position_target_node = Util.getXPositionOf(targetNodeView);
 
 			// Target node will 'always' be the non-focused node (opposite of node.getSUID)
-			if (sourceNode.getSUID() == highlight_node.getSUID()) {
+			if (IsIntraLink || sourceNode.getSUID() == highlight_node.getSUID()) {
 				center_position_source_node = (proteinLength * Util.node_label_factor_size) / 2.0;
 				center_position_target_node = (other_node_width_or_height) / 2.0;
 			} else {
 				center_position_source_node = (other_node_width_or_height) / 2.0;
 				center_position_target_node = (proteinLength * Util.node_label_factor_size) / 2.0;
 			}
-
-			String source_node_name = myNetwork.getDefaultNodeTable().getRow(sourceNode.getSUID())
-					.getRaw(CyNetwork.NAME).toString();
-			String protein_source_name = source_node_name.replaceAll(pattern, "$4").trim();
-			String res_source_pos = source_node_name.replaceAll(pattern, "$6").trim();
-
-			String target_node_name = myNetwork.getDefaultNodeTable().getRow(targetNode.getSUID())
-					.getRaw(CyNetwork.NAME).toString();
-			String protein_target_name = target_node_name.replaceAll(pattern, "$4").trim();
-			String res_target_pos = target_node_name.replaceAll(pattern, "$6").trim();
 
 			for (int countEdge = 0; countEdge < current_crosslinks.size(); countEdge++) {
 
@@ -419,10 +428,19 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 						&& current_crosslinks.get(countEdge).protein_b.equals(protein_target_name)
 						&& current_crosslinks.get(countEdge).pos_site_b == Integer.parseInt(res_target_pos))))
 					continue;
+				// After checking position, exchange position if necessary
 				else if (IsIntraLink
 						&& !(current_crosslinks.get(countEdge).pos_site_a == Integer.parseInt(res_source_pos)
 								&& current_crosslinks.get(countEdge).pos_site_b == Integer.parseInt(res_target_pos)))
 					continue;
+
+				if (changePosToCheckXL) {
+
+					String _tmp = res_source_pos;
+					res_source_pos = res_target_pos;
+					res_target_pos = _tmp;
+
+				}
 
 				// ###### STYLE #######
 				Color linkColor = Util.InterLinksColor;
@@ -445,7 +463,7 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 
 				// ##### POSITION #######
 
-				if (sourceNode.getSUID() == highlight_node.getSUID()) {
+				if (IsIntraLink || sourceNode.getSUID() == highlight_node.getSUID()) {
 					xl_pos_source = current_crosslinks.get(countEdge).pos_site_a * Util.node_label_factor_size;
 					xl_pos_target = current_crosslinks.get(countEdge).pos_site_b;
 				} else {
