@@ -1491,6 +1491,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				residue.previous_residue = null;
 				residue.score = 0.0;
 			}
+			
+			summary_processed++;
 
 			Util.progressBar(summary_processed, old_progress, total_ptns, "Restoring residues parameters: ",
 					taskMonitor, null);

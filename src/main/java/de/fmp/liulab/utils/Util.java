@@ -2,16 +2,11 @@ package de.fmp.liulab.utils;
 
 import java.awt.Color;
 import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.net.URL;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -73,6 +68,7 @@ import de.fmp.liulab.model.CrossLink;
 import de.fmp.liulab.model.Fasta;
 import de.fmp.liulab.model.PDB;
 import de.fmp.liulab.model.PTM;
+import de.fmp.liulab.model.PredictedTransmem;
 import de.fmp.liulab.model.Protein;
 import de.fmp.liulab.model.ProteinDomain;
 import de.fmp.liulab.model.Residue;
@@ -155,6 +151,7 @@ public class Util {
 	public static Integer neighborAA = 3;
 	public static Integer transmemNeighborAA = 3;
 	public static double deltaScore = 0.5;
+	public static double transmemPredictionRegionsScore = 0.5;
 	public static boolean considerConflict = true;
 	public static boolean fixDomainManually = true;
 
@@ -4518,17 +4515,61 @@ public class Util {
 	 * 
 	 * @param protein_sequence protein sequence
 	 */
-	public static void predictTransmemRegions(String protein_sequence) {
+	public static List<PredictedTransmem> predictTransmemRegions(String protein_sequence) {
 
 		String jobID = callTMHMM_webservice(protein_sequence);
 
-		while (!checkJobID_status(jobID))
-			;
+		boolean isValid = false;
 
-		String data_link_url = getTransmemDataLinkFromTMHMM(jobID);
-		String response = connectTMHMM_website(data_link_url);
+		if (!(jobID.isBlank() || jobID.isEmpty())) {
+			
+			int isFinished = checkJobID_status(jobID);
+			while (isFinished == -1 || isFinished == 1) {
 
-		System.out.println(response);
+				if (isFinished == 1)// Job has been expired
+				{
+					break;
+				}
+				isFinished = checkJobID_status(jobID);
+			}
+
+			if (isFinished == 0)
+				isValid = true;
+		}
+		if (isValid) {
+
+			String data_link_url = getTransmemDataLinkFromTMHMM(jobID);
+			String response = connectTMHMM_website(data_link_url);
+			return createPredictedTransmemList(response);
+		} else
+			return new ArrayList<PredictedTransmem>();
+
+	}
+
+	private static List<PredictedTransmem> createPredictedTransmemList(String response) {
+
+		List<PredictedTransmem> final_list = new ArrayList<PredictedTransmem>();
+
+		if (response.isBlank() || response.isEmpty())
+			return final_list;
+
+		String[] cols_each_line = response.split("\r");
+
+		for (String col_line : cols_each_line) {
+
+			if (!Character.isDigit(col_line.charAt(0)))
+				continue;
+			String[] cols = col_line.split("\t");
+
+			String[] id_aa = cols[0].split(" ");
+			int index = Integer.parseInt(id_aa[0]);
+
+			PredictedTransmem pred_transm = new PredictedTransmem(index, id_aa[1], Double.parseDouble(cols[2]));
+			final_list.add(pred_transm);
+		}
+
+		return final_list;
+
 	}
 
 	/**
@@ -4545,7 +4586,11 @@ public class Util {
 
 		String data_link = "";
 		if (data_index != -1) {
-			data_link = response.subSequence(data_index - 51, data_index).toString();
+			data_link = response.subSequence(data_index - 55, data_index).toString();
+
+			int real_index = data_link.indexOf("services/TMHMM-2.0");
+			data_link = data_link.subSequence(real_index, data_link.length()).toString();
+
 			data_link = "https://services.healthtech.dtu.dk/" + data_link;
 		}
 		return data_link;
@@ -4611,16 +4656,20 @@ public class Util {
 	 * @param jobID job id attribute
 	 * @return true if it worked
 	 */
-	private static boolean checkJobID_status(String jobID) {
+	private static int checkJobID_status(String jobID) {
 
-		boolean isFinished = false;
+		int isFinished = -1;
 
 		String url = "https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi?jobid=" + jobID + "&wait=20";
 		String response = connectTMHMM_website(url);
-		int status_index = response.indexOf("<TITLE>TMHMM result</TITLE>");
+		int status_index = response.toLowerCase().indexOf("<title>tmhmm result</title>");
 
 		if (status_index != -1) {
-			isFinished = true;
+			isFinished = 0;
+		}
+		status_index = response.toLowerCase().indexOf("<title> expired</title>");
+		if (status_index != -1) {
+			isFinished = 1;
 		}
 		return isFinished;
 

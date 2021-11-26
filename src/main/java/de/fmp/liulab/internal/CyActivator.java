@@ -57,6 +57,7 @@ import de.fmp.liulab.task.LoadPTMsTaskFactory;
 import de.fmp.liulab.task.MainSingleEdgeTaskFactory;
 import de.fmp.liulab.task.MainSingleNodeTaskFactory;
 import de.fmp.liulab.task.ProcessProteinLocationTaskFactory;
+import de.fmp.liulab.task.ProcessTransmemRegionsTaskFactory;
 import de.fmp.liulab.task.ProteinScalingFactorHorizontalExpansionTableTaskFactory;
 import de.fmp.liulab.task.ResiduesTreeTaskFactory;
 import de.fmp.liulab.task.SetDomainColorTaskFactory;
@@ -126,6 +127,9 @@ public class CyActivator extends AbstractCyActivator {
 		// ### 3.2 - LOAD ####
 
 		ProcessProteinLocationTaskFactory myProcessProteinLocationTaskFactory = new ProcessProteinLocationTaskFactory(
+				cyApplicationManager, vmmServiceRef);
+
+		ProcessTransmemRegionsTaskFactory myProcessTransmemRegionsTaskFactory = new ProcessTransmemRegionsTaskFactory(
 				cyApplicationManager, vmmServiceRef);
 
 		LoadProteinLocationAction myProteinLocationAction = new LoadProteinLocationAction(dialogTaskManager,
@@ -239,7 +243,7 @@ public class CyActivator extends AbstractCyActivator {
 		registerService(bc, updateViewListener, NetworkDestroyedListener.class, new Properties());
 		registerService(bc, updateViewListener, RemovedEdgesListener.class, new Properties());
 		registerService(bc, updateViewListener, AboutToRemoveEdgesListener.class, new Properties());
-		
+
 		// #####################
 
 		// #### 2 - PANEL (SETTINGS) ####
@@ -247,7 +251,7 @@ public class CyActivator extends AbstractCyActivator {
 
 		CySwingApplication cytoscapeDesktopService = getService(bc, CySwingApplication.class);
 		MainControlPanel mainControlPanel = new MainControlPanel(MainProps, cm, myProcessProteinLocationTaskFactory,
-				mySingleNodeShortCutFactory, dialogTaskManager);
+				myProcessTransmemRegionsTaskFactory, mySingleNodeShortCutFactory, dialogTaskManager);
 		MainPanelAction panelAction = new MainPanelAction(cytoscapeDesktopService, mainControlPanel);
 
 		// ##############################

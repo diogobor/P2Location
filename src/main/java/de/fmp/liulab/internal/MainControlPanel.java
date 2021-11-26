@@ -57,6 +57,7 @@ import org.cytoscape.work.swing.DialogTaskManager;
 import de.fmp.liulab.core.ConfigurationManager;
 import de.fmp.liulab.task.ProcessProteinLocationTask;
 import de.fmp.liulab.task.ProcessProteinLocationTaskFactory;
+import de.fmp.liulab.task.ProcessTransmemRegionsTaskFactory;
 import de.fmp.liulab.utils.Util;
 
 /**
@@ -68,14 +69,18 @@ import de.fmp.liulab.utils.Util;
 public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 	private ProcessProteinLocationTaskFactory processProteinLocationTaskFactory;
+	private ProcessTransmemRegionsTaskFactory processTransmemRegionsTaskFactory;
 	private TaskFactory singleNodeTaskFactory;
 	private DialogTaskManager dialogTaskManager;
 
+	private static final int WIDTH_PANEL = 320;
 	private static final long serialVersionUID = 8292806967891823933L;
 	private JPanel link_panel;
 	private JPanel filter_panel;
 	private JPanel option_panel;
 	private JPanel prediction_panel;
+	private JPanel protein_domains_prediction_panel;
+	private JPanel transmem_regions_prediction_panel;
 	private JPanel display_prediction_panel;
 	private JPanel fix_conflict_panel;
 	private JPanel node_panel;
@@ -83,6 +88,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private JPanel pymol_panel;
 
 	private static JButton processButton;
+	private static JButton processTransmemButton;
 	private static JButton interLinkColorButton;
 	private static JButton ptmColorButton;
 	private static JButton monolinkColorButton;
@@ -111,6 +117,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JSpinner spinner_opacity_node_border;
 	private static JSpinner spinner_width_node_border;
 	private static JSpinner spinner_deltaScore;
+	private static JSpinner spinner_transmemCutoffScore;
 
 	private static JComboBox epochCombobox;
 	private static Integer current_epoch;
@@ -136,10 +143,12 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	 * @param cm              configuration manager
 	 */
 	public MainControlPanel(Properties P2LocationProps, ConfigurationManager cm,
-			ProcessProteinLocationTaskFactory processProteinLocationTaskFactory, TaskFactory mainSingleNodeTaskFactory,
+			ProcessProteinLocationTaskFactory processProteinLocationTaskFactory,
+			ProcessTransmemRegionsTaskFactory processTransmemRegionsTaskFactory, TaskFactory mainSingleNodeTaskFactory,
 			DialogTaskManager dialogTaskManager) {
 
 		this.processProteinLocationTaskFactory = processProteinLocationTaskFactory;
+		this.processTransmemRegionsTaskFactory = processTransmemRegionsTaskFactory;
 		this.singleNodeTaskFactory = mainSingleNodeTaskFactory;
 		this.dialogTaskManager = dialogTaskManager;
 
@@ -388,7 +397,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		filter_panel = new JPanel();
 		filter_panel.setBackground(Color.WHITE);
 		filter_panel.setBorder(BorderFactory.createTitledBorder("Filter"));
-		filter_panel.setBounds(10, offset_y, 290, 120);
+		filter_panel.setBounds(10, offset_y, WIDTH_PANEL, 120);
 		filter_panel.setLayout(null);
 		link_panel.add(filter_panel);
 
@@ -556,7 +565,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		option_panel = new JPanel();
 		option_panel.setBackground(Color.WHITE);
 		option_panel.setBorder(BorderFactory.createTitledBorder("Option"));
-		option_panel.setBounds(10, offset_y + 130, 290, 125);
+		option_panel.setBounds(10, offset_y + 130, WIDTH_PANEL, 125);
 		option_panel.setLayout(null);
 		link_panel.add(option_panel);
 
@@ -666,20 +675,144 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		prediction_panel = new JPanel();
 		prediction_panel.setBackground(Color.WHITE);
 		prediction_panel.setBorder(BorderFactory.createTitledBorder("Prediction"));
-		prediction_panel.setBounds(10, offset_y + 275, 290, 260);
+		prediction_panel.setBounds(10, offset_y + 275, WIDTH_PANEL, 360);
 		prediction_panel.setLayout(null);
 		link_panel.add(prediction_panel);
+
+		this.init_transmem_regions_prediction(offset_x, button_width + 20, button_height);
+		this.init_protein_domains_prediction(offset_x, button_width + 20, button_height);
+
+	}
+
+	/**
+	 * Method responsible for initializing transmem region
+	 * 
+	 * @param offset_x      offset x
+	 * @param button_width  button width
+	 * @param button_height botton height
+	 */
+	private void init_transmem_regions_prediction(int offset_x, int button_width, int button_height) {
+
+		offset_x -= 10;
+		int offset_y = 25;
+		transmem_regions_prediction_panel = new JPanel();
+		transmem_regions_prediction_panel.setBackground(Color.WHITE);
+		transmem_regions_prediction_panel.setBorder(BorderFactory.createTitledBorder("Transmembrane regions"));
+		transmem_regions_prediction_panel.setBounds(10, offset_y, WIDTH_PANEL - 20, 75);
+		transmem_regions_prediction_panel.setLayout(null);
+		prediction_panel.add(transmem_regions_prediction_panel);
+
+		offset_y -= 15;
+		JLabel epochLabel = new JLabel("Score:");
+		epochLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		epochLabel.setBounds(10, offset_y, 150, 40);
+		transmem_regions_prediction_panel.add(epochLabel);
+
+		offset_y += 8;
+
+		SpinnerModel model_transmemCutoffScore = new SpinnerNumberModel(Util.transmemPredictionRegionsScore, // initial
+				// value
+				0, // min
+				1, // max
+				0.1); // step
+		spinner_transmemCutoffScore = new JSpinner(model_transmemCutoffScore);
+		spinner_transmemCutoffScore.setBounds(offset_x, offset_y, 60, 20);
+		JComponent comp_transmemCutoffScore = spinner_transmemCutoffScore.getEditor();
+		JFormattedTextField field_transmemCutoffScore = (JFormattedTextField) comp_transmemCutoffScore.getComponent(0);
+		DefaultFormatter formatter_transmemCutoffScore = (DefaultFormatter) field_transmemCutoffScore.getFormatter();
+		formatter_transmemCutoffScore.setCommitsOnValidEdit(true);
+		spinner_transmemCutoffScore.addChangeListener(new ChangeListener() {
+
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				Util.transmemPredictionRegionsScore = (Double) spinner_transmemCutoffScore.getValue();
+				P2LocationProps.setProperty("p2location.transmemPredictionRegionsScore",
+						String.valueOf(Util.transmemPredictionRegionsScore));
+
+			}
+		});
+		spinner_transmemCutoffScore.setToolTipText("Set a value between 0 and 1.");
+		transmem_regions_prediction_panel.add(spinner_transmemCutoffScore);
+		offset_y += 30;
+
+		processTransmemButton = new JButton("Run");
+		processTransmemButton.setBounds(offset_x + 5, offset_y, button_width, button_height);
+		processTransmemButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+		processTransmemButton.addMouseListener(new MouseAdapter() {
+			public void mouseClicked(MouseEvent e) {
+				if (processTransmemButton.isEnabled()) {
+
+					if (myNetwork != null && processTransmemRegionsTaskFactory != null && dialogTaskManager != null) {
+
+						TaskIterator ti = processTransmemRegionsTaskFactory.createTaskIterator(true, false);
+
+						TaskObserver observer = new TaskObserver() {
+
+							@Override
+							public void taskFinished(ObservableTask task) {
+
+							}
+
+							@Override
+							public void allFinished(FinishStatus finishStatus) {
+
+								JOptionPane.showMessageDialog(null,
+										"Transmembrane prediction has been done successfully!",
+										"P2Location - Information", JOptionPane.INFORMATION_MESSAGE,
+										new ImageIcon(getClass().getResource("/images/logo.png")));
+
+								enable_disableDisplayBox(true, false);
+								enable_disable_predictBox(true);
+								enable_disable_transmemBox(true);
+								processButton.setEnabled(true);
+							}
+						};
+
+						dialogTaskManager.execute(ti, observer);
+						processButton.setEnabled(false);
+
+						enable_disable_predictBox(false);
+						enable_disable_transmemBox(false);
+
+					} else {
+						JOptionPane.showMessageDialog(null, "No network has been loaded!", "P2Location - Alert",
+								JOptionPane.WARNING_MESSAGE, new ImageIcon(getClass().getResource("/images/logo.png")));
+					}
+				}
+			}
+		});
+		transmem_regions_prediction_panel.add(processTransmemButton);
+
+	}
+
+	/**
+	 * Method responsible for creating protein domains panel
+	 * 
+	 * @param offset_x      current offset x
+	 * @param button_width  current button width
+	 * @param button_height current button height
+	 */
+	private void init_protein_domains_prediction(int offset_x, int button_width, int button_height) {
+
+		offset_x -= 10;
+		int offset_y = 25;
+		protein_domains_prediction_panel = new JPanel();
+		protein_domains_prediction_panel.setBackground(Color.WHITE);
+		protein_domains_prediction_panel.setBorder(BorderFactory.createTitledBorder("Protein domains"));
+		protein_domains_prediction_panel.setBounds(10, offset_y + 85, WIDTH_PANEL - 20, 240);
+		protein_domains_prediction_panel.setLayout(null);
+		prediction_panel.add(protein_domains_prediction_panel);
 
 		enable_conflict = new JCheckBox("Fix conflicts manually");
 		enable_conflict.setBackground(Color.WHITE);
 		enable_conflict.setSelected(Util.fixDomainManually);
 		enable_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		if (Util.isWindows())
-			enable_conflict.setBounds(5, offset_y, 155, 20);
+			enable_conflict.setBounds(5, offset_y - 5, 155, 20);
 		else
-			enable_conflict.setBounds(5, offset_y, 170, 20);
+			enable_conflict.setBounds(5, offset_y - 5, 170, 20);
 
-		prediction_panel.add(enable_conflict);
+		protein_domains_prediction_panel.add(enable_conflict);
 		offset_y += 30;
 		enable_conflict.addItemListener(new ItemListener() {
 			@Override
@@ -698,7 +831,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		});
 
 		this.init_fix_conflict(offset_x, button_width + 20, button_height);
-		offset_y += 80;
+		offset_y += 65;
 
 		processButton = new JButton("Run");
 		processButton.setBounds(offset_x + 5, offset_y, button_width, button_height);
@@ -747,11 +880,16 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 								current_epoch = Integer.parseInt(epochsList.get(epochsList.size() - 1));
 								enable_disableDisplayBox(true, false);
 								enable_disable_predictBox(true);
+								enable_disable_transmemBox(true);
+								processButton.setEnabled(true);
 							}
 						};
 
+						processButton.setEnabled(false);
 						dialogTaskManager.execute(ti, observer);
+
 						enable_disable_predictBox(false);
+						enable_disable_transmemBox(false);
 
 					} else {
 						JOptionPane.showMessageDialog(null, "No network has been loaded!", "P2Location - Alert",
@@ -760,21 +898,9 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 				}
 			}
 		});
-		prediction_panel.add(processButton);
+		protein_domains_prediction_panel.add(processButton);
 		enable_disable_spinners(false);
 
-		// ####### TEMP #########
-		JButton predictTransmemButton = new JButton("Predict Transmem Regions");
-		predictTransmemButton.setBounds(offset_x - 190, offset_y, button_width + 140, button_height);
-		predictTransmemButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-		predictTransmemButton.addMouseListener(new MouseAdapter() {
-			public void mouseClicked(MouseEvent e) {
-				Util.predictTransmemRegions("MFRIEGLAPKLDPEEMKRKMREDVISSIRNFLIYVALLRVTPFILKKLDSI");
-			}
-		});
-		prediction_panel.add(predictTransmemButton);
-		// #####################
-		
 		this.init_display_prediction(offset_x, button_width + 20, button_height);
 
 	}
@@ -791,9 +917,9 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		fix_conflict_panel = new JPanel();
 		fix_conflict_panel.setBackground(Color.WHITE);
 		fix_conflict_panel.setBorder(BorderFactory.createTitledBorder("Fix conflicts automatically"));
-		fix_conflict_panel.setBounds(10, offset_y + 30, 270, 75);
+		fix_conflict_panel.setBounds(10, offset_y + 30, WIDTH_PANEL - 40, 65);
 		fix_conflict_panel.setLayout(null);
-		prediction_panel.add(fix_conflict_panel);
+		protein_domains_prediction_panel.add(fix_conflict_panel);
 
 		JLabel epochLabel = new JLabel("\u0394 score:");
 		epochLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
@@ -842,10 +968,11 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		display_prediction_panel = new JPanel();
 		display_prediction_panel.setBackground(Color.WHITE);
 		display_prediction_panel.setBorder(BorderFactory.createTitledBorder("Display"));
-		display_prediction_panel.setBounds(10, offset_y + 125, 270, 95);
+		display_prediction_panel.setBounds(10, offset_y + 115, WIDTH_PANEL - 40, 85);
 		display_prediction_panel.setLayout(null);
-		prediction_panel.add(display_prediction_panel);
+		protein_domains_prediction_panel.add(display_prediction_panel);
 
+		offset_y -= 10;
 		JLabel epochLabel = new JLabel("Epoch:");
 		epochLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		epochLabel.setBounds(10, offset_y, 50, 40);
@@ -883,7 +1010,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			offset_x -= 20;
 
 		display_epochButton = new JButton("Update");
-		display_epochButton.setBounds(offset_x, offset_y, button_width, button_height);
+		display_epochButton.setBounds(offset_x - 10, offset_y, button_width, button_height);
 		display_epochButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 		display_epochButton.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
@@ -1005,6 +1132,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	 * @param enable
 	 * @param isInitial
 	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static void enable_disableDisplayBox(boolean enable, boolean isInitial) {
 
 		if (epochCombobox != null)
@@ -1021,6 +1149,16 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 				epochCombobox.setSelectedIndex(epochsList.size() - 1);
 			}
 		}
+	}
+
+	public static void enable_disable_transmemBox(boolean enable) {
+
+		if (processTransmemButton != null)
+			processTransmemButton.setEnabled(enable);
+
+		if (spinner_transmemCutoffScore != null)
+			spinner_transmemCutoffScore.setEnabled(enable);
+
 	}
 
 	/**
@@ -1352,6 +1490,9 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 	}
 
+	/**
+	 * Method responsible for updating parameters
+	 */
 	public static void updateParamsValue() {
 
 		show_intra_link.setSelected(Util.showIntraLinks);
