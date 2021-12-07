@@ -2012,7 +2012,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 					? domainTableDataModel.getValueAt(row, 3).toString()
 					: "";
 
-			boolean isPredicted = eValue.equals("predicted");
+			boolean isPredicted = eValue.contains("predicted");
 
 			Optional<ProteinDomain> isPtnDomainPresent = myProtein.domains.stream()
 					.filter(value -> value.name.equals(domain) && value.startId == startId && value.endId == endId

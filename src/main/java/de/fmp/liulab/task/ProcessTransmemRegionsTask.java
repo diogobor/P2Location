@@ -5,7 +5,6 @@ import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +31,7 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 	public static VisualStyle style;
 
 	private Map<Protein, List<PredictedTransmem>> proteinsWithPredTransmDict;
+	private final static String TRANSMEMBRANE = "transmem";
 
 	public ProcessTransmemRegionsTask(CyApplicationManager cyApplicationManager,
 			final VisualMappingManager vmmServiceRef) {
@@ -39,7 +39,7 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 		this.cyApplicationManager = cyApplicationManager;
 		this.style = vmmServiceRef.getCurrentVisualStyle();
 		this.myNetwork = cyApplicationManager.getCurrentNetwork();
-		proteinsWithPredTransmDict = new HashMap<Protein, List<PredictedTransmem>>();
+
 	}
 
 	@Override
@@ -53,29 +53,74 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 
 		taskMonitor.setTitle("P2Location - Predict transmembrane regions task");
 
-		if (Util.proteinsMap == null || myNetwork == null)
+		if (Util.proteinsMap == null || myNetwork == null || Util.proteinsWithPredTransmDict == null)
 			return;
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+		this.proteinsWithPredTransmDict = Util.proteinsWithPredTransmDict.get(myNetwork.toString());
 
 		int old_progress = 0;
 		int summary_processed = 0;
 		int total_ptns = allProteins.size();
 
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Predicting transmembrane regions: " + old_progress + "%");
-		for (Protein protein : allProteins) {
 
-			if (protein.sequence.isBlank() || protein.sequence.isEmpty())
-				continue;
+		if (this.proteinsWithPredTransmDict.size() == 0) {
 
-			List<PredictedTransmem> predictedTransmemList = Util.predictTransmemRegions(protein.sequence);
-			proteinsWithPredTransmDict.put(protein, predictedTransmemList);
+			for (Protein protein : allProteins) {
 
-			summary_processed++;
+				if (protein.sequence.isBlank() || protein.sequence.isEmpty())
+					continue;
 
-			Util.progressBar(summary_processed, old_progress, total_ptns, "Predicting transmembrane regions: ",
-					taskMonitor, null);
+				if (protein.domains != null && protein.domains.size() > 0) {
 
+					List<ProteinDomain> non_predict_domains = protein.domains.stream()
+							.filter(value -> !value.isPredicted).collect(Collectors.toList());
+
+					if (non_predict_domains == null || non_predict_domains.size() > 0)
+						continue;
+				}
+
+				List<PredictedTransmem> predictedTransmemList = Util.predictTransmemRegions(protein, taskMonitor);
+				this.proteinsWithPredTransmDict.put(protein, predictedTransmemList);
+
+				summary_processed++;
+
+				Util.progressBar(summary_processed, old_progress, total_ptns, "Predicting transmembrane regions: ",
+						taskMonitor, null);
+
+			}
+
+		} else {
+
+			for (Protein protein : allProteins) {
+
+				if (protein.sequence.isBlank() || protein.sequence.isEmpty())
+					continue;
+
+				if (protein.domains != null && protein.domains.size() > 0) {
+
+					List<ProteinDomain> non_predict_domains = protein.domains.stream()
+							.filter(value -> !value.isPredicted).collect(Collectors.toList());
+
+					if (non_predict_domains == null || non_predict_domains.size() > 0)
+						continue;
+				}
+
+				Optional<Map.Entry<Protein, List<PredictedTransmem>>> isPresent = this.proteinsWithPredTransmDict
+						.entrySet().stream()
+						.filter(value -> value.getKey().gene.equals(protein.gene)
+								&& value.getKey().location.equals(protein.location)
+								&& value.getKey().proteinID.equals(protein.proteinID)
+								&& value.getKey().sequence.equals(protein.sequence))
+						.findFirst();
+
+				if (!isPresent.isPresent()) {
+					List<PredictedTransmem> predictedTransmemList = Util.predictTransmemRegions(protein, taskMonitor);
+					this.proteinsWithPredTransmDict.put(protein, predictedTransmemList);
+				}
+
+			}
 		}
 
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Applying cutoff filtering...");
@@ -86,28 +131,44 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 	private void applyFilterToTransmemDic(TaskMonitor taskMonitor) {
 
 		boolean isChanged = false;
-		for (Map.Entry<Protein, List<PredictedTransmem>> entry : proteinsWithPredTransmDict.entrySet()) {
-			Protein protein = entry.getKey();
-			List<PredictedTransmem> transmemList = entry.getValue();
+		for (Map.Entry<Protein, List<PredictedTransmem>> entry : this.proteinsWithPredTransmDict.entrySet()) {
 
-			List<ProteinDomain> transmemDomains = createTransmemDomains(transmemList);
+			try {
+				Protein protein = entry.getKey();
+				List<PredictedTransmem> transmemList = entry.getValue();
 
-			if (transmemDomains.size() == 0)
-				continue;
+				List<ProteinDomain> transmemDomains = createTransmemDomains(transmemList);
 
-			isChanged = true;
+				List<ProteinDomain> domains_without_predicted_transm = null;
 
-			if (protein.domains != null)
-				protein.domains.addAll(transmemDomains);
-			else
-				protein.domains = transmemDomains;
-
-			Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
-				@Override
-				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
-					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+				if (protein.domains != null) {
+					domains_without_predicted_transm = protein.domains.stream()
+							.filter(value -> (!value.isPredicted && !value.name.toLowerCase().contains(TRANSMEMBRANE))
+									|| (value.isPredicted && !value.name.toLowerCase().contains(TRANSMEMBRANE)))
+							.collect(Collectors.toList());
 				}
-			});
+
+				isChanged = true;
+
+				if (domains_without_predicted_transm != null)
+					domains_without_predicted_transm.addAll(transmemDomains);
+				else if (transmemDomains.size() > 0)
+					domains_without_predicted_transm = transmemDomains;
+
+				protein.domains = domains_without_predicted_transm;
+
+				if (protein.domains != null) {
+					Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+						@Override
+						public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+							return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+						}
+					});
+				}
+			} catch (Exception e) {
+				System.out.println("ERROR");
+			}
+
 		}
 
 		if (isChanged)
@@ -115,13 +176,22 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 
 	}
 
+	/**
+	 * Method responsible for updating proteins map
+	 * 
+	 * @param taskMonitor
+	 */
 	private void updateProteinsMap(TaskMonitor taskMonitor) {
-		for (Map.Entry<Protein, List<PredictedTransmem>> entry : proteinsWithPredTransmDict.entrySet()) {
+		for (Map.Entry<Protein, List<PredictedTransmem>> entry : this.proteinsWithPredTransmDict.entrySet()) {
 			Protein protein = entry.getKey();
+			if (protein.domains == null)
+				continue;
 
 			Optional<Protein> isPresent = Util.proteinsMap.get(myNetwork.toString()).stream()
-					.filter(value -> value.gene.equals(protein.gene) && value.location.equals(protein.location)
-							&& value.proteinID.equals(protein.proteinID) && value.sequence.equals(protein.sequence))
+					.filter(value -> value.gene != null && value.gene.equals(protein.gene) && value.location != null
+							&& value.location.equals(protein.location) && value.proteinID != null
+							&& value.proteinID.equals(protein.proteinID) && value.sequence != null
+							&& value.sequence.equals(protein.sequence))
 					.findFirst();
 
 			if (isPresent.isPresent()) {
@@ -129,34 +199,40 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 				current_protein.domains = protein.domains;
 				current_protein.domains = current_protein.domains.stream().distinct().collect(Collectors.toList());
 			}
+			Util.updateResiduesBasedOnProteinDomains(protein);
 		}
 
-		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
+		Util.updateProteins(taskMonitor, myNetwork, null, false, false);
 	}
 
 	private List<ProteinDomain> createTransmemDomains(List<PredictedTransmem> transmemList) {
 
 		List<ProteinDomain> new_transm_list = new ArrayList<ProteinDomain>();
+		double transm_score = 0;
 		for (int i = 0; i < transmemList.size(); i++) {
 
+			transm_score = 0;
 			PredictedTransmem predictedTransmem = transmemList.get(i);
 			if (predictedTransmem.score == 0)
 				continue;
 
-			if (predictedTransmem.score >= Util.transmemPredictionRegionsScore) {
-				int startID = i;
-				int endID = i;
+			if (predictedTransmem.score >= Util.transmemPredictionRegionsLowerScore) {
+				int startID = (i + 1);
+				int endID = (i + 1);
 
 				int j = i + 1;
 				for (; j < transmemList.size(); j++) {
 					PredictedTransmem nextPredictedTransmem = transmemList.get(j);
-					if (nextPredictedTransmem.score >= Util.transmemPredictionRegionsScore) {
-						endID = j;
+					if (nextPredictedTransmem.score >= Util.transmemPredictionRegionsLowerScore) {
+						endID = (j + 1);
+						if (nextPredictedTransmem.score > transm_score)
+							transm_score = nextPredictedTransmem.score;
 					} else
 						break;
 				}
 
-				ProteinDomain new_transm_domain = new ProteinDomain("TRANSMEM", startID, endID, true, "predicted");
+				ProteinDomain new_transm_domain = new ProteinDomain("TRANSMEM", startID, endID, false,
+						"" + transm_score);
 				new_transm_list.add(new_transm_domain);
 				i = j - 1;
 			}

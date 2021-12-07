@@ -117,7 +117,8 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JSpinner spinner_opacity_node_border;
 	private static JSpinner spinner_width_node_border;
 	private static JSpinner spinner_deltaScore;
-	private static JSpinner spinner_transmemCutoffScore;
+	private static JSpinner spinner_transmemUpperCutoffScore;
+	private static JSpinner spinner_transmemLowerCutoffScore;
 
 	private static JComboBox epochCombobox;
 	private static Integer current_epoch;
@@ -675,7 +676,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		prediction_panel = new JPanel();
 		prediction_panel.setBackground(Color.WHITE);
 		prediction_panel.setBorder(BorderFactory.createTitledBorder("Prediction"));
-		prediction_panel.setBounds(10, offset_y + 275, WIDTH_PANEL, 360);
+		prediction_panel.setBounds(10, offset_y + 275, WIDTH_PANEL, 390);
 		prediction_panel.setLayout(null);
 		link_panel.add(prediction_panel);
 
@@ -698,41 +699,73 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		transmem_regions_prediction_panel = new JPanel();
 		transmem_regions_prediction_panel.setBackground(Color.WHITE);
 		transmem_regions_prediction_panel.setBorder(BorderFactory.createTitledBorder("Transmembrane regions"));
-		transmem_regions_prediction_panel.setBounds(10, offset_y, WIDTH_PANEL - 20, 75);
+		transmem_regions_prediction_panel.setBounds(10, offset_y, WIDTH_PANEL - 20, 105);
 		transmem_regions_prediction_panel.setLayout(null);
 		prediction_panel.add(transmem_regions_prediction_panel);
 
 		offset_y -= 15;
-		JLabel epochLabel = new JLabel("Score:");
-		epochLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		epochLabel.setBounds(10, offset_y, 150, 40);
-		transmem_regions_prediction_panel.add(epochLabel);
+		JLabel upperScoreLabel = new JLabel("Upper Score:");
+		upperScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		upperScoreLabel.setBounds(10, offset_y, 150, 40);
+		transmem_regions_prediction_panel.add(upperScoreLabel);
 
 		offset_y += 8;
 
-		SpinnerModel model_transmemCutoffScore = new SpinnerNumberModel(Util.transmemPredictionRegionsScore, // initial
+		SpinnerModel model_transmemUpperCutoffScore = new SpinnerNumberModel(Util.transmemPredictionRegionsUpperScore, // initial
 				// value
 				0, // min
 				1, // max
 				0.1); // step
-		spinner_transmemCutoffScore = new JSpinner(model_transmemCutoffScore);
-		spinner_transmemCutoffScore.setBounds(offset_x, offset_y, 60, 20);
-		JComponent comp_transmemCutoffScore = spinner_transmemCutoffScore.getEditor();
-		JFormattedTextField field_transmemCutoffScore = (JFormattedTextField) comp_transmemCutoffScore.getComponent(0);
-		DefaultFormatter formatter_transmemCutoffScore = (DefaultFormatter) field_transmemCutoffScore.getFormatter();
-		formatter_transmemCutoffScore.setCommitsOnValidEdit(true);
-		spinner_transmemCutoffScore.addChangeListener(new ChangeListener() {
+		spinner_transmemUpperCutoffScore = new JSpinner(model_transmemUpperCutoffScore);
+		spinner_transmemUpperCutoffScore.setBounds(offset_x, offset_y, 60, 20);
+		JComponent comp_transmemUpperCutoffScore = spinner_transmemUpperCutoffScore.getEditor();
+		JFormattedTextField field_transmemUpperCutoffScore = (JFormattedTextField) comp_transmemUpperCutoffScore.getComponent(0);
+		DefaultFormatter formatter_transmemUpperCutoffScore = (DefaultFormatter) field_transmemUpperCutoffScore.getFormatter();
+		formatter_transmemUpperCutoffScore.setCommitsOnValidEdit(true);
+		spinner_transmemUpperCutoffScore.addChangeListener(new ChangeListener() {
 
 			@Override
 			public void stateChanged(ChangeEvent e) {
-				Util.transmemPredictionRegionsScore = (Double) spinner_transmemCutoffScore.getValue();
+				Util.transmemPredictionRegionsUpperScore = (Double) spinner_transmemUpperCutoffScore.getValue();
 				P2LocationProps.setProperty("p2location.transmemPredictionRegionsScore",
-						String.valueOf(Util.transmemPredictionRegionsScore));
+						String.valueOf(Util.transmemPredictionRegionsUpperScore));
 
 			}
 		});
-		spinner_transmemCutoffScore.setToolTipText("Set a value between 0 and 1.");
-		transmem_regions_prediction_panel.add(spinner_transmemCutoffScore);
+		spinner_transmemUpperCutoffScore.setToolTipText("Set a value between 0 and 1.");
+		transmem_regions_prediction_panel.add(spinner_transmemUpperCutoffScore);
+		offset_y += 20;
+		
+		JLabel lowerScoreLabel = new JLabel("Lower Score:");
+		lowerScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		lowerScoreLabel.setBounds(10, offset_y, 150, 40);
+		transmem_regions_prediction_panel.add(lowerScoreLabel);
+
+		offset_y += 8;
+
+		SpinnerModel model_transmemLowerCutoffScore = new SpinnerNumberModel(Util.transmemPredictionRegionsLowerScore, // initial
+				// value
+				0, // min
+				1, // max
+				0.1); // step
+		spinner_transmemLowerCutoffScore = new JSpinner(model_transmemLowerCutoffScore);
+		spinner_transmemLowerCutoffScore.setBounds(offset_x, offset_y, 60, 20);
+		JComponent comp_transmemLowerCutoffScore = spinner_transmemLowerCutoffScore.getEditor();
+		JFormattedTextField field_transmemLowerCutoffScore = (JFormattedTextField) comp_transmemLowerCutoffScore.getComponent(0);
+		DefaultFormatter formatter_transmemLowerCutoffScore = (DefaultFormatter) field_transmemLowerCutoffScore.getFormatter();
+		formatter_transmemLowerCutoffScore.setCommitsOnValidEdit(true);
+		spinner_transmemLowerCutoffScore.addChangeListener(new ChangeListener() {
+
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				Util.transmemPredictionRegionsLowerScore = (Double) spinner_transmemLowerCutoffScore.getValue();
+				P2LocationProps.setProperty("p2location.transmemPredictionRegionsScore",
+						String.valueOf(Util.transmemPredictionRegionsLowerScore));
+
+			}
+		});
+		spinner_transmemLowerCutoffScore.setToolTipText("Set a value between 0 and 1.");
+		transmem_regions_prediction_panel.add(spinner_transmemLowerCutoffScore);
 		offset_y += 30;
 
 		processTransmemButton = new JButton("Run");
@@ -799,7 +832,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		protein_domains_prediction_panel = new JPanel();
 		protein_domains_prediction_panel.setBackground(Color.WHITE);
 		protein_domains_prediction_panel.setBorder(BorderFactory.createTitledBorder("Protein domains"));
-		protein_domains_prediction_panel.setBounds(10, offset_y + 85, WIDTH_PANEL - 20, 240);
+		protein_domains_prediction_panel.setBounds(10, offset_y + 115, WIDTH_PANEL - 20, 240);
 		protein_domains_prediction_panel.setLayout(null);
 		prediction_panel.add(protein_domains_prediction_panel);
 
@@ -1156,8 +1189,11 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		if (processTransmemButton != null)
 			processTransmemButton.setEnabled(enable);
 
-		if (spinner_transmemCutoffScore != null)
-			spinner_transmemCutoffScore.setEnabled(enable);
+		if (spinner_transmemUpperCutoffScore != null)
+			spinner_transmemUpperCutoffScore.setEnabled(enable);
+		
+		if (spinner_transmemLowerCutoffScore != null)
+			spinner_transmemLowerCutoffScore.setEnabled(enable);
 
 	}
 

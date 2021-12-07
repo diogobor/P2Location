@@ -3,6 +3,7 @@ package de.fmp.liulab.internal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -48,6 +49,7 @@ import org.cytoscape.work.TaskObserver;
 import org.cytoscape.work.swing.DialogTaskManager;
 
 import de.fmp.liulab.model.CrossLink;
+import de.fmp.liulab.model.PredictedTransmem;
 import de.fmp.liulab.model.Protein;
 import de.fmp.liulab.model.Residue;
 import de.fmp.liulab.task.MainSingleNodeTask;
@@ -405,6 +407,12 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 			if (!Util.proteinsMap.containsKey(cyNetwork.toString()))
 				Util.proteinsMap.put(cyNetwork.toString(), new ArrayList<Protein>());
 
+			// Initialize Transmem dictionary
+			if (!Util.proteinsWithPredTransmDict.containsKey(cyNetwork.toString())) {
+				Util.proteinsWithPredTransmDict.put(cyNetwork.toString(),
+						new HashMap<Protein, List<PredictedTransmem>>());
+			}
+
 			createAuxiliarColumnsTable();
 		}
 
@@ -442,6 +450,9 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 			if (Util.proteinsMap.containsKey(current_network_name))
 				Util.proteinsMap.remove(current_network_name);
 
+			if (Util.proteinsWithPredTransmDict.containsKey(current_network_name)) {
+				Util.proteinsWithPredTransmDict.remove(current_network_name);
+			}
 		}
 
 		MainControlPanel.enable_disableDisplayBox(false, false);

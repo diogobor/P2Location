@@ -1171,7 +1171,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	/**
 	 * Method responsible for updating reaction sites into protein
 	 * 
-	 * @param protein
+	 * @param protein current protein
 	 */
 	public static void addReactionSites(Protein protein) {
 		// Find out all lysines
@@ -1187,29 +1187,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			residues = residues.stream().distinct().collect(Collectors.toList());
 		}
 
-		if (protein.domains != null && protein.domains.size() > 0) {
-			for (ProteinDomain domain : protein.domains) {
-
-				residues.stream().filter(value -> value.position >= domain.startId && value.position <= domain.endId)
-						.forEach(
-
-								res -> {
-
-									res.location = domain.name;
-									res.predictedLocation = domain.name;
-
-								});
-
-			}
-			Collections.sort(residues, new Comparator<Residue>() {
-				@Override
-				public int compare(Residue lhs, Residue rhs) {
-					return lhs.position > rhs.position ? 1 : (lhs.position < rhs.position) ? -1 : 0;
-				}
-			});
-			residues = residues.stream().distinct().collect(Collectors.toList());
-		}
 		protein.reactionSites = residues;
+		Util.updateResiduesBasedOnProteinDomains(protein);
 
 	}
 
@@ -1491,7 +1470,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				residue.previous_residue = null;
 				residue.score = 0.0;
 			}
-			
+
 			summary_processed++;
 
 			Util.progressBar(summary_processed, old_progress, total_ptns, "Restoring residues parameters: ",
@@ -1612,7 +1591,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 				unique_domain.clear();
 
-				// There is only Transmembrane domain
+				// There is only Transmembrane domains
 				if (protein.domains.size() == 1)
 					continue;
 
@@ -1655,11 +1634,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		List<String> unique_domain = new ArrayList<String>();
 
 		int count_protein = 0;
-		try {
 
-			for (Protein protein : allProteins.stream().filter(value -> !value.isPredictedTransmem)
-					.collect(Collectors.toList())) {
-
+		for (Protein protein : allProteins.stream().filter(value -> !value.isPredictedTransmem)
+				.collect(Collectors.toList())) {
+			try {
 				if (protein.domains == null)
 					continue;
 
@@ -1840,7 +1818,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								}
 
 								// Set 'predicted_protein_domain_name' based on 'Transmem' info
-								predictDomainBasedOnOMMorIMM(count_protein, j, new_domain_list, protein, isForward);
+								if (!isForward)
+									predictDomainBasedOnOMMorIMM(i, j, new_domain_list, protein, isForward);
+								else
+									predictDomainBasedOnOMMorIMM(count_protein, j, new_domain_list, protein, isForward);
 								domain.name = predicted_protein_domain_name;
 
 							}
@@ -1870,12 +1851,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					updateResiduesLocation(protein);
 				}
 
-				count_protein++;
+			} catch (Exception e) {
+				System.out.println(count_protein);
 			}
-		} catch (Exception e) {
-			System.out.println(count_protein);
+			count_protein++;
 		}
-
 	}
 
 	/**
@@ -1929,6 +1909,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				} else {
 
 					if (predicted_protein_domain_name.toLowerCase().contains(CYTOSOL))
+						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
+					else if (predicted_protein_domain_name.toLowerCase().contains(MATRIX))
 						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
 					else
 						predicted_protein_domain_name = "";
@@ -2179,7 +2161,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					for (CrossLink crossLink : links) {
 
-						// It means the current residue is A
+						// It means that the current residue is A
 						if (crossLink.pos_site_a == pos) {
 							Optional<Residue> isResiduePresent = residue_collection.stream()
 									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)

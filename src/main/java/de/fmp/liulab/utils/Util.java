@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -151,7 +152,8 @@ public class Util {
 	public static Integer neighborAA = 3;
 	public static Integer transmemNeighborAA = 3;
 	public static double deltaScore = 0.5;
-	public static double transmemPredictionRegionsScore = 0.5;
+	public static double transmemPredictionRegionsUpperScore = 0.7;
+	public static double transmemPredictionRegionsLowerScore = 0.015;
 	public static boolean considerConflict = true;
 	public static boolean fixDomainManually = true;
 
@@ -159,6 +161,7 @@ public class Util {
 	public static Map<String, List<Protein>> proteinsMap = new HashMap<String, List<Protein>>();
 	public static Map<String, Color> proteinDomainsColorMap = new HashMap<String, Color>();
 	public static List<java.awt.Color> available_domain_colors = new ArrayList<Color>();
+	public static Map<String, Map<Protein, List<PredictedTransmem>>> proteinsWithPredTransmDict = new HashMap<String, Map<Protein, List<PredictedTransmem>>>();
 
 	// Map<Network name, Map<Protein - Node SUID, List<PTM>>
 	public static Map<String, Map<Long, List<PTM>>> ptmsMap = new HashMap<String, Map<Long, List<PTM>>>();
@@ -1158,7 +1161,7 @@ public class Util {
 	 */
 	private static void fillProteinDomainColumns(CyNetwork myNetwork, final Protein protein, CyNode node) {
 
-		if (protein.domains != null && protein.domains.size() > 0) {
+		if (protein.domains != null) {
 
 			List<String> list_original_domains = new ArrayList<>();
 			List<String> list_predicted_domains = new ArrayList<>();
@@ -1394,6 +1397,41 @@ public class Util {
 				if (targetXL != null && (targetXL.location == null || targetXL.location.equals("UK")))
 					targetXL.location = interXL.location;
 			}
+		}
+	}
+
+	/**
+	 * Method responsible for updating residue location based on protein domains
+	 * information
+	 * 
+	 * @param protein current protein
+	 * 
+	 */
+	public static void updateResiduesBasedOnProteinDomains(Protein protein) {
+
+		List<Residue> residues = protein.reactionSites;
+
+		if (protein.domains != null && protein.domains.size() > 0) {
+			for (ProteinDomain domain : protein.domains) {
+
+				residues.stream().filter(value -> value.position >= domain.startId && value.position <= domain.endId)
+						.forEach(
+
+								res -> {
+
+									res.location = domain.name;
+									res.predictedLocation = domain.name;
+
+								});
+
+			}
+			Collections.sort(residues, new Comparator<Residue>() {
+				@Override
+				public int compare(Residue lhs, Residue rhs) {
+					return lhs.position > rhs.position ? 1 : (lhs.position < rhs.position) ? -1 : 0;
+				}
+			});
+			residues = residues.stream().distinct().collect(Collectors.toList());
 		}
 	}
 
@@ -4515,14 +4553,15 @@ public class Util {
 	 * 
 	 * @param protein_sequence protein sequence
 	 */
-	public static List<PredictedTransmem> predictTransmemRegions(String protein_sequence) {
+	public static List<PredictedTransmem> predictTransmemRegions(Protein protein, TaskMonitor taskMonitor) {
 
+		String protein_sequence = protein.sequence;
 		String jobID = callTMHMM_webservice(protein_sequence);
 
 		boolean isValid = false;
 
-		if (!(jobID.isBlank() || jobID.isEmpty())) {
-			
+		if (!(jobID.isBlank() || jobID.isEmpty() || jobID.startsWith("Error to call TMHMM web service"))) {
+
 			int isFinished = checkJobID_status(jobID);
 			while (isFinished == -1 || isFinished == 1) {
 
@@ -4541,8 +4580,15 @@ public class Util {
 			String data_link_url = getTransmemDataLinkFromTMHMM(jobID);
 			String response = connectTMHMM_website(data_link_url);
 			return createPredictedTransmemList(response);
-		} else
+
+		} else {
+
+			if (!(jobID.isBlank() || jobID.isEmpty()))
+				jobID = "ERROR: " + jobID;
+			taskMonitor.showMessage(TaskMonitor.Level.ERROR,
+					"Error retrieving protein " + protein.gene + " information from TMHMM server.\n" + jobID);
 			return new ArrayList<PredictedTransmem>();
+		}
 
 	}
 
@@ -4709,7 +4755,7 @@ public class Util {
 			}
 		} catch (Exception e) {
 
-			System.out.println("ERROR: Error to call TMHMM web service:" + e.getMessage());
+			jobID = "Error to call TMHMM web service: " + e.getMessage();
 		}
 
 		return jobID;
