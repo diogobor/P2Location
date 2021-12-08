@@ -1607,9 +1607,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							int offset = protein.domains.get(i + 1).startId - protein.domains.get(i).endId + 1;
 							UnifyResiduesDomains(protein, offset, true);
 						}
+
+						if (protein.domains.size() - 2 > i) {
+							if (protein.domains.get(i).name.toLowerCase()
+									.equals(protein.domains.get(i + 2).name.toLowerCase())
+									&& protein.domains.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
+								protein.isConflictedDomain = true;
+								break;
+							}
+						}
 					}
 				}
-
 			} else if (unique_domain.size() > 0)
 				protein.isConflictedDomain = true;
 
@@ -1821,7 +1829,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								if (!isForward)
 									predictDomainBasedOnOMMorIMM(i, j, new_domain_list, protein, isForward);
 								else
-									predictDomainBasedOnOMMorIMM(count_protein, j, new_domain_list, protein, isForward);
+									predictDomainBasedOnOMMorIMM(i, (j - 1), new_domain_list, protein, isForward);
 								domain.name = predicted_protein_domain_name;
 
 							}
@@ -1843,6 +1851,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										&& !protein.domains.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
 									protein.isConflictedDomain = true;
 									break;
+								}
+								if (protein.domains.size() - 2 > i) {
+									if (protein.domains.get(i).name.toLowerCase()
+											.equals(protein.domains.get(i + 2).name.toLowerCase())
+											&& protein.domains.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
+										protein.isConflictedDomain = true;
+										break;
+									}
 								}
 							}
 						}
