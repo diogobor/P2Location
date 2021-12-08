@@ -438,7 +438,6 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 						.createTaskIterator(current_network, false);
 				this.dialogTaskManager.execute(ti);
 
-				Util.myCyNetworkList.remove(current_network);
 			}
 		}
 	}
@@ -453,6 +452,19 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 			if (Util.proteinsWithPredTransmDict.containsKey(current_network_name)) {
 				Util.proteinsWithPredTransmDict.remove(current_network_name);
 			}
+
+			// Check if the node exists in the network
+			Optional<CyNetwork> isNetworkPresent = Util.myCyNetworkList.stream().filter(new Predicate<CyNetwork>() {
+				public boolean test(CyNetwork o) {
+					return o.getSUID() == myNetwork.getSUID();
+				}
+			}).findFirst();
+
+			if (isNetworkPresent.isPresent()) {// Get node if exists
+				CyNetwork current_network = isNetworkPresent.get();
+				Util.myCyNetworkList.remove(current_network);
+			}
+
 		}
 
 		MainControlPanel.enable_disableDisplayBox(false, false);
@@ -557,6 +569,26 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 			conflicted_residue.conflicted_residue = null;
 			conflicted_residue.conflicted_score = 0.0;
 			conflicted_residue.isConflicted = false;
+
+			if (myNetwork.toString().contains("#")) {
+
+				String parent_network_str = myNetwork.toString().split("#")[0];
+
+				Optional<CyNetwork> parent_network_optional = Util.myCyNetworkList.stream()
+						.filter(value -> value.toString().equals(parent_network_str)).findFirst();
+
+				if (parent_network_optional.isPresent()) {
+					CyNetwork parent_network = parent_network_optional.get();
+
+					CyNode source_node = Util.getNode(parent_network, source_protein.gene);
+					if (source_node == null)
+						return;
+
+					Util.fillConflictedResiduesColumn(parent_network, source_protein, source_node);
+
+				}
+			}
+
 		} catch (Exception e2) {
 			// TODO: handle exception
 		}

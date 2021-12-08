@@ -953,14 +953,18 @@ public class Util {
 		int summary_processed = 0;
 		int total_rows = proteinList.size();
 
-		for (final Protein protein : proteinList) {
+		try {
+			for (final Protein protein : proteinList) {
 
-			getXLsOneProtein(taskMonitor, protein, myNetwork, textLabel_status_result);
+				getXLsOneProtein(taskMonitor, protein, myNetwork, textLabel_status_result);
 
-			summary_processed++;
-			progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ", taskMonitor,
-					textLabel_status_result);
+				summary_processed++;
+				progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ", taskMonitor,
+						textLabel_status_result);
 
+			}
+		} catch (Exception e) {
+			System.out.println(summary_processed);
 		}
 	}
 
@@ -1057,7 +1061,7 @@ public class Util {
 
 	}
 
-	private static void fillConflictedResiduesColumn(CyNetwork myNetwork, final Protein protein, CyNode node) {
+	public static void fillConflictedResiduesColumn(CyNetwork myNetwork, final Protein protein, CyNode node) {
 
 		List<String> list_residues = new ArrayList<String>();
 		if (protein.reactionSites == null)
@@ -4151,10 +4155,13 @@ public class Util {
 
 					List<String> xls = Arrays.asList(myCurrentRow.getRaw(XL_PROTEIN_A_B).toString().split("#"));
 					List<String> scores = Arrays.asList(myCurrentRow.getRaw(XL_SCORE_AB).toString().split("#"));
-					for (int i = 0; i < xls.size(); i++) {
-						cross_links_with_score.add(new Tuple2(xls.get(i), scores.get(i)));
-					}
-
+					if (xls.size() == scores.size()) {
+						for (int i = 0; i < xls.size(); i++) {
+							cross_links_with_score.add(new Tuple2(xls.get(i), scores.get(i)));
+						}
+					} else
+						cross_links_set
+								.addAll(Arrays.asList(myCurrentRow.getRaw(XL_PROTEIN_A_B).toString().split("#")));
 				} else {
 					cross_links_set.addAll(Arrays.asList(myCurrentRow.getRaw(XL_PROTEIN_A_B).toString().split("#")));
 
@@ -4166,10 +4173,14 @@ public class Util {
 
 					List<String> xls = Arrays.asList(myCurrentRow.getRaw(XL_PROTEIN_B_A).toString().split("#"));
 					List<String> scores = Arrays.asList(myCurrentRow.getRaw(XL_SCORE_BA).toString().split("#"));
-					for (int i = 0; i < xls.size(); i++) {
-						cross_links_with_score.add(new Tuple2(xls.get(i), scores.get(i)));
-					}
+					if (xls.size() == scores.size()) {
+						for (int i = 0; i < xls.size(); i++) {
+							cross_links_with_score.add(new Tuple2(xls.get(i), scores.get(i)));
+						}
 
+					} else
+						cross_links_set
+								.addAll(Arrays.asList(myCurrentRow.getRaw(XL_PROTEIN_B_A).toString().split("#")));
 				} else {
 					cross_links_set.addAll(Arrays.asList(myCurrentRow.getRaw(XL_PROTEIN_B_A).toString().split("#")));
 				}
