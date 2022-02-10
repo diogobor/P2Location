@@ -1177,6 +1177,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		// Find out all lysines
 		List<Residue> residues = new ArrayList<Residue>();
 
+		// Add N-term residue
+		residues.add(new Residue(protein.sequence.charAt(0), "UK", 1, protein));
+
 		for (int index = protein.sequence.indexOf(Util.REACTION_RESIDUE); index >= 0; index = protein.sequence
 				.indexOf(Util.REACTION_RESIDUE, index + 1)) {
 			residues.add(new Residue(Util.REACTION_RESIDUE, "UK", (index + 1), protein));
@@ -1595,29 +1598,37 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				if (protein.domains.size() == 1)
 					continue;
 
-				for (int i = 0; i < protein.domains.size() - 1; i++) {
+				// Copy protein domains collection because it will be changed on
+				// UnifyResiduesDomains method
+				List<ProteinDomain> current_ptn_domain_list = protein.domains.stream().collect(Collectors.toList());
 
-					if (!protein.domains.get(i).name.toLowerCase().contains(TRANSMEMBRANE)) {
-						if (!protein.domains.get(i).name.toLowerCase()
-								.equals(protein.domains.get(i + 1).name.toLowerCase())
-								&& !protein.domains.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
+				for (int i = 0; i < current_ptn_domain_list.size() - 1; i++) {
+
+					if (!current_ptn_domain_list.get(i).name.toLowerCase().contains(TRANSMEMBRANE)) {
+						if (!current_ptn_domain_list.get(i).name.toLowerCase()
+								.equals(current_ptn_domain_list.get(i + 1).name.toLowerCase())
+								&& !current_ptn_domain_list.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
 							protein.isConflictedDomain = true;
 							break;
 						} else {
-							int offset = protein.domains.get(i + 1).startId - protein.domains.get(i).endId + 1;
+							int offset = current_ptn_domain_list.get(i + 1).startId
+									- current_ptn_domain_list.get(i).endId + 1;
 							UnifyResiduesDomains(protein, offset, true);
 						}
 
-						if (protein.domains.size() - 2 > i) {
-							if (protein.domains.get(i).name.toLowerCase()
-									.equals(protein.domains.get(i + 2).name.toLowerCase())
-									&& protein.domains.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
+						if (current_ptn_domain_list.size() - 2 > i) {
+							if (current_ptn_domain_list.get(i).name.toLowerCase()
+									.equals(current_ptn_domain_list.get(i + 2).name.toLowerCase())
+									&& current_ptn_domain_list.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
 								protein.isConflictedDomain = true;
 								break;
 							}
 						}
 					}
 				}
+
+				protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
+
 			} else if (unique_domain.size() > 0)
 				protein.isConflictedDomain = true;
 
@@ -1724,16 +1735,26 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							continue;
 						}
 
-						// e.g [IMS | Transmem | ??? ]
+						ProteinDomain next_domain = null;
+						if (protein.domains.size() > (i + 1))
+							next_domain = protein.domains.get(i + 1);
+
 						if (current_domain.startId < next_transmem.startId) {
-							predicted_protein_domain_name = current_domain.name;
-							i = protein.domains.indexOf(next_transmem) - 1;
 
-							current_domain.startId = startDomain;
-							current_domain.endId = next_transmem.startId - 1;
+							// e.g [IMS | Transmem | ??? ]
+							if (next_domain != null && next_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
 
-							startDomain = next_transmem.endId + 1;
-							transmemDomains.remove(next_transmem);
+								predicted_protein_domain_name = current_domain.name;
+								i = protein.domains.indexOf(next_transmem) - 1;
+
+								current_domain.startId = startDomain;
+								current_domain.endId = next_transmem.startId - 1;
+
+								startDomain = next_transmem.endId + 1;
+								transmemDomains.remove(next_transmem);
+							} else {
+								startDomain = current_domain.endId + 1;
+							}
 
 						} else {
 
@@ -1755,6 +1776,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						current_domain.isPredicted = true;
 						new_domain_list.add(current_domain);
 						protein.isPredictedTransmem = true;
+
 					}
 
 					Collections.sort(new_domain_list, new Comparator<ProteinDomain>() {
@@ -2040,16 +2062,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			if (uk_res == old_number_uk_residues)
 				break;
 
+			if (Util.getEpochs && (Util.epochs + 1) <= epochs)
+				break;
+
 			ComputeNewResidues(taskMonitor, all_unknownResidues, false);
 			if (compartments.get(UNKNOWN_RESIDUE) != null)
 				old_number_uk_residues = compartments.get(UNKNOWN_RESIDUE).size();
 			else
 				old_number_uk_residues = 0;
 
-			if (Util.getEpochs && (Util.epochs + 1) <= epochs)
-				break;
-
 			epochs++;
+
 		} while (compartments.containsKey(UNKNOWN_RESIDUE));
 	}
 
@@ -2913,7 +2936,61 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			}
 		}
 
+		// E.g. IMS [50-250], IMS [50-255], IMS [50-300]
+		checkSubsetProteinDomains(protein);
+
 		protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
+	}
+
+	/**
+	 * Method responsible for merging subset protein domains with different ranges
+	 * 
+	 * @param protein
+	 */
+	private void checkSubsetProteinDomains(Protein protein) {
+
+		for (ProteinDomain domain : protein.domains) {
+
+			if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
+				continue;
+
+			// E.g. IMS [50-250], IMS [50-255], IMS [50-300]
+			List<ProteinDomain> candidates_domains = protein.domains.stream()
+					.filter(value -> value.startId == domain.startId && value.name.equals(domain.name))
+					.collect(Collectors.toList());
+
+			int max_value = Collections.max(candidates_domains, Comparator.comparing(s -> s.getEndId())).endId;
+			if (candidates_domains.size() > 0) {
+				for (ProteinDomain expandDomain : candidates_domains) {
+
+					if (domain.isPredicted) {
+						expandDomain.startId = domain.startId;
+						expandDomain.endId = max_value;
+						expandDomain.isPredicted = true;
+						expandDomain.eValue = "predicted";
+					}
+				}
+			}
+
+			// E.g. IMS [50-250], IMS [150-250], IMS [230-250]
+			candidates_domains = protein.domains.stream()
+					.filter(value -> value.endId == domain.endId && value.name.equals(domain.name))
+					.collect(Collectors.toList());
+			
+			int min_value = Collections.min(candidates_domains, Comparator.comparing(s -> s.getStartId())).startId;
+			if (candidates_domains.size() > 0) {
+				for (ProteinDomain expandDomain : candidates_domains) {
+
+					if (domain.isPredicted) {
+						expandDomain.startId = min_value;
+						expandDomain.endId = domain.endId;
+						expandDomain.isPredicted = true;
+						expandDomain.eValue = "predicted";
+					}
+				}
+			}
+		}
+
 	}
 
 	/**

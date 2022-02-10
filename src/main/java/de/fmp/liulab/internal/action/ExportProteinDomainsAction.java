@@ -22,6 +22,7 @@ import org.cytoscape.model.CyNetwork;
 import org.cytoscape.work.TaskMonitor;
 
 import de.fmp.liulab.internal.view.ExtensionFileFilter;
+import de.fmp.liulab.model.CrossLink;
 import de.fmp.liulab.model.Protein;
 import de.fmp.liulab.model.ProteinDomain;
 import de.fmp.liulab.model.Residue;
@@ -69,7 +70,7 @@ public class ExportProteinDomainsAction extends AbstractCyAction {
 		String msg = "";
 		if (!Util.proteinsMap.containsKey(myNetwork.toString())
 				|| Util.proteinsMap.get(myNetwork.toString()).size() == 0) {
-			msg = "<html><p>There is no protein domain(s) for the following network: <b>" + myNetwork.toString()
+			msg = "<html><p>There are no protein domain(s) for the following network: <b>" + myNetwork.toString()
 					+ "</b></p></html>";
 			isEmpty = true;
 		} else {
@@ -131,79 +132,58 @@ public class ExportProteinDomainsAction extends AbstractCyAction {
 	 * @param myNetwork current network
 	 */
 	public static void createProteinDomainsFile(String fileName, CyNetwork myNetwork, TaskMonitor taskMonitor) {
-		try {
 
+		try {
 			if (Util.proteinsMap.containsKey(myNetwork.toString())) {
 
+				FileWriter myWriterSQL = new FileWriter(
+						fileName.toString().substring(0, fileName.toString().length() - 3) + "sql");
 				FileWriter myWriter = new FileWriter(fileName);
+				myWriter.write("Accession Number, Sequence, Description, Domains, Crosslinks, Subcellular Location\n");
 
 				List<Protein> all_proteinDomains = Util.proteinsMap.get(myNetwork.toString());
 				for (Protein protein : all_proteinDomains) {
 
-					StringBuilder sb_conflicted_residues = new StringBuilder();
 					StringBuilder sb_original_domains = new StringBuilder();
-					StringBuilder sb_predicted_domains = new StringBuilder();
 
-					if (protein.reactionSites != null) {
-						for (Residue residue : protein.reactionSites) {
-							sb_conflicted_residues.append(residue.aminoacid + "[" + residue.position + "],");
-						}
-					}
-
-					if (protein.domains != null) {
+					if (protein.domains != null && protein.domains.size() > 0) {
 						for (ProteinDomain domain : protein.domains) {
-							if (!domain.isPredicted)
-								sb_original_domains
-										.append(domain.name + "[" + domain.startId + "-" + domain.endId + "],");
-							else
-								sb_predicted_domains
-										.append(domain.name + "[" + domain.startId + "-" + domain.endId + "],");
+							sb_original_domains.append(domain.name + "[" + domain.startId + "-" + domain.endId + "],");
+						}
+					} else {
+						sb_original_domains.append(",");
+					}
+
+					StringBuilder sb_links = new StringBuilder();
+
+					if (protein.intraLinks != null) {
+						for (CrossLink link : protein.intraLinks) {
+							sb_links.append(link.protein_a + "-" + link.pos_site_a + "-" + link.protein_a + "-"
+									+ link.pos_site_b + "#");
 						}
 					}
-					if (sb_original_domains.length() > 0 && sb_predicted_domains.length() > 0
-							&& sb_conflicted_residues.length() > 0)// 3 columns
-						myWriter.write(protein.gene + "," + "\""
-								+ sb_original_domains
-										.toString().substring(0, sb_original_domains.toString().length() - 1)
-								+ "\"" + "," + "\""
-								+ sb_predicted_domains.toString().substring(0,
-										sb_predicted_domains.toString().length() - 1)
-								+ "\"" + "," + "\"" + sb_conflicted_residues.toString().substring(0,
-										sb_conflicted_residues.toString().length() - 1)
-								+ "\"\n");
-					else if (sb_original_domains.length() > 0 && sb_predicted_domains.length() > 0)// 1st and 2nd
-						myWriter.write(protein.gene + "," + "\""
-								+ sb_original_domains.toString().substring(0,
-										sb_original_domains.toString().length() - 1)
-								+ "\"" + "," + "\"" + sb_predicted_domains.toString().substring(0,
-										sb_predicted_domains.toString().length() - 1)
-								+ "\"\n");
-					else if (sb_original_domains.length() > 0 && sb_conflicted_residues.length() > 0)// 1st and 3rd
-						myWriter.write(protein.gene + "," + "\""
-								+ sb_original_domains.toString().substring(0,
-										sb_original_domains.toString().length() - 1)
-								+ "\"" + ",," + "\"" + sb_conflicted_residues.toString().substring(0,
-										sb_conflicted_residues.toString().length() - 1)
-								+ "\"\n");
-					else if (sb_predicted_domains.length() > 0 && sb_conflicted_residues.length() > 0)// 2nd and 3rd
-						myWriter.write(protein.gene + ",," + "\""
-								+ sb_predicted_domains.toString().substring(0,
-										sb_predicted_domains.toString().length() - 1)
-								+ "\"" + "," + "\"" + sb_conflicted_residues.toString().substring(0,
-										sb_conflicted_residues.toString().length() - 1)
-								+ "\"\n");
-					else if (sb_original_domains.length() > 0)// 1st
-						myWriter.write(protein.gene + "," + "\"" + sb_original_domains.toString().substring(0,
-								sb_original_domains.toString().length() - 1) + "\"" + "\n");
-					else if (sb_predicted_domains.length() > 0)// 2nd
-						myWriter.write(protein.gene + ",," + "\"" + sb_predicted_domains.toString().substring(0,
-								sb_predicted_domains.toString().length() - 1) + "\"" + "\n");
-					else if (sb_conflicted_residues.length() > 0)// 3rd
-						myWriter.write(protein.gene + ",,," + "\"" + sb_conflicted_residues.toString().substring(0,
-								sb_conflicted_residues.toString().length() - 1) + "\"" + "\n");
+
+					if (protein.interLinks != null) {
+						for (CrossLink link : protein.interLinks) {
+							sb_links.append(link.protein_a + "-" + link.pos_site_a + "-" + link.protein_b + "-"
+									+ link.pos_site_b + "#");
+						}
+					}
+
+					String domainsStr = sb_original_domains.toString().substring(0,
+							sb_original_domains.toString().length() - 1);
+					String linksStr = sb_links.toString().substring(0, sb_links.toString().length() - 1);
+					myWriter.write(protein.proteinID + "," + protein.sequence + ",," + domainsStr + "," + linksStr + ","
+							+ protein.location + "\n");
+
+					myWriterSQL.write(
+							"INSERT INTO protein (accession_number, sequence, description, domains, crosslinks, subcellular_location) VALUES ('"
+									+ protein.proteinID + "', '" + protein.sequence + "', '', '" + domainsStr + "', '"
+									+ linksStr + "', '" + protein.location + "');\n");
 				}
 
 				myWriter.close();
+				myWriterSQL.close();
 				if (taskMonitor == null) {
 					JOptionPane.showMessageDialog(null, "File has been saved successfully!",
 							"P2Location - Export protein domains", JOptionPane.INFORMATION_MESSAGE);
@@ -225,7 +205,7 @@ public class ExportProteinDomainsAction extends AbstractCyAction {
 		} catch (IOException e) {
 
 			if (taskMonitor == null) {
-				String errorMsg = "<htmml><p>ERROR: It is not possible to save the file.</p><p>" + e.getMessage()
+				String errorMsg = "<html><p>ERROR: It is not possible to save the file.</p><p>" + e.getMessage()
 						+ "</p></html>";
 				JOptionPane.showMessageDialog(null, errorMsg, "P2Location - Export protein domains",
 						JOptionPane.ERROR_MESSAGE);
@@ -235,7 +215,7 @@ public class ExportProteinDomainsAction extends AbstractCyAction {
 
 		} catch (Exception e2) {
 			if (taskMonitor == null) {
-				String errorMsg = "<htmml><p>ERROR: It is not possible to save the file.</p><p>" + e2.getMessage()
+				String errorMsg = "<html><p>ERROR: It is not possible to save the file.</p><p>" + e2.getMessage()
 						+ "</p></html>";
 				JOptionPane.showMessageDialog(null, errorMsg, "P2Location - Export protein domains",
 						JOptionPane.ERROR_MESSAGE);

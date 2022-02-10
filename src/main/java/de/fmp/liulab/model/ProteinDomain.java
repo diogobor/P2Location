@@ -14,6 +14,14 @@ public class ProteinDomain implements Comparable<ProteinDomain> {
 	public java.awt.Color color;
 	public boolean isPredicted = false;
 
+	public int getEndId() {
+		return endId;
+	}
+
+	public int getStartId() {
+		return startId;
+	}
+
 	/**
 	 * Constructor
 	 * 
