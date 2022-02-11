@@ -17,7 +17,8 @@ public class Parser {
 
 	private ReaderWriterTextFile parserFile;
 	private List<String> qtdParser = new ArrayList<String>();
-	private String[] columnNames = { "Node Name", "Sequence", "Topological Domain(s)", "Subcellular location" };
+	private static String[] columnNames = { "Node Name", "Description", "Sequence", "Topological Domain(s)",
+			"Subcellular location" };
 	private String[] columnNamesPTMTable = { "Node Name", "PTM(s)" };
 //	private String[] columnNamesMonolinksTable = { "Node Name", "Sequence", "Monolink(s)" };
 
@@ -81,6 +82,7 @@ public class Parser {
 					String gene_name = "";
 					String sequence = "";
 					String location = "";
+					String description = "";
 					StringBuilder domainsSB = new StringBuilder();
 
 					if (isUniprot) {
@@ -174,12 +176,17 @@ public class Parser {
 
 						index = Arrays.asList(uniprot_header_lines).indexOf("Sequence");
 						if (index != -1) {
-							sequence = each_line_cols[index];
+							sequence = each_line_cols[index].replaceAll("\"", "");
 						}
 
 						index = Arrays.asList(uniprot_header_lines).indexOf("Subcellular location");
 						if (index != -1) {
-							location = each_line_cols[index];
+							location = each_line_cols[index].replaceAll("\"", "");
+						}
+
+						index = Arrays.asList(uniprot_header_lines).indexOf("Description");
+						if (index != -1) {
+							description = each_line_cols[index].replaceAll("\"", "");
 						}
 
 					} else {
@@ -193,6 +200,8 @@ public class Parser {
 						if (each_gene.isBlank() || each_gene.isEmpty() || each_gene.trim().equals("\t"))
 							continue;
 						sb_data_to_be_stored.append(each_gene);
+						sb_data_to_be_stored.append("\t");
+						sb_data_to_be_stored.append(description);
 						sb_data_to_be_stored.append("\t");
 						sb_data_to_be_stored.append(sequence);
 						sb_data_to_be_stored.append("\t");
@@ -282,6 +291,7 @@ public class Parser {
 						ProcessProteinLocationTask.tableDataModel.setValueAt(cols_line[1], countPtnDomain, 1);
 						ProcessProteinLocationTask.tableDataModel.setValueAt(cols_line[2], countPtnDomain, 2);
 						ProcessProteinLocationTask.tableDataModel.setValueAt(cols_line[3], countPtnDomain, 3);
+						ProcessProteinLocationTask.tableDataModel.setValueAt(cols_line[4], countPtnDomain, 4);
 					}
 				}
 
@@ -317,7 +327,7 @@ public class Parser {
 				if (protein_domain_name.contains("evidence"))
 					protein_domain_name = "";
 
-				String[] cols_range = cols_topol_domains[i].replace(tag, "").split("\\.");
+				String[] cols_range = cols_topol_domains[i].replace(tag, "").replaceAll("\"", "").split("\\.");
 				int start_index = Integer.parseInt(cols_range[0].replaceAll("(\\\\D+)", "").trim());
 				int end_index = 0;
 				if (cols_range.length == 1) {

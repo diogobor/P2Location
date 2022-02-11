@@ -173,13 +173,13 @@ public class ExportProteinDomainsAction extends AbstractCyAction {
 					String domainsStr = sb_original_domains.toString().substring(0,
 							sb_original_domains.toString().length() - 1);
 					String linksStr = sb_links.toString().substring(0, sb_links.toString().length() - 1);
-					myWriter.write(protein.proteinID + "," + protein.sequence + ",," + domainsStr + "," + linksStr + ","
-							+ protein.location + "\n");
+					myWriter.write(protein.proteinID + "," + protein.sequence + "," + protein.fullName + ","
+							+ domainsStr + "," + linksStr + "," + protein.location + "\n");
 
 					myWriterSQL.write(
 							"INSERT INTO protein (accession_number, sequence, description, domains, crosslinks, subcellular_location) VALUES ('"
-									+ protein.proteinID + "', '" + protein.sequence + "', '', '" + domainsStr + "', '"
-									+ linksStr + "', '" + protein.location + "');\n");
+									+ protein.proteinID + "', '" + protein.sequence + "', '" + protein.fullName + "', '"
+									+ domainsStr + "', '" + linksStr + "', '" + protein.location + "');\n");
 				}
 
 				myWriter.close();

@@ -51,11 +51,13 @@ public class Protein {
 	 * @param sequence  protein sequence
 	 * @param domains   protein domain
 	 */
-	public Protein(String proteinID, String gene, String sequence, String location, List<ProteinDomain> domains) {
+	public Protein(String proteinID, String gene, String fullName, String sequence, String location,
+			List<ProteinDomain> domains) {
 		this.proteinID = proteinID;
 		this.gene = gene;
 		this.sequence = sequence;
 		this.location = location;
+		this.fullName = fullName;
 		this.domains = domains;
 		this.isConflictedDomain = false;
 		this.isPredictedTransmem = false;
@@ -83,13 +85,26 @@ public class Protein {
 	 * @param proteinID protein ID
 	 * @param sequence  protein sequence
 	 */
-	public Protein(String proteinID, String gene, String sequence, String location) {
+	public Protein(String proteinID, String gene, String fullName, String location) {
 		this.proteinID = proteinID;
 		this.gene = gene;
-		this.sequence = sequence;
+		this.fullName = fullName;
 		this.location = location;
 		this.isConflictedDomain = false;
 		this.isPredictedTransmem = false;
+	}
+
+	public Protein(String proteinID, String gene, String sequence) {
+		this.proteinID = proteinID;
+		this.gene = gene;
+		this.sequence = sequence;
+		this.isConflictedDomain = false;
+		this.isPredictedTransmem = false;
+	}
+
+	public Protein(String proteinID, String gene) {
+		this.proteinID = proteinID;
+		this.gene = gene;
 	}
 
 	/**

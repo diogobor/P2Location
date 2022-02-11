@@ -92,6 +92,7 @@ public class Util {
 	public static String CONFLICTED_PREDICTED_RESIDUES_COLUMN = PROJECT_NAME + "conflicted_residues";
 	public static String CONFLICTED_PROTEIN_DOMAINS_COLUMN = PROJECT_NAME + "conflicted_protein_domains";
 	public static String PROTEIN_SEQUENCE_COLUMN = PROJECT_NAME + "sequence";
+	public static String PROTEIN_NAME_COLUMN = PROJECT_NAME + "protein_name";
 	public static String SUBCELLULAR_LOCATION_COLUMN = PROJECT_NAME + "subcellular_location";
 	public static String PTM_COLUMN = PROJECT_NAME + "ptms";
 	public static String MONOLINK_COLUMN = PROJECT_NAME + "monolinks";
@@ -1040,6 +1041,7 @@ public class Util {
 
 			fillProteinDomainColumns(myNetwork, protein, node);
 			fillProteinSequenceColumn(myNetwork, protein, node);
+			fillProteinNameColumn(myNetwork, protein, node);
 			fillSubcellularLocationColumn(myNetwork, protein, node);
 			fillConflictedResiduesColumn(myNetwork, protein, node);
 
@@ -1150,6 +1152,43 @@ public class Util {
 			} else {
 				CyRow row = myNetwork.getRow(node);
 				row.set(PROTEIN_SEQUENCE_COLUMN, protein.sequence);
+			}
+		}
+	}
+	
+	/**
+	 * Method responsible for filling protein sequence column
+	 * 
+	 * @param myNetwork current network
+	 * @param protein   current protein
+	 * @param node      current node
+	 */
+	private static void fillProteinNameColumn(CyNetwork myNetwork, final Protein protein, CyNode node) {
+
+		if (myNetwork.getRow(node).get(PROTEIN_NAME_COLUMN, String.class) != null)
+			myNetwork.getRow(node).set(PROTEIN_NAME_COLUMN, protein.fullName);
+		else {
+			// Create Scaling factor protein column
+			CyTable nodeTable = myNetwork.getDefaultNodeTable();
+			if (nodeTable.getColumn(PROTEIN_NAME_COLUMN) == null) {
+				try {
+					nodeTable.createColumn(PROTEIN_NAME_COLUMN, String.class, false);
+
+					CyRow row = myNetwork.getRow(node);
+					row.set(PROTEIN_NAME_COLUMN, protein.fullName);
+
+				} catch (IllegalArgumentException e) {
+					try {
+						CyRow row = myNetwork.getRow(node);
+						row.set(PROTEIN_NAME_COLUMN, protein.fullName);
+
+					} catch (Exception e2) {
+					}
+				} catch (Exception e) {
+				}
+			} else {
+				CyRow row = myNetwork.getRow(node);
+				row.set(PROTEIN_NAME_COLUMN, protein.fullName);
 			}
 		}
 	}
@@ -5453,6 +5492,99 @@ public class Util {
 				}
 				rd.close();
 				return response.toString();
+
+			} else {
+				return "";
+			}
+
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+			return "";
+		}
+	}
+	
+	/**
+	 * Method responsible for getting protein description from Uniprot
+	 * 
+	 * @param myCurrentRow current row
+	 * @return protein sequence
+	 */
+	public static String getProteinDescriptionFromUniprot(CyRow myCurrentRow) {
+
+		String proteinID = getProteinID(myCurrentRow);
+		if (proteinID.isBlank() || proteinID.isEmpty()) {
+			return "";
+		}
+
+		try {
+			String _url = "https://www.uniprot.org/uniprot/" + proteinID + ".xml";
+			final URL url = new URL(_url);
+			final HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("POST");
+			connection.setDoOutput(true);
+			connection.setReadTimeout(5000);
+			connection.setConnectTimeout(5000);
+			connection.connect();
+
+			if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+
+				// Get Response
+				InputStream inputStream = connection.getErrorStream(); // first check for error.
+				if (inputStream == null) {
+					inputStream = connection.getInputStream();
+				}
+				BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
+				String line;
+				StringBuilder response = new StringBuilder();
+				int total_lines = connection.getContentLength();
+
+				int old_progress = 0;
+				int summary_processed = 0;
+				while ((line = rd.readLine()) != null) {
+					response.append(line);
+					response.append('\r');
+
+					summary_processed += line.toCharArray().length + 1;
+					progressBar(summary_processed, old_progress, total_lines,
+							"Downloading protein information from Uniprot: ", null, null);
+				}
+				rd.close();
+				String responseString = response.toString();
+
+				if (responseString.startsWith("<!DOCTYPE html PUBLIC"))
+					return "";
+
+				// Use method to convert XML string content to XML Document object
+				Document doc = convertStringToXMLDocument(responseString);
+
+				if (doc == null)
+					return "";
+
+				// check if exists error
+				NodeList xmlnodes = doc.getElementsByTagName("error");
+				if (xmlnodes.getLength() > 0) {
+					throw new Exception("P2Location ERROR: " + xmlnodes.item(0).getNodeValue());
+				}
+
+				xmlnodes = doc.getElementsByTagName("recommendedName");
+				if (xmlnodes.getLength() == 0) {
+					xmlnodes = doc.getElementsByTagName("submittedName");
+				}
+				NodeList nodes = xmlnodes.item(0).getChildNodes();
+
+				String fullName = "";
+				for (int i = 0; i < nodes.getLength(); i++) {
+					Node node = nodes.item(i);
+					if (node instanceof Element) {
+						if (node.getNodeName().equals("fullName")) {
+							Node nodeChild = node.getFirstChild();
+							fullName = nodeChild.getNodeValue();
+							break;
+						}
+					}
+				}
+
+				return fullName;
 
 			} else {
 				return "";

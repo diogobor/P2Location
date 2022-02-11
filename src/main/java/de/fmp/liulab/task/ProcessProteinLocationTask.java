@@ -89,9 +89,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	// Table
 	private static JTable mainProteinDomainTable;
 	public static DefaultTableModel tableDataModel;
-	private static String[] columnNames = { "Node Name", "Sequence", "Topological Domain(s)", "Subcellular location" };
+	private static String[] columnNames = { "Node Name", "Description", "Sequence", "Topological Domain(s)",
+			"Subcellular location" };
 	@SuppressWarnings("rawtypes")
-	private final Class[] columnClass = new Class[] { String.class, String.class, String.class, String.class };
+	private final Class[] columnClass = new Class[] { String.class, String.class, String.class, String.class,
+			String.class };
 	private String rowstring, value;
 	private Clipboard clipboard;
 	private StringSelection stsel;
@@ -175,18 +177,18 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		mainFrame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		Dimension appSize = null;
 		if (Util.isWindows()) {
-			appSize = new Dimension(540, 375);
+			appSize = new Dimension(640, 375);
 		} else if (Util.isMac()) {
-			appSize = new Dimension(525, 355);
+			appSize = new Dimension(625, 355);
 		} else {
-			appSize = new Dimension(525, 365);
+			appSize = new Dimension(625, 365);
 		}
 		mainFrame.setSize(appSize);
 		mainFrame.setResizable(false);
 
 		if (mainPanel == null)
 			mainPanel = new JPanel();
-		mainPanel.setBounds(10, 10, 490, 365);
+		mainPanel.setBounds(10, 10, 590, 365);
 		mainPanel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), ""));
 		mainPanel.setLayout(null);
 
@@ -252,7 +254,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		information_panel = new JPanel();
 		information_panel.setBorder(BorderFactory.createTitledBorder(""));
-		information_panel.setBounds(10, 8, 355, 146);
+		information_panel.setBounds(10, 8, 455, 146);
 		information_panel.setLayout(null);
 		mainPanel.add(information_panel);
 
@@ -260,7 +262,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		if (Util.isUnix())
 			textLabel_Protein_lbl_1 = new JLabel("Fill in the table below to indicate what proteins will");
 		else
-			textLabel_Protein_lbl_1 = new JLabel("Fill in the table below to indicate what proteins will have their");
+			textLabel_Protein_lbl_1 = new JLabel("Fill in the table below to indicate what proteins will have their domains");
 		textLabel_Protein_lbl_1.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		textLabel_Protein_lbl_1.setBounds(10, offset_y, 450, 40);
 		information_panel.add(textLabel_Protein_lbl_1);
@@ -271,7 +273,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			textLabel_Protein_lbl_2 = new JLabel("have their domains loaded.");
 			textLabel_Protein_lbl_2.setBounds(10, offset_y, 250, 40);
 		} else {
-			textLabel_Protein_lbl_2 = new JLabel("domains loaded.");
+			textLabel_Protein_lbl_2 = new JLabel("loaded.");
 			textLabel_Protein_lbl_2.setBounds(10, offset_y, 100, 40);
 		}
 		textLabel_Protein_lbl_2.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
@@ -359,7 +361,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		JPanel logo_panel = new JPanel();
 		logo_panel.setBorder(BorderFactory.createTitledBorder(""));
-		logo_panel.setBounds(370, 8, 140, 146);
+		logo_panel.setBounds(470, 8, 140, 146);
 		logo_panel.setLayout(null);
 		mainPanel.add(logo_panel);
 
@@ -469,7 +471,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		// Create the scroll pane and add the table to it.
 		proteinDomainTableScrollPanel = new JScrollPane();
-		proteinDomainTableScrollPanel.setBounds(10, 160, 500, 105);
+		proteinDomainTableScrollPanel.setBounds(10, 160, 600, 105);
 		proteinDomainTableScrollPanel.setViewportView(mainProteinDomainTable);
 		proteinDomainTableScrollPanel.setRowHeaderView(rowHeader);
 		setTableProperties(1);
@@ -603,7 +605,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		proteinSequenceServerButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 		proteinSequenceServerButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent ae) {
-				taskMonitor.setTitle("Monolinks...");
+				taskMonitor.setTitle("Protein domains");
 
 				if (isPtnSequenceLoaded) {
 					try {
@@ -637,9 +639,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		okButton = new JButton(iconBtnOk);
 		okButton.setText("OK");
 		if (Util.isWindows())
-			okButton.setBounds(30, 280, 220, 25);
+			okButton.setBounds(80, 280, 220, 25);
 		else
-			okButton.setBounds(30, 270, 220, 25);
+			okButton.setBounds(80, 270, 220, 25);
 
 		okButton.addActionListener(new ActionListener() {
 
@@ -685,9 +687,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		JButton cancelButton = new JButton(iconBtnCancel);
 		cancelButton.setText("Cancel");
 		if (Util.isWindows())
-			cancelButton.setBounds(265, 280, 220, 25);
+			cancelButton.setBounds(315, 280, 220, 25);
 		else
-			cancelButton.setBounds(265, 270, 220, 25);
+			cancelButton.setBounds(315, 270, 220, 25);
 
 		cancelButton.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
@@ -734,8 +736,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						Protein protein = entry.getValue();
 
 						tableDataModel.setValueAt(protein.gene, countPtnDomain, 0);
-						tableDataModel.setValueAt(protein.sequence, countPtnDomain, 1);
-						tableDataModel.setValueAt(ToStringProteinDomains(protein.domains), countPtnDomain, 2);
+						tableDataModel.setValueAt(protein.fullName, countPtnDomain, 1);
+						tableDataModel.setValueAt(protein.sequence, countPtnDomain, 2);
+						tableDataModel.setValueAt(ToStringProteinDomains(protein.domains), countPtnDomain, 3);
 						countPtnDomain++;
 					}
 
@@ -792,8 +795,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				myCurrentRow = myNetwork.getRow(node);
 
 				String sequence = Util.getProteinSequenceFromUniprot(myCurrentRow);
+				String fullName = Util.getProteinDescriptionFromUniprot(myCurrentRow);
 				Protein ptn = entry.getValue();
 				ptn.sequence = sequence;
+				ptn.fullName = fullName;
 				entry.setValue(ptn);
 			} else {
 				sb_error.append("ERROR: Node " + node_name + " has not been found.\n");
@@ -1211,7 +1216,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			String gene = tableDataModel.getValueAt(row, 0) != null ? tableDataModel.getValueAt(row, 0).toString() : "";
 
 			List<ProteinDomain> proteinDomains = new ArrayList<ProteinDomain>();
-			String domainsStr = tableDataModel.getValueAt(row, 2) != null ? tableDataModel.getValueAt(row, 2).toString()
+			String domainsStr = tableDataModel.getValueAt(row, 3) != null ? tableDataModel.getValueAt(row, 3).toString()
 					: "";
 			if (!domainsStr.isBlank() && !domainsStr.isEmpty()) {
 
@@ -1231,10 +1236,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				}
 			}
 
-			String sequence = tableDataModel.getValueAt(row, 1) != null ? tableDataModel.getValueAt(row, 1).toString()
+			String description = tableDataModel.getValueAt(row, 1) != null
+					? tableDataModel.getValueAt(row, 1).toString()
 					: "";
 
-			String location = tableDataModel.getValueAt(row, 3) != null ? tableDataModel.getValueAt(row, 3).toString()
+			String sequence = tableDataModel.getValueAt(row, 2) != null ? tableDataModel.getValueAt(row, 2).toString()
+					: "";
+
+			String location = tableDataModel.getValueAt(row, 4) != null ? tableDataModel.getValueAt(row, 4).toString()
 					: "";
 
 			if (gene.isEmpty() || gene.isBlank()) {
@@ -1245,7 +1254,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					Protein ptn = proteinsMap.get(current_node.getSUID());
 					if (ptn == null) {
-						ptn = new Protein(gene, gene, sequence, location, proteinDomains);
+						ptn = new Protein(gene, gene, description, sequence, location, proteinDomains);
 						proteinsMap.put(current_node.getSUID(), ptn);
 
 					} else {
@@ -1326,7 +1335,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		String[] data_to_be_stored = sb_data_to_be_stored.toString().split("\n");
 
 		Object[][] data = new Object[data_to_be_stored.length][2];
-		String[] columnNames = { "Node Name", "Sequence", "Topological Domain(s)", "Subcellular location" };
+		String[] columnNames = { "Node Name", "Description", "Sequence", "Topological Domain(s)", "Subcellular location" };
 		tableDataModel.setDataVector(data, columnNames);
 
 		for (String line : data_to_be_stored) {
@@ -1345,11 +1354,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 */
 	public static void setTableProperties(int number_lines) {
 		if (mainProteinDomainTable != null) {
-			mainProteinDomainTable.setPreferredScrollableViewportSize(new Dimension(490, 90));
+			mainProteinDomainTable.setPreferredScrollableViewportSize(new Dimension(590, 90));
 			mainProteinDomainTable.getColumnModel().getColumn(0).setPreferredWidth(90);
 			mainProteinDomainTable.getColumnModel().getColumn(1).setPreferredWidth(100);
-			mainProteinDomainTable.getColumnModel().getColumn(2).setPreferredWidth(150);
+			mainProteinDomainTable.getColumnModel().getColumn(2).setPreferredWidth(100);
 			mainProteinDomainTable.getColumnModel().getColumn(3).setPreferredWidth(150);
+			mainProteinDomainTable.getColumnModel().getColumn(4).setPreferredWidth(150);
 			mainProteinDomainTable.setFillsViewportHeight(true);
 			mainProteinDomainTable.setAutoCreateRowSorter(true);
 
@@ -2976,7 +2986,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			candidates_domains = protein.domains.stream()
 					.filter(value -> value.endId == domain.endId && value.name.equals(domain.name))
 					.collect(Collectors.toList());
-			
+
 			int min_value = Collections.min(candidates_domains, Comparator.comparing(s -> s.getStartId())).startId;
 			if (candidates_domains.size() > 0) {
 				for (ProteinDomain expandDomain : candidates_domains) {
