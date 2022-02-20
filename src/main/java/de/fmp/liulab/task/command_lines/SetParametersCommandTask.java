@@ -69,7 +69,7 @@ public class SetParametersCommandTask extends CyRESTAbstractTask {
 	public double scoreInterlink = 0.0;
 
 	@Tunable(description = "Set the threshold -log(score) to PPI links.", longDescription = "Set the threshold score to PPI links. All PPI links that have a -log(score) above the threshold will be displayed.", exampleStringValue = "20")
-	public double scorePPIlink = 0.0;
+	public double scorePPIlink = Integer.MIN_VALUE;
 
 	@Tunable(description = "Set font size of nodes name", longDescription = "Set the font size of the name of all nodes", exampleStringValue = "PDE12")
 	public Integer fontSizeNodesName = Util.node_label_font_size;

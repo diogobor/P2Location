@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.cytoscape.model.CyEdge;
 import org.cytoscape.model.CyIdentifiable;
@@ -819,14 +820,31 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			// Update proteinsMap
 			List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
 			if (proteinList != null) {
+
+				boolean noDomains = false;
 				Optional<Protein> isPtnPresent = proteinList.stream().filter(value -> value.gene.equals(nodeName))
 						.findFirst();
 
 				if (isPtnPresent.isPresent()) {
 					Protein _myProtein = isPtnPresent.get();
-					_myProtein.domains = proteinDomains;
+					if (isPredicted) {
+						if (_myProtein.domains != null && _myProtein.domains.size() > 0) {
+							_myProtein.domains.addAll(proteinDomains);
+							_myProtein.domains = _myProtein.domains.stream().distinct().collect(Collectors.toList());
+						} else {
+							noDomains = true;
+						}
+					} else {
+						noDomains = true;
+					}
 
-					ProcessProteinLocationTask.addReactionSites(_myProtein);
+					if (noDomains) {
+						_myProtein.domains = proteinDomains;
+						ProcessProteinLocationTask.addReactionSites(_myProtein);
+					}
+					else {
+						Util.updateResiduesBasedOnProteinDomains(_myProtein);
+					}
 				}
 
 				else {

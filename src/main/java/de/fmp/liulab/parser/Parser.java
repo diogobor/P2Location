@@ -176,17 +176,17 @@ public class Parser {
 
 						index = Arrays.asList(uniprot_header_lines).indexOf("Sequence");
 						if (index != -1) {
-							sequence = each_line_cols[index].replaceAll("\"", "");
+							sequence = each_line_cols[index].replaceAll("\"", "").trim();
 						}
 
 						index = Arrays.asList(uniprot_header_lines).indexOf("Subcellular location");
 						if (index != -1) {
-							location = each_line_cols[index].replaceAll("\"", "");
+							location = each_line_cols[index].replaceAll("\"", "").trim();
 						}
 
 						index = Arrays.asList(uniprot_header_lines).indexOf("Description");
 						if (index != -1) {
-							description = each_line_cols[index].replaceAll("\"", "");
+							description = each_line_cols[index].replaceAll("\"", "").trim();
 						}
 
 					} else {
@@ -315,7 +315,7 @@ public class Parser {
 		StringBuilder sb_domains = new StringBuilder();
 		if (cols_topol_domains.length > 0) {
 			for (int i = 0; i < cols_topol_domains.length; i++) {
-				if (cols_topol_domains[i].equals(""))
+				if (cols_topol_domains[i].trim().equals(""))
 					continue;
 				String protein_domain_name = "";
 				// TRANSMEM 1..100

@@ -304,7 +304,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			propertyValue = ((Properties) P2LocationProps).getProperty("p2location.combinedlink_threshold_score");
 		else
 			propertyValue = cm.getProperties().getProperty("p2location.combinedlink_threshold_score");
-		Util.combinedlink_threshold_score = Double.parseDouble(propertyValue);
+//		Util.combinedlink_threshold_score = Double.parseDouble(propertyValue);
 
 		if (cm == null)
 			propertyValue = ((Properties) P2LocationProps).getProperty("p2location.pymol_path");

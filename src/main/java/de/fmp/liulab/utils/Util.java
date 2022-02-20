@@ -142,7 +142,7 @@ public class Util {
 	public static boolean stopUpdateViewer = false;
 	public static double intralink_threshold_score = 0;
 	public static double interlink_threshold_score = 0;
-	public static double combinedlink_threshold_score = 0;
+	public static double combinedlink_threshold_score = Integer.MIN_VALUE;
 	public static Integer epochs = 100;
 	public static boolean getEpochs = false;
 	public static Integer specCount = 5;

@@ -54,7 +54,7 @@ public class CrossLink implements Comparable<CrossLink> {
 		this.protein_b = ptn_b;
 		this.pos_site_a = pos_a;
 		this.pos_site_b = pos_b;
-		this.score = Double.NaN;
+		this.score = 1.0;
 	}
 
 	/**
@@ -71,7 +71,7 @@ public class CrossLink implements Comparable<CrossLink> {
 		this.protein_b = "";
 		this.pos_site_a = xl_a;
 		this.pos_site_b = xl_b;
-		this.score = Double.NaN;
+		this.score = 1.0;
 		this.sequence = sequence;
 		this.start_pos_protein = start_pos_ptn;
 		this.end_pos_protein = end_pos_ptn;

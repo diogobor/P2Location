@@ -25,7 +25,6 @@ import de.fmp.liulab.internal.view.ExtensionFileFilter;
 import de.fmp.liulab.model.CrossLink;
 import de.fmp.liulab.model.Protein;
 import de.fmp.liulab.model.ProteinDomain;
-import de.fmp.liulab.model.Residue;
 import de.fmp.liulab.utils.Util;
 
 /**
@@ -132,7 +131,6 @@ public class ExportProteinDomainsAction extends AbstractCyAction {
 	 * @param myNetwork current network
 	 */
 	public static void createProteinDomainsFile(String fileName, CyNetwork myNetwork, TaskMonitor taskMonitor) {
-
 		try {
 			if (Util.proteinsMap.containsKey(myNetwork.toString())) {
 
@@ -141,14 +139,20 @@ public class ExportProteinDomainsAction extends AbstractCyAction {
 				FileWriter myWriter = new FileWriter(fileName);
 				myWriter.write("Accession Number, Sequence, Description, Domains, Crosslinks, Subcellular Location\n");
 
+//				myWriter.write("Protein,#intralinks,#interlinks,#total\n");
 				List<Protein> all_proteinDomains = Util.proteinsMap.get(myNetwork.toString());
+//				for (Protein protein : all_proteinDomains) {
+//					myWriter.write(protein.gene + "," + protein.intraLinks.size() + "," + protein.interLinks.size()
+//							+ "," + (int)(protein.intraLinks.size() + protein.interLinks.size()) + "\n");
+//				}
 				for (Protein protein : all_proteinDomains) {
 
 					StringBuilder sb_original_domains = new StringBuilder();
 
 					if (protein.domains != null && protein.domains.size() > 0) {
 						for (ProteinDomain domain : protein.domains) {
-							sb_original_domains.append(domain.name + "[" + domain.startId + "-" + domain.endId + "],");
+							String domain_clean = domain.name.replaceAll("'", "").replaceAll(",", "_");
+							sb_original_domains.append(domain_clean + "[" + domain.startId + "-" + domain.endId + "],");
 						}
 					} else {
 						sb_original_domains.append(",");
@@ -172,13 +176,17 @@ public class ExportProteinDomainsAction extends AbstractCyAction {
 
 					String domainsStr = sb_original_domains.toString().substring(0,
 							sb_original_domains.toString().length() - 1);
-					String linksStr = sb_links.toString().substring(0, sb_links.toString().length() - 1);
+					String linksStr = sb_links.toString().length() > 0
+							? sb_links.toString().substring(0, sb_links.toString().length() - 1)
+							: "";
+					
+					String description_clean = protein.fullName.replaceAll("'", "").replaceAll(",", "_");
 					myWriter.write(protein.proteinID + "," + protein.sequence + "," + protein.fullName + ","
 							+ domainsStr + "," + linksStr + "," + protein.location + "\n");
 
 					myWriterSQL.write(
 							"INSERT INTO protein (accession_number, sequence, description, domains, crosslinks, subcellular_location) VALUES ('"
-									+ protein.proteinID + "', '" + protein.sequence + "', '" + protein.fullName + "', '"
+									+ protein.proteinID + "', '" + protein.sequence + "', '" + description_clean + "', '"
 									+ domainsStr + "', '" + linksStr + "', '" + protein.location + "');\n");
 				}
 
