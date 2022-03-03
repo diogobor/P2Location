@@ -262,7 +262,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		if (Util.isUnix())
 			textLabel_Protein_lbl_1 = new JLabel("Fill in the table below to indicate what proteins will");
 		else
-			textLabel_Protein_lbl_1 = new JLabel("Fill in the table below to indicate what proteins will have their domains");
+			textLabel_Protein_lbl_1 = new JLabel(
+					"Fill in the table below to indicate what proteins will have their domains");
 		textLabel_Protein_lbl_1.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		textLabel_Protein_lbl_1.setBounds(10, offset_y, 450, 40);
 		information_panel.add(textLabel_Protein_lbl_1);
@@ -1335,7 +1336,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		String[] data_to_be_stored = sb_data_to_be_stored.toString().split("\n");
 
 		Object[][] data = new Object[data_to_be_stored.length][2];
-		String[] columnNames = { "Node Name", "Description", "Sequence", "Topological Domain(s)", "Subcellular location" };
+		String[] columnNames = { "Node Name", "Description", "Sequence", "Topological Domain(s)",
+				"Subcellular location" };
 		tableDataModel.setDataVector(data, columnNames);
 
 		for (String line : data_to_be_stored) {
@@ -1662,7 +1664,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		int count_transmem = 0;
 		List<String> unique_domain = new ArrayList<String>();
 
-		int count_protein = 0;
+		// int count_protein = 0;
 
 		for (Protein protein : allProteins.stream().filter(value -> !value.isPredictedTransmem)
 				.collect(Collectors.toList())) {
@@ -1900,9 +1902,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				}
 
 			} catch (Exception e) {
-				System.out.println(count_protein);
+				// System.out.println(count_protein);
 			}
-			count_protein++;
+			// count_protein++;
 		}
 	}
 
@@ -1934,7 +1936,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			ProteinDomain previous_domain = new_domain_list.get(count_reverse);
 			if (previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
 
-				if (protein.location.equals(OUTER_MEMBRANE)) {
+				if (protein.location != null && protein.location.equals(OUTER_MEMBRANE)) {
 					if (predicted_protein_domain_name.toLowerCase().contains(INTERMEMBRANE)) {
 
 						predicted_protein_domain_name = "TOPO_DOM - Cytoplasmic";
@@ -1944,7 +1946,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
 
 					}
-				} else if (protein.location.equals(INNER_MEMBRANE)) {
+				} else if (protein.location != null && protein.location.equals(INNER_MEMBRANE)) {
 					if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
 
 						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
@@ -1956,11 +1958,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					}
 				} else {
 
-					if (predicted_protein_domain_name.toLowerCase().contains(CYTOSOL))
+					if (predicted_protein_domain_name.toLowerCase().contains(CYTOSOL)) {
 						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
-					else if (predicted_protein_domain_name.toLowerCase().contains(MATRIX))
+						protein.location = OUTER_MEMBRANE;
+					} else if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
 						predicted_protein_domain_name = "TOPO_DOM - Mitochondrial intermembrane";
-					else
+						protein.location = INNER_MEMBRANE;
+					} else
 						predicted_protein_domain_name = "";
 				}
 			}
@@ -2003,7 +2007,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			ProteinDomain next_transmem, int startDomain) {
 
 		ProteinDomain new_predicted_domain = null;
-		if (current_protein.location.equals(OUTER_MEMBRANE)) {
+		if (current_protein.location != null && current_protein.location.equals(OUTER_MEMBRANE)) {
 			if (predicted_protein_domain_name.toLowerCase().contains(INTERMEMBRANE)) {
 
 				new_predicted_domain = new ProteinDomain("TOPO_DOM - Cytoplasmic", startDomain,
@@ -2017,7 +2021,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				predicted_protein_domain_name = INTERMEMBRANE;
 
 			}
-		} else if (current_protein.location.equals(INNER_MEMBRANE)) {
+		} else if (current_protein.location != null && current_protein.location.equals(INNER_MEMBRANE)) {
 			if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
 
 				new_predicted_domain = new ProteinDomain("TOPO_DOM - Mitochondrial intermembrane", startDomain,
@@ -2037,7 +2041,16 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				new_predicted_domain = new ProteinDomain("TOPO_DOM - Mitochondrial intermembrane", startDomain,
 						next_transmem.startId - 1, true, "predicted");
 				predicted_protein_domain_name = INTERMEMBRANE;
-			} else
+				current_protein.location = OUTER_MEMBRANE;
+
+			} else if (predicted_protein_domain_name.toLowerCase().contains(MATRIX)) {
+				new_predicted_domain = new ProteinDomain("TOPO_DOM - Mitochondrial intermembrane", startDomain,
+						next_transmem.startId - 1, true, "predicted");
+				predicted_protein_domain_name = INTERMEMBRANE;
+				current_protein.location = INNER_MEMBRANE;
+			}
+
+			else
 				predicted_protein_domain_name = "";
 		}
 
@@ -2222,7 +2235,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
 
 								boolean saveConflict = true;
-								if (score > res.score) {
+								if (score >= res.score) {
 
 									if (Util.considerConflict && ((!isKnownResidues
 											&& !res.predictedLocation.equals(residue.predictedLocation))
@@ -2343,7 +2356,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
 
 								boolean saveConflict = true;
-								if (score > res.score) {
+								if (score >= res.score) {
 
 									if (Util.considerConflict && ((!isKnownResidues
 											&& !res.predictedLocation.equals(residue.predictedLocation))
@@ -2478,7 +2491,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
 
 								boolean saveConflict = true;
-								if (score > res.score) {
+								if (score >= res.score) {
 
 									if (Util.considerConflict && ((!isKnownResidues
 											&& !res.predictedLocation.equals(residue.predictedLocation))
@@ -2599,7 +2612,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
 
 								boolean saveConflict = true;
-								if (score > res.score) {
+								if (score >= res.score) {
 
 									if (Util.considerConflict && ((!isKnownResidues
 											&& !res.predictedLocation.equals(residue.predictedLocation))
