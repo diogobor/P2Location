@@ -777,7 +777,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 					if (myNetwork != null && processTransmemRegionsTaskFactory != null && dialogTaskManager != null) {
 
-						TaskIterator ti = processTransmemRegionsTaskFactory.createTaskIterator(true, false);
+						TaskIterator ti = processTransmemRegionsTaskFactory.createTaskIterator();
 
 						TaskObserver observer = new TaskObserver() {
 

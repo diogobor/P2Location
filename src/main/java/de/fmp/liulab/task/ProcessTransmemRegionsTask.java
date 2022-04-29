@@ -60,13 +60,11 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 		this.proteinsWithPredTransmDict = Util.proteinsWithPredTransmDict.get(myNetwork.toString());
 
 		int old_progress = 0;
-		int summary_processed = 0;
-		int total_ptns = allProteins.size();
-
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Predicting transmembrane regions: " + old_progress + "%");
 
 		if (this.proteinsWithPredTransmDict.size() == 0) {
 
+			List<Protein> ProteinsOfInterest = new ArrayList<Protein>();
 			for (Protein protein : allProteins) {
 
 				if (protein.sequence.isBlank() || protein.sequence.isEmpty())
@@ -81,18 +79,19 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 						continue;
 				}
 
-				List<PredictedTransmem> predictedTransmemList = Util.predictTransmemRegions(protein, taskMonitor);
-				this.proteinsWithPredTransmDict.put(protein, predictedTransmemList);
+				ProteinsOfInterest.add(protein);
+			}
 
-				summary_processed++;
-
-				Util.progressBar(summary_processed, old_progress, total_ptns, "Predicting transmembrane regions: ",
-						taskMonitor, null);
-
+			Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util
+					.predictTransmemRegions(ProteinsOfInterest, taskMonitor);
+			for (Map.Entry<Protein, List<PredictedTransmem>> entry : predictedTransmemList.entrySet()) {
+				this.proteinsWithPredTransmDict.put(entry.getKey(), entry.getValue());
 			}
 
 		} else {
 
+			List<Protein> ProteinsOfInterest = new ArrayList<Protein>();
+			
 			for (Protein protein : allProteins) {
 
 				if (protein.sequence.isBlank() || protein.sequence.isEmpty())
@@ -110,16 +109,21 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 				Optional<Map.Entry<Protein, List<PredictedTransmem>>> isPresent = this.proteinsWithPredTransmDict
 						.entrySet().stream()
 						.filter(value -> value.getKey().gene.equals(protein.gene)
-								&& value.getKey().location.equals(protein.location)
 								&& value.getKey().proteinID.equals(protein.proteinID)
-								&& value.getKey().sequence.equals(protein.sequence))
+								&& value.getKey().sequence.equals(protein.sequence) && value.getKey().location != null
+								&& protein.location != null && value.getKey().location.equals(protein.location))
 						.findFirst();
 
 				if (!isPresent.isPresent()) {
-					List<PredictedTransmem> predictedTransmemList = Util.predictTransmemRegions(protein, taskMonitor);
-					this.proteinsWithPredTransmDict.put(protein, predictedTransmemList);
+					ProteinsOfInterest.add(protein);
 				}
 
+			}
+			
+			Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util
+					.predictTransmemRegions(ProteinsOfInterest, taskMonitor);
+			for (Map.Entry<Protein, List<PredictedTransmem>> entry : predictedTransmemList.entrySet()) {
+				this.proteinsWithPredTransmDict.put(entry.getKey(), entry.getValue());
 			}
 		}
 
@@ -199,7 +203,7 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 				current_protein.domains = protein.domains;
 				current_protein.domains = current_protein.domains.stream().distinct().collect(Collectors.toList());
 			}
-			Util.updateResiduesBasedOnProteinDomains(protein);
+			Util.updateResiduesBasedOnProteinDomains(protein, false);
 		}
 
 		Util.updateProteins(taskMonitor, myNetwork, null, false, false);

@@ -1197,7 +1197,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		}
 
 		protein.reactionSites = residues;
-		Util.updateResiduesBasedOnProteinDomains(protein);
+		Util.updateResiduesBasedOnProteinDomains(protein, false);
 
 	}
 

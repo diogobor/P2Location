@@ -1155,7 +1155,7 @@ public class Util {
 			}
 		}
 	}
-	
+
 	/**
 	 * Method responsible for filling protein sequence column
 	 * 
@@ -1210,8 +1210,16 @@ public class Util {
 			List<String> list_predicted_domains = new ArrayList<>();
 			for (ProteinDomain domain : protein.domains) {
 				if (domain.isPredicted) {
-					list_predicted_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
-							+ Integer.toString(domain.endId) + "]");
+					list_predicted_domains.add(domain.name + "#Score:" + domain.eValue + "["
+							+ Integer.toString(domain.startId) + "-" + Integer.toString(domain.endId) + "]");
+				} else if (domain.name.toLowerCase().contains("transmem")) {
+					String score = "";
+					if (!(domain.eValue.isBlank() || domain.eValue.isEmpty()))
+						score = domain.eValue;
+					else
+						score = "1.0";
+					list_original_domains.add(domain.name + "#Score:" + score + "[" + Integer.toString(domain.startId)
+							+ "-" + Integer.toString(domain.endId) + "]");
 				} else {
 					list_original_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
 							+ Integer.toString(domain.endId) + "]");
@@ -1450,7 +1458,7 @@ public class Util {
 	 * @param protein current protein
 	 * 
 	 */
-	public static void updateResiduesBasedOnProteinDomains(Protein protein) {
+	public static void updateResiduesBasedOnProteinDomains(Protein protein, boolean isNewDomainSet) {
 
 		List<Residue> residues = protein.reactionSites;
 
@@ -1461,6 +1469,16 @@ public class Util {
 						.forEach(
 
 								res -> {
+
+									if (isNewDomainSet)
+										res.score = 1;
+									else if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
+										try {
+											res.score = Double.parseDouble(domain.eValue);
+										} catch (Exception e) {
+											res.score = 0;
+										}
+									}
 
 									res.location = domain.name;
 									res.predictedLocation = domain.name;
@@ -4599,6 +4617,120 @@ public class Util {
 	}
 
 	/**
+	 * Method responsible for predicting transmembrane regions
+	 * 
+	 * @param proteins
+	 * @param taskMonitor
+	 * @return map Proteins and their predicted transmem
+	 */
+	public static Map<Protein, List<PredictedTransmem>> predictTransmemRegions(List<Protein> proteins,
+			TaskMonitor taskMonitor) {
+
+		if (proteins.size() == 0)
+			return new HashMap<Protein, List<PredictedTransmem>>();
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO,
+					"Connecting to the server to predict transmembrane regions...");
+
+		String jobID = callTMHMM_sequence_webservice(createFastaToTMHMM(proteins));
+		boolean isValid = false;
+
+		if (!(jobID.isBlank() || jobID.isEmpty() || jobID.startsWith("Error to call TMHMM web service"))) {
+
+			int isFinished = checkJobID_status(jobID);
+			while (isFinished == -1 || isFinished == 1) {
+
+				if (isFinished == 1)// Job has been expired
+				{
+					break;
+				}
+				isFinished = checkJobID_status(jobID);
+			}
+
+			if (isFinished == 0)
+				isValid = true;
+		}
+
+		boolean errorToRetrieve = false;
+		if (isValid) {
+
+			if (taskMonitor != null)
+				taskMonitor.showMessage(TaskMonitor.Level.INFO, "Obtaining transmem regions...");
+
+			// ProteinID, data_link
+			Map<String, String> data_link_url = getTransmemDataLinksFromTMHMM(jobID);
+
+			while (data_link_url.size() == 0) {
+				data_link_url = getTransmemDataLinksFromTMHMM(jobID);
+			}
+
+			if (data_link_url.containsKey("time out")) {
+				errorToRetrieve = true;
+			}
+
+			int old_progress = 0;
+			int summary_processed = 0;
+			int total_lines = data_link_url.size();
+			if (!errorToRetrieve) {
+
+				Map<Protein, List<PredictedTransmem>> final_result = new HashMap<Protein, List<PredictedTransmem>>();
+				// Map<ProteinID, data_link>
+				for (Map.Entry<String, String> entry : data_link_url.entrySet()) {
+
+					String response = connectTMHMM_website(entry.getValue());
+					int processing_time = response.toLowerCase().indexOf("your job has run for ");
+					if (processing_time != -1) {
+						String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
+						procTimeStr = procTimeStr.replaceAll("[^0-9]", "").trim();
+						if (Integer.parseInt(procTimeStr) > 3000) {
+							errorToRetrieve = true;
+						}
+					}
+
+					if (!errorToRetrieve) {
+
+						Optional<Protein> isPtnPresent = proteins.stream()
+								.filter(value -> value.proteinID.equals(entry.getKey())).findFirst();
+						if (isPtnPresent.isPresent()) {
+							Protein ptn = isPtnPresent.get();
+							final_result.put(ptn, createPredictedTransmemList(response));
+						}
+					}
+
+					summary_processed++;
+					progressBar(summary_processed, old_progress, total_lines, "Obtaining transmem regions: ",
+							taskMonitor, null);
+
+				}
+
+				return final_result;
+
+			}
+		}
+		return new HashMap<Protein, List<PredictedTransmem>>();
+	}
+
+	/**
+	 * Method responsible for preparing protein sequences to TMHMM
+	 * 
+	 * @param proteins
+	 * @return string with protein sequences
+	 */
+	private static String createFastaToTMHMM(List<Protein> proteins) {
+
+		List<String> fasta = new ArrayList<String>();
+		for (Protein protein : proteins) {
+			fasta.add(">" + protein.proteinID + "\n");
+			fasta.add(protein.sequence + "\n");
+		}
+
+		String result = fasta.stream().map(n -> String.valueOf(n)).collect(Collectors.joining(""));
+
+		return result;
+	}
+
+	/**
 	 * Method responsible for predicting transmem regions
 	 * 
 	 * @param protein_sequence protein sequence
@@ -4606,7 +4738,7 @@ public class Util {
 	public static List<PredictedTransmem> predictTransmemRegions(Protein protein, TaskMonitor taskMonitor) {
 
 		String protein_sequence = protein.sequence;
-		String jobID = callTMHMM_webservice(protein_sequence);
+		String jobID = callTMHMM_sequence_webservice(protein_sequence);
 
 		boolean isValid = false;
 
@@ -4625,13 +4757,40 @@ public class Util {
 			if (isFinished == 0)
 				isValid = true;
 		}
+
+		boolean errorToRetrieve = false;
 		if (isValid) {
 
 			String data_link_url = getTransmemDataLinkFromTMHMM(jobID);
-			String response = connectTMHMM_website(data_link_url);
-			return createPredictedTransmemList(response);
 
-		} else {
+			while (data_link_url.isBlank() || data_link_url.isEmpty()) {
+				data_link_url = getTransmemDataLinkFromTMHMM(jobID);
+			}
+
+			if (data_link_url.equals("time out")) {
+				errorToRetrieve = true;
+			}
+
+			if (!errorToRetrieve) {
+				String response = connectTMHMM_website(data_link_url);
+				int processing_time = response.toLowerCase().indexOf("your job has run for ");
+				if (processing_time != -1) {
+					String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
+					procTimeStr = procTimeStr.replaceAll("[^0-9]", "").trim();
+					if (Integer.parseInt(procTimeStr) > 3000) {
+						errorToRetrieve = true;
+					}
+				}
+
+				if (!errorToRetrieve) {
+					while (response.isBlank() || response.isEmpty()) {
+						data_link_url = connectTMHMM_website(data_link_url);
+					}
+					return createPredictedTransmemList(response);
+				}
+			}
+		}
+		if (!isValid || errorToRetrieve) {
 
 			if (!(jobID.isBlank() || jobID.isEmpty()))
 				jobID = "ERROR: " + jobID;
@@ -4639,6 +4798,7 @@ public class Util {
 					"Error retrieving protein " + protein.gene + " information from TMHMM server.\n" + jobID);
 			return new ArrayList<PredictedTransmem>();
 		}
+		return new ArrayList<PredictedTransmem>();
 
 	}
 
@@ -4674,10 +4834,72 @@ public class Util {
 	 * @param jobID job id
 	 * @return url
 	 */
+	private static Map<String, String> getTransmemDataLinksFromTMHMM(String jobID) {
+
+		String url = "https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi?jobid=" + jobID + "&wait=20";
+		String response = connectTMHMM_website(url);
+		int processing_time = response.toLowerCase().indexOf("your job has run for ");
+		if (processing_time != -1) {
+			String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
+			procTimeStr = procTimeStr.replaceAll("[^0-9]", "").trim();
+			if (Integer.parseInt(procTimeStr) > 3000) {
+				HashMap<String, String> result = new HashMap<String, String>();
+				result.put("time out", "time out");
+				return result;
+			}
+		}
+
+		// Map<Protein,data_link>
+		Map<String, String> result = new HashMap<String, String>();
+		int seq_index = response.indexOf("<pre>\r# ", 0);
+		int data_index = 0;
+		while (seq_index != -1) {
+
+			String sequenceID = response.subSequence(seq_index, seq_index + 40).toString();
+			int real_seq_index = sequenceID.indexOf(" Length:");
+			sequenceID = sequenceID.subSequence(8, real_seq_index).toString().trim();
+
+			data_index = response.indexOf("\">data</A> for plot<br>", data_index);
+
+			String data_link = "";
+			if (data_index != -1) {
+				data_link = response.subSequence(data_index - 70, data_index).toString();
+
+				int real_index = data_link.indexOf("services/TMHMM-2.0");
+				data_link = data_link.subSequence(real_index, data_link.length()).toString();
+
+				data_link = "https://services.healthtech.dtu.dk/" + data_link;
+			}
+
+			result.put(sequenceID, data_link);
+
+			seq_index++;
+			data_index++;
+			seq_index = response.indexOf("<pre>\r# ", seq_index);
+
+		}
+
+		return result;
+	}
+
+	/**
+	 * Method responsible for getting transmem data link from TMHMM website
+	 * 
+	 * @param jobID job id
+	 * @return url
+	 */
 	private static String getTransmemDataLinkFromTMHMM(String jobID) {
 
 		String url = "https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi?jobid=" + jobID + "&wait=20";
 		String response = connectTMHMM_website(url);
+		int processing_time = response.toLowerCase().indexOf("your job has run for ");
+		if (processing_time != -1) {
+			String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
+			procTimeStr = procTimeStr.replaceAll("[^0-9]", "").trim();
+			if (Integer.parseInt(procTimeStr) > 3000) {
+				return "time out";
+			}
+		}
 		int data_index = response.indexOf("\">data</A> for plot<br>");
 
 		String data_link = "";
@@ -4699,6 +4921,7 @@ public class Util {
 	 * @return return the website as string
 	 */
 	private static String connectTMHMM_website(String _url) {
+
 		try {
 
 			final URL url = new URL(_url);
@@ -4708,8 +4931,8 @@ public class Util {
 			connection.setRequestProperty("Accept-Language", "en-US");
 			connection.setRequestProperty("Connection", "close");
 			connection.setDoOutput(true);
-			connection.setReadTimeout(1000);
-			connection.setConnectTimeout(1000);
+			connection.setReadTimeout(10000);
+			connection.setConnectTimeout(10000);
 			connection.connect();
 
 			if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
@@ -4758,6 +4981,14 @@ public class Util {
 
 		String url = "https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi?jobid=" + jobID + "&wait=20";
 		String response = connectTMHMM_website(url);
+		int processing_time = response.toLowerCase().indexOf("your job has run for ");
+		if (processing_time != -1) {
+			String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
+			procTimeStr = procTimeStr.replaceAll("[^0-9]", "").trim();
+			if (Integer.parseInt(procTimeStr) > 3000) {
+				isFinished = 1;
+			}
+		}
 		int status_index = response.toLowerCase().indexOf("<title>tmhmm result</title>");
 
 		if (status_index != -1) {
@@ -4777,7 +5008,7 @@ public class Util {
 	 * @param protein_sequence protein sequence
 	 * @return job ID
 	 */
-	private static String callTMHMM_webservice(String protein_sequence) {
+	private static String callTMHMM_sequence_webservice(String protein_sequence) {
 		String jobID = "";
 
 		try {
@@ -5502,7 +5733,7 @@ public class Util {
 			return "";
 		}
 	}
-	
+
 	/**
 	 * Method responsible for getting protein description from Uniprot
 	 * 

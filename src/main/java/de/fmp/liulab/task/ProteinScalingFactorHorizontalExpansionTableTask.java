@@ -800,12 +800,33 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 		try {
 
 			for (String domain : domains) {
-				String[] domainsArray = domain.split("\\[|\\]");
-				String domainName = domainsArray[0].trim();
-				String[] colRange = domainsArray[1].split("-");
-				int startId = Integer.parseInt(colRange[0]);
-				int endId = Integer.parseInt(colRange[1]);
-				proteinDomains.add(new ProteinDomain(domainName, startId, endId, isPredicted, ""));
+
+				String domainName = "";
+				String score = "";
+				ProteinDomain pd;
+				if (domain.contains("#Score:")) {
+					// e.g. TRANSMEM#Score:0.9992[30-40]
+					String[] domainScore = domain.split("#Score:");
+					domainName = domainScore[0].trim();
+
+					// e.g. 0.9992[30-40]
+					String[] domainsArray = domainScore[1].split("\\[|\\]");
+					score = domainsArray[0];
+					String[] colRange = domainsArray[1].split("-");
+					int startId = Integer.parseInt(colRange[0]);
+					int endId = Integer.parseInt(colRange[1]);
+					pd = new ProteinDomain(domainName, startId, endId, isPredicted, score);
+				} else {
+					// e.g. TRANSMEM[30-40]
+					String[] domainsArray = domain.split("\\[|\\]");
+					domainName = domainsArray[0].trim();
+					String[] colRange = domainsArray[1].split("-");
+					int startId = Integer.parseInt(colRange[0]);
+					int endId = Integer.parseInt(colRange[1]);
+					pd = new ProteinDomain(domainName, startId, endId, isPredicted, "");
+				}
+				proteinDomains.add(pd);
+
 			}
 		} catch (Exception e) {
 			taskMonitor.showMessage(TaskMonitor.Level.WARN, "ERROR: Node: " + nodeName
@@ -841,9 +862,8 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 					if (noDomains) {
 						_myProtein.domains = proteinDomains;
 						ProcessProteinLocationTask.addReactionSites(_myProtein);
-					}
-					else {
-						Util.updateResiduesBasedOnProteinDomains(_myProtein);
+					} else {
+						Util.updateResiduesBasedOnProteinDomains(_myProtein, false);
 					}
 				}
 

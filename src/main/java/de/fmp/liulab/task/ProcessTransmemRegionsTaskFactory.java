@@ -32,14 +32,11 @@ public class ProcessTransmemRegionsTaskFactory extends AbstractTaskFactory {
 	/**
 	 * Method responsible for initializing task
 	 */
-	public TaskIterator createTaskIterator(boolean isPredictLocation, boolean updateAnnotationDomain) {
-		return new TaskIterator(new ProcessTransmemRegionsTask(cyApplicationManager, vmmServiceRef));
-	}
 
 	@Override
 	public TaskIterator createTaskIterator() {
 		// TODO Auto-generated method stub
-		return null;
+		return new TaskIterator(new ProcessTransmemRegionsTask(cyApplicationManager, vmmServiceRef));
 	}
 
 }
