@@ -1470,9 +1470,12 @@ public class Util {
 
 								res -> {
 
-									if (isNewDomainSet)
-										res.score = 1;
-									else if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
+									if (isNewDomainSet) {
+										if (domain.name.toLowerCase().equals("transmem"))
+											res.score = Double.parseDouble(domain.eValue);
+										else
+											res.score = 1;
+									} else if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
 										try {
 											res.score = Double.parseDouble(domain.eValue);
 										} catch (Exception e) {

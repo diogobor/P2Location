@@ -1197,7 +1197,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		}
 
 		protein.reactionSites = residues;
-		Util.updateResiduesBasedOnProteinDomains(protein, false);
+		Util.updateResiduesBasedOnProteinDomains(protein, true);
 
 	}
 
@@ -1483,7 +1483,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				residue.history_residues = null;
 				residue.predicted_epoch = -1;
 				residue.previous_residue = null;
-				residue.score = 0.0;
 			}
 
 			summary_processed++;
@@ -1509,15 +1508,18 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		processRoundLocation(taskMonitor, old_number_uk_residues);
 		annotatePredictedLocation(taskMonitor, epochs);
 
-		if (Util.consider_domain_whole_ptn) {
-			do {
-				UnifyProteinDomains(taskMonitor);
+		// TODO: Update the annotation mode
 
-				// Call again the process to predict domains just to check if there is an
-				// unknown domain
-				processRoundLocation(taskMonitor, old_number_uk_residues);
-			} while (checkConflictProteinDomains());
-		}
+//
+//		if (Util.consider_domain_whole_ptn) {
+//			do {
+//				UnifyProteinDomains(taskMonitor);
+//
+//				// Call again the process to predict domains just to check if there is an
+//				// unknown domain
+//				processRoundLocation(taskMonitor, old_number_uk_residues);
+//			} while (checkConflictProteinDomains());
+//		}
 	}
 
 	/**
@@ -2232,7 +2234,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
-								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
+								double score = Math.sqrt(Math.pow(crossLink.score * residue.score, 2) / epochs);
+								// -Math.log10(crossLink.score) * 1 / epochs;
 
 								boolean saveConflict = true;
 								if (score >= res.score) {
@@ -2353,7 +2356,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
-								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
+								double score = Math.sqrt(Math.pow(crossLink.score * residue.score, 2) / epochs);
+								// -Math.log10(crossLink.score) * 1 / epochs;
 
 								boolean saveConflict = true;
 								if (score >= res.score) {
@@ -2488,7 +2492,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
-								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
+								double score = Math.sqrt(Math.pow(crossLink.score * residue.score, 2) / epochs);
+								// -Math.log10(crossLink.score) * 1 / epochs;
 
 								boolean saveConflict = true;
 								if (score >= res.score) {
@@ -2609,7 +2614,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
 								Residue res = isResiduePresent.get();
-								double score = crossLink.score / epochs;// -Math.log10(crossLink.score) * 1 / epochs;
+								double score = Math.sqrt(Math.pow(crossLink.score * residue.score, 2) / epochs);
+								// -Math.log10(crossLink.score) * 1 / epochs;
 
 								boolean saveConflict = true;
 								if (score >= res.score) {
@@ -2801,7 +2807,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					continue;
 
 				// Get the residue that was predicted in a specific epoch
-				// -1 means that the residue was not predicted
+				// -1 means that the residue has not been predicted
 				if (first_residue.predicted_epoch > -1 && first_residue.predicted_epoch != epoch) {
 
 					if (!first_residue.history_residues.contains(first_residue))
@@ -2829,7 +2835,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						continue;
 
 					// Get the residue that was predicted in a specific epoch
-					// -1 means that the residue was not predicted
+					// -1 means that the residue has not been predicted
 					if (second_residue.predicted_epoch > -1 && second_residue.predicted_epoch != epoch) {
 
 						if (!second_residue.history_residues.contains(second_residue))
@@ -2859,6 +2865,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							protein.domains.remove(protein_domain);
 					}
 
+					// TODO: Replace 'predicted' to a new domain score
 					protein_domain = new ProteinDomain(domain, start_domain, end_domain, "predicted");
 					protein_domain.isPredicted = true;
 					if (protein.domains != null)
