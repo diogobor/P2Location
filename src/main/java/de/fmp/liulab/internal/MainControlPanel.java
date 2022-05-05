@@ -611,7 +611,6 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 				255, // max
 				1); // step
 		spinner_transmem_neighborAA = new JSpinner(model_transmem_neighborAA);
-		spinner_transmem_neighborAA.setEnabled(false);
 		spinner_transmem_neighborAA.setBounds(offset_x, offset_y, 60, 20);
 		JComponent comp_transmem_neighborAA = spinner_transmem_neighborAA.getEditor();
 		JFormattedTextField field_transmem_neighborAA = (JFormattedTextField) comp_transmem_neighborAA.getComponent(0);
@@ -642,13 +641,11 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
 					Util.consider_domain_whole_ptn = true;
 					P2LocationProps.setProperty("p2location.consider_domain_whole_ptn", "true");
-					spinner_transmem_neighborAA.setEnabled(false);
 					spinner_neighborAA.setEnabled(false);
 
 				} else {
 					Util.consider_domain_whole_ptn = false;
 					P2LocationProps.setProperty("p2location.consider_domain_whole_ptn", "false");
-					spinner_transmem_neighborAA.setEnabled(true);
 					spinner_neighborAA.setEnabled(true);
 				}
 			}

@@ -1449,6 +1449,29 @@ public class Util {
 					targetXL.location = interXL.location;
 			}
 		}
+
+		// Try to retrieve the location information from intralinks that don't belong to
+		// the same region
+		for (CrossLink intraXL : protein.intraLinks) {
+
+			if (intraXL.location != null)
+				continue;
+
+			Residue res1 = protein.reactionSites.stream().filter(value -> value.position == intraXL.pos_site_a)
+					.findFirst().get();
+			if (res1 == null)
+				continue;
+
+			Residue res2 = protein.reactionSites.stream().filter(value -> value.position == intraXL.pos_site_b)
+					.findFirst().get();
+
+			if (res2 == null)
+				continue;
+
+			if (res1.predictedLocation.equals(res2.predictedLocation)) {
+				intraXL.location = res1.predictedLocation;
+			}
+		}
 	}
 
 	/**

@@ -6,7 +6,7 @@ package de.fmp.liulab.model;
  * @author borges.diogo
  *
  */
-public class ProteinDomain implements Comparable<ProteinDomain> {
+public class ProteinDomain implements Comparable<ProteinDomain>, Cloneable {
 	public String name;
 	public int startId;
 	public int endId;
@@ -128,6 +128,10 @@ public class ProteinDomain implements Comparable<ProteinDomain> {
 		if (startId != other.startId)
 			return false;
 		return true;
+	}
+
+	public Object clone() throws CloneNotSupportedException {
+		return super.clone();
 	}
 
 }

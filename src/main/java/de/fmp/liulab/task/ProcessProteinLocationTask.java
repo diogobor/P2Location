@@ -18,11 +18,15 @@ import java.awt.event.ItemListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.StringTokenizer;
@@ -1508,18 +1512,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		processRoundLocation(taskMonitor, old_number_uk_residues);
 		annotatePredictedLocation(taskMonitor, epochs);
 
-		// TODO: Update the annotation mode
-
-//
-//		if (Util.consider_domain_whole_ptn) {
+		if (Util.consider_domain_whole_ptn) {
+			UnifyProteinDomains(taskMonitor);
 //			do {
-//				UnifyProteinDomains(taskMonitor);
 //
 //				// Call again the process to predict domains just to check if there is an
 //				// unknown domain
 //				processRoundLocation(taskMonitor, old_number_uk_residues);
 //			} while (checkConflictProteinDomains());
-//		}
+		}
+		
+		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
 	}
 
 	/**
@@ -1623,11 +1626,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								.equals(current_ptn_domain_list.get(i + 1).name.toLowerCase())
 								&& !current_ptn_domain_list.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
 							protein.isConflictedDomain = true;
-							break;
+//							break;
 						} else {
 							int offset = current_ptn_domain_list.get(i + 1).startId
 									- current_ptn_domain_list.get(i).endId + 1;
-							UnifyResiduesDomains(protein, offset, true);
+							UnifyResiduesDomain(protein, i, offset, true);
 						}
 
 						if (current_ptn_domain_list.size() - 2 > i) {
@@ -1635,13 +1638,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									.equals(current_ptn_domain_list.get(i + 2).name.toLowerCase())
 									&& current_ptn_domain_list.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
 								protein.isConflictedDomain = true;
-								break;
+//								break;
 							}
 						}
 					}
 				}
 
-				protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
+				protein.domains = protein.domains.stream().filter(value -> !value.eValue.equals("invalid")).distinct()
+						.collect(Collectors.toList());
 
 			} else if (unique_domain.size() > 0)
 				protein.isConflictedDomain = true;
@@ -2325,7 +2329,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										}
 									}
 
-									if (saveConflict) {
+									if (saveConflict && Util.fixDomainManually) {
 
 										boolean isValid = false;
 
@@ -2446,7 +2450,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										}
 									}
 
-									if (saveConflict) {
+									if (saveConflict && Util.fixDomainManually) {
 
 										boolean isValid = false;
 
@@ -2583,7 +2587,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										}
 									}
 
-									if (saveConflict) {
+									if (saveConflict && Util.fixDomainManually) {
 
 										boolean isValid = false;
 
@@ -2705,7 +2709,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										}
 									}
 
-									if (saveConflict) {
+									if (saveConflict && Util.fixDomainManually) {
 
 										boolean isValid = false;
 
@@ -2736,7 +2740,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					boolean isValid = false;
 
 					if (Util.getThreshold_score) {
-						if (Util.threshold_score >= uk_residue.score)
+						if (Util.threshold_score >= -Math.log10(uk_residue.score))
 							isValid = true;
 					} else {
 						isValid = true;
@@ -2785,8 +2789,42 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	}
 
 	/**
+	 * Method responsible for labeling predicted transm as Predicted, because in the
+	 * beginning they are labeled as no predicted
+	 * 
+	 * @param taskMonitor
+	 * @param epoch
+	 */
+	private void labelPredictedTransmAsPredicted() {
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		for (Protein protein : allProteins) {
+
+			if (protein.domains == null)
+				continue;
+
+			// Iterate only over transmembrane domains
+			for (ProteinDomain domain : protein.domains) {
+
+				if (!(domain.name.toLowerCase().contains(TRANSMEMBRANE)))
+					continue;
+
+				if (!(domain.eValue.equals("1.0") || domain.eValue.isBlank() || domain.eValue.isEmpty())) {
+					domain.isPredicted = true;
+					domain.eValue = RoundScore(Double.parseDouble(domain.eValue));
+				}
+			}
+		}
+	}
+
+	/**
+	 * 
 	 * Method responsible for updating the annotation domain of all proteins
 	 * according to the new predicted annotations
+	 *
+	 * @param taskMonitor
+	 * @param epoch
 	 */
 	private void annotatePredictedLocation(TaskMonitor taskMonitor, int epoch) {
 
@@ -2806,7 +2844,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				if (first_residue.predicted_epoch > epoch || first_residue.predicted_epoch == -1)
 					continue;
 
-				// Get the residue that was predicted in a specific epoch
+				// Get the residue that has been predicted in a specific epoch
 				// -1 means that the residue has not been predicted
 				if (first_residue.predicted_epoch > -1 && first_residue.predicted_epoch != epoch) {
 
@@ -2865,9 +2903,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							protein.domains.remove(protein_domain);
 					}
 
-					// TODO: Replace 'predicted' to a new domain score
-					protein_domain = new ProteinDomain(domain, start_domain, end_domain, "predicted");
+					double domain_score = ComputeDomainScore(protein, start_domain, end_domain);
+					protein_domain = new ProteinDomain(domain, start_domain, end_domain, RoundScore(domain_score));
 					protein_domain.isPredicted = true;
+
 					if (protein.domains != null)
 						protein.domains.add(protein_domain);
 					else {
@@ -2882,10 +2921,59 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			resetCrossLinksAnnotation(protein);
 		}
 
-		// Annotate neighbor amino acids based on predicted location
-		AnnotateNeighborAminoAcids();
+		if (!Util.consider_domain_whole_ptn) {
+			// Annotate neighbor amino acids based on predicted location
+			AnnotateNeighborAminoAcids();
+		} else {
 
+			UnifyResiduesDomainsFromAllProteins();
+		}
+
+		labelPredictedTransmAsPredicted();
 		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
+	}
+
+	/**
+	 * Method responsible for computing domain score
+	 * 
+	 * @param protein      current protein
+	 * @param start_domain starts domain
+	 * @param end_domain   ends domain
+	 * @return score
+	 */
+	private double ComputeDomainScore(Protein protein, int start_domain, int end_domain) {
+
+		List<Residue> current_residues = protein.reactionSites.stream()
+				.filter(value -> value.position >= start_domain && value.position <= end_domain)
+				.collect(Collectors.toList());
+
+		if (current_residues.size() == 0)
+			return 0;
+
+		double score = 0;
+
+		for (Residue residue : current_residues) {
+			score += Math.pow(residue.score, 2);
+		}
+
+		return Math.sqrt(score / current_residues.size());
+
+	}
+
+	/**
+	 * Method responsible for rounding double score
+	 * 
+	 * @param score current score
+	 * @return rounded score
+	 */
+	private String RoundScore(double score) {
+
+		DecimalFormatSymbols decimalFormatSymbols = new DecimalFormatSymbols(Locale.US);
+		DecimalFormat df = new DecimalFormat("0.####E0", decimalFormatSymbols);
+		df.setRoundingMode(RoundingMode.CEILING);
+
+		return df.format(score);
+
 	}
 
 	/**
@@ -2923,11 +3011,54 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					new_end = protein.sequence.length();
 				domain.startId = new_start;
 				domain.endId = new_end;
+				domain.eValue = RoundScore(ComputeDomainScore(protein, domain.startId, domain.endId));
 
 			}
 		}
 
 		UnifyResiduesDomainsFromAllProteins();// E.g. Domain[216-722] and Domain[217-723] => Domain[216-723]
+	}
+
+	/**
+	 * Method responsible for merging similar protein domains with different ranges
+	 * (ONLY one source domain)
+	 * 
+	 * @param protein
+	 * @param startDomainID
+	 * @param delta_aa
+	 * @param forceUnification
+	 */
+	private void UnifyResiduesDomain(Protein protein, int startDomainID, int delta_aa, boolean forceUnification) {
+
+		ProteinDomain domain = protein.domains.get(startDomainID);
+		if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
+			return;
+
+		// e.g. Domain[716-722] and Domain[717-723] => Domain[716-723] -> delta == 0
+		// e.g. Domain[136-142] and Domain[144-150] => Domain[136-150] -> delta == 2
+		List<ProteinDomain> candidates_domains = protein.domains.stream()
+				.filter(value -> value.startId >= domain.startId - delta_aa && value.startId <= domain.endId + delta_aa
+						&& value.endId >= domain.endId && value.name.equals(domain.name) && !value.eValue.equals("invalid"))
+				.collect(Collectors.toList());
+
+		if (candidates_domains.size() > 0) {
+			for (ProteinDomain expandDomain : candidates_domains) {
+				if (domain.equals(expandDomain)) {
+
+					if (candidates_domains.size() > 1)
+						domain.eValue = "invalid";
+					continue;
+				}
+
+				if (forceUnification || domain.isPredicted) {
+					domain.endId = expandDomain.endId;
+					expandDomain.startId = domain.startId;
+					expandDomain.isPredicted = true;
+					expandDomain.eValue = RoundScore(
+							ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
+				}
+			}
+		}
 	}
 
 	/**
@@ -2938,7 +3069,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 */
 	private void UnifyResiduesDomains(Protein protein, int delta_aa, boolean forceUnification) {
 
-		for (ProteinDomain domain : protein.domains) {
+		List<ProteinDomain> current_ptn_domain_list = new ArrayList<ProteinDomain>();
+		for (ProteinDomain proteinDomain : protein.domains) {
+			try {
+
+				current_ptn_domain_list.add((ProteinDomain) proteinDomain.clone());
+			} catch (Exception e) {
+				// TODO: handle exception
+			}
+		}
+
+		for (ProteinDomain domain : current_ptn_domain_list) {
 
 			if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
 				continue;
@@ -2953,18 +3094,26 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 			if (candidates_domains.size() > 0) {
 				for (ProteinDomain expandDomain : candidates_domains) {
-					if (domain.equals(expandDomain))
+					if (domain.equals(expandDomain)) {
+
+						if (candidates_domains.size() > 1)
+							domain.eValue = "invalid";
 						continue;
+					}
 
 					if (forceUnification || domain.isPredicted) {
 						domain.endId = expandDomain.endId;
 						expandDomain.startId = domain.startId;
 						expandDomain.isPredicted = true;
-						expandDomain.eValue = "predicted";
+						expandDomain.eValue = RoundScore(
+								ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
 					}
 				}
 			}
 		}
+
+		protein.domains = protein.domains.stream().filter(value -> !value.eValue.equals("invalid"))
+				.collect(Collectors.toList());
 
 		// E.g. IMS [50-250], IMS [50-255], IMS [50-300]
 		checkSubsetProteinDomains(protein);
@@ -2993,11 +3142,15 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			if (candidates_domains.size() > 0) {
 				for (ProteinDomain expandDomain : candidates_domains) {
 
+					if (domain.equals(expandDomain)) {
+						continue;
+					}
 					if (domain.isPredicted) {
 						expandDomain.startId = domain.startId;
 						expandDomain.endId = max_value;
 						expandDomain.isPredicted = true;
-						expandDomain.eValue = "predicted";
+						expandDomain.eValue = RoundScore(
+								ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
 					}
 				}
 			}
@@ -3011,11 +3164,15 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			if (candidates_domains.size() > 0) {
 				for (ProteinDomain expandDomain : candidates_domains) {
 
+					if (domain.equals(expandDomain)) {
+						continue;
+					}
 					if (domain.isPredicted) {
 						expandDomain.startId = min_value;
 						expandDomain.endId = domain.endId;
 						expandDomain.isPredicted = true;
-						expandDomain.eValue = "predicted";
+						expandDomain.eValue = RoundScore(
+								ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
 					}
 				}
 			}

@@ -1091,10 +1091,10 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 				domainTableDataModel.setValueAt(domain.name, countPtnDomain, 0);
 				domainTableDataModel.setValueAt(domain.startId, countPtnDomain, 1);
 				domainTableDataModel.setValueAt(domain.endId, countPtnDomain, 2);
-				if(domain.isPredicted)
-					domainTableDataModel.setValueAt("predicted", countPtnDomain, 3);
-				else
-					domainTableDataModel.setValueAt(domain.eValue, countPtnDomain, 3);
+//				if(domain.isPredicted)
+//					domainTableDataModel.setValueAt("predicted", countPtnDomain, 3);
+//				else
+				domainTableDataModel.setValueAt(domain.eValue, countPtnDomain, 3);
 				Color color = domain.color;
 				if (color != null) {
 
@@ -2012,7 +2012,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 					? domainTableDataModel.getValueAt(row, 3).toString()
 					: "";
 
-			boolean isPredicted = eValue.contains("predicted");
+			boolean isPredicted = !(eValue.isBlank() || eValue.isEmpty() || eValue.equals("1.0"));
 
 			Optional<ProteinDomain> isPtnDomainPresent = myProtein.domains.stream()
 					.filter(value -> value.name.equals(domain) && value.startId == startId && value.endId == endId
@@ -2040,10 +2040,9 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 					_myProteinDomain.startId = startId;
 					_myProteinDomain.endId = endId;
 				} else {
-					ProteinDomain _myProteinDomain = new ProteinDomain(domain, startId, endId, "");
+					ProteinDomain _myProteinDomain = new ProteinDomain(domain, startId, endId, eValue);
 					if (isPredicted) {
 						_myProteinDomain.isPredicted = true;
-						_myProteinDomain.eValue = "predicted";
 					}
 					myProtein.domains.add(_myProteinDomain);
 				}
