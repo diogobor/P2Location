@@ -2,6 +2,7 @@ package de.fmp.liulab.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Model class for protein
@@ -21,6 +22,7 @@ public class Protein {
 	public List<CrossLink> interLinks;
 	public List<CrossLink> intraLinks;
 	public List<ProteinDomain> domains;
+	public Map<String, Double> domainScores;
 	public List<Residue> reactionSites;
 	public boolean isConflictedDomain;
 	public boolean isPredictedTransmem;

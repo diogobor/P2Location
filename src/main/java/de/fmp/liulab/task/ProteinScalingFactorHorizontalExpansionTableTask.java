@@ -2,7 +2,9 @@ package de.fmp.liulab.task;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -397,6 +399,51 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 
 						if (domains != null && domains.size() > 0 && proteinDomainsMapOK) {
 							updateProteinDomainsMap(nodeName, domains, true, taskMonitor);
+						}
+					}
+				}
+			} catch (Exception e) {
+			}
+		}
+
+		// ######## PROTEIN DOMAINS SCORES ########
+		if (nodeTable.getColumn(Util.PROTEIN_DOMAINS_SCORES_COLUMN) == null) {
+			try {
+				nodeTable.createListColumn(Util.PROTEIN_DOMAINS_SCORES_COLUMN, String.class, false);
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					row.set(Util.PROTEIN_DOMAINS_SCORES_COLUMN, new ArrayList<String>());
+				}
+
+			} catch (IllegalArgumentException e) {
+				try {
+					for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+						if (row.get(Util.PROTEIN_DOMAINS_SCORES_COLUMN, List.class) == null)
+							row.set(Util.PROTEIN_DOMAINS_SCORES_COLUMN, new ArrayList<String>());
+					}
+				} catch (Exception e2) {
+				}
+			} catch (Exception e) {
+			}
+
+		} else { // The column exists, but it's necessary to check the cells
+			try {
+
+				// Check if proteinDomainsMap has been initialized
+				boolean proteinDomainsMapOK = true;
+				if (Util.proteinsMap == null)
+					proteinDomainsMapOK = false;
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					if (row.get(Util.PROTEIN_DOMAINS_SCORES_COLUMN, List.class) == null)
+						row.set(Util.PROTEIN_DOMAINS_SCORES_COLUMN, new ArrayList<String>());
+					else {
+						String nodeName = row.get(CyNetwork.NAME, String.class);
+						@SuppressWarnings("unchecked")
+						List<String> scores = row.get(Util.PROTEIN_DOMAINS_SCORES_COLUMN, List.class);
+
+						if (scores != null && scores.size() > 0 && proteinDomainsMapOK) {
+							updateProteinDomainsScores(nodeName, scores, taskMonitor);
 						}
 					}
 				}
@@ -865,6 +912,62 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 					} else {
 						Util.updateResiduesBasedOnProteinDomains(_myProtein, false);
 					}
+				}
+
+				else {
+					taskMonitor.showMessage(TaskMonitor.Level.WARN,
+							"WARNING: Node " + nodeName + " has not been found.\n");
+				}
+			}
+		}
+	}
+
+	/**
+	 * Method responsible for updating protein domains scores map
+	 * 
+	 * @param nodeName    node name
+	 * @param domains     domains stored in Cytoscape Table
+	 * @param taskMonitor task monitor
+	 */
+	private void updateProteinDomainsScores(String nodeName, List<String> domains, TaskMonitor taskMonitor) {
+
+		if (domains == null || domains.size() == 0 || domains.get(0).isBlank() || domains.get(0).isEmpty())
+			return;
+
+		Map<String, Double> domainScores = new HashMap<String, Double>();
+		try {
+
+			for (String domain : domains) {
+
+				String domainName = "";
+				String score = "";
+				// e.g. TRANSMEM#Score:0.9992
+				String[] domainScore = domain.split("#Score:");
+				domainName = domainScore[0].trim();
+				score = domainScore[1].trim();
+				domainScores.put(domainName, Double.valueOf(score));
+
+			}
+		} catch (Exception e) {
+			taskMonitor.showMessage(TaskMonitor.Level.WARN, "ERROR: Node: " + nodeName
+					+ " - Protein domains scores don't match with the pattern 'name#Score'\n");
+			return;
+		}
+
+		// Check if the node exists in the network
+
+		if (domainScores.size() > 0) {
+
+			// Update proteinsMap
+			List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+			if (proteinList != null) {
+
+				Optional<Protein> isPtnPresent = proteinList.stream().filter(value -> value.gene.equals(nodeName))
+						.findFirst();
+
+				if (isPtnPresent.isPresent()) {
+					Protein _myProtein = isPtnPresent.get();
+					_myProtein.domainScores = domainScores;
 				}
 
 				else {

@@ -5,9 +5,12 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
+import java.math.RoundingMode;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -16,6 +19,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -94,6 +98,7 @@ public class Util {
 	public static String PROTEIN_SEQUENCE_COLUMN = PROJECT_NAME + "sequence";
 	public static String PROTEIN_NAME_COLUMN = PROJECT_NAME + "protein_name";
 	public static String SUBCELLULAR_LOCATION_COLUMN = PROJECT_NAME + "subcellular_location";
+	public static String PROTEIN_DOMAINS_SCORES_COLUMN = PROJECT_NAME + "domain_scores";
 	public static String PTM_COLUMN = PROJECT_NAME + "ptms";
 	public static String MONOLINK_COLUMN = PROJECT_NAME + "monolinks";
 	public static String PROTEIN_LENGTH_A = "length_protein_a";
@@ -1044,6 +1049,7 @@ public class Util {
 			fillProteinNameColumn(myNetwork, protein, node);
 			fillSubcellularLocationColumn(myNetwork, protein, node);
 			fillConflictedResiduesColumn(myNetwork, protein, node);
+			fillProteinDomainsScoresColumn(myNetwork, protein, node);
 
 			/**
 			 * Get intra and interlinks
@@ -1234,6 +1240,83 @@ public class Util {
 		}
 
 		updateProteinDomainsConflictedStatus(myNetwork, node, protein, CONFLICTED_PROTEIN_DOMAINS_COLUMN);
+
+	}
+
+	/**
+	 * Method responsible for adding protein domains scores in the table
+	 * 
+	 * @param myNetwork current network
+	 * @param protein   current protein
+	 * @param node      current node
+	 */
+	private static void fillProteinDomainsScoresColumn(CyNetwork myNetwork, final Protein protein, CyNode node) {
+
+		if (protein.domainScores != null) {
+
+			List<String> list_domains = new ArrayList<>();
+
+			for (var domain : protein.domainScores.entrySet()) {
+				list_domains.add(domain.getKey() + "#Score: " + RoundScore(domain.getValue()));
+			}
+
+			String columnName = PROTEIN_DOMAINS_SCORES_COLUMN;
+
+			if (myNetwork.getRow(node).get(columnName, List.class) != null) {
+				if (list_domains.size() > 0)
+					myNetwork.getRow(node).set(columnName, Arrays.asList(list_domains.toArray()));
+				else
+					myNetwork.getRow(node).set(columnName, new ArrayList<String>());
+			} else {
+				// Create protein domain or conflicted residue column
+				CyTable nodeTable = myNetwork.getDefaultNodeTable();
+				if (nodeTable.getColumn(columnName) == null) {
+					try {
+						nodeTable.createListColumn(columnName, String.class, false);
+
+						CyRow row = myNetwork.getRow(node);
+						if (list_domains.size() > 0)
+							row.set(columnName, Arrays.asList(list_domains.toArray()));
+						else
+							myNetwork.getRow(node).set(columnName, new ArrayList<String>());
+
+					} catch (IllegalArgumentException e) {
+						try {
+							CyRow row = myNetwork.getRow(node);
+							if (list_domains.size() > 0)
+								row.set(columnName, Arrays.asList(list_domains.toArray()));
+							else
+								myNetwork.getRow(node).set(columnName, new ArrayList<String>());
+
+						} catch (Exception e2) {
+						}
+					} catch (Exception e) {
+					}
+
+				} else {
+					CyRow row = myNetwork.getRow(node);
+					if (list_domains.size() > 0)
+						row.set(columnName, Arrays.asList(list_domains.toArray()));
+					else
+						myNetwork.getRow(node).set(columnName, new ArrayList<String>());
+				}
+			}
+		}
+	}
+
+	/**
+	 * Method responsible for rounding double score
+	 * 
+	 * @param score current score
+	 * @return rounded score
+	 */
+	public static String RoundScore(double score) {
+
+		DecimalFormatSymbols decimalFormatSymbols = new DecimalFormatSymbols(Locale.US);
+		DecimalFormat df = new DecimalFormat("0.####E0", decimalFormatSymbols);
+		df.setRoundingMode(RoundingMode.CEILING);
+
+		return df.format(score);
 
 	}
 
@@ -1452,24 +1535,23 @@ public class Util {
 
 		// Try to retrieve the location information from intralinks that don't belong to
 		// the same region
-		for (CrossLink intraXL : protein.intraLinks) {
+		for (CrossLink intraXL : protein.intraLinks.stream().filter(value -> value.location == null)
+				.collect(Collectors.toList())) {
 
-			if (intraXL.location != null)
+			Optional<Residue> res1 = protein.reactionSites.stream()
+					.filter(value -> value.position == intraXL.pos_site_a).findFirst();
+
+			if (!res1.isPresent())
 				continue;
 
-			Residue res1 = protein.reactionSites.stream().filter(value -> value.position == intraXL.pos_site_a)
-					.findFirst().get();
-			if (res1 == null)
+			Optional<Residue> res2 = protein.reactionSites.stream()
+					.filter(value -> value.position == intraXL.pos_site_b).findFirst();
+
+			if (!res2.isPresent())
 				continue;
 
-			Residue res2 = protein.reactionSites.stream().filter(value -> value.position == intraXL.pos_site_b)
-					.findFirst().get();
-
-			if (res2 == null)
-				continue;
-
-			if (res1.predictedLocation.equals(res2.predictedLocation)) {
-				intraXL.location = res1.predictedLocation;
+			if (res1.get().predictedLocation.equals(res2.get().predictedLocation)) {
+				intraXL.location = res1.get().predictedLocation;
 			}
 		}
 	}
