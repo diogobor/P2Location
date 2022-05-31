@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -161,7 +162,7 @@ public class Util {
 	public static double transmemPredictionRegionsUpperScore = 0.7;
 	public static double transmemPredictionRegionsLowerScore = 0.015;
 	public static boolean considerConflict = true;
-	public static boolean fixDomainManually = true;
+	public static boolean fixDomainManually = false;
 
 	// Map<Network name,List<Protein>
 	public static Map<String, List<Protein>> proteinsMap = new HashMap<String, List<Protein>>();
@@ -189,6 +190,45 @@ public class Util {
 
 	public static float getProteinLength() {
 		return (float) (proteinLength);
+	}
+
+	/**
+	 * Method responsible for computing partial combinatorial of comb form
+	 * 
+	 * @param inputSet
+	 * @param k
+	 * @param results
+	 * @param accumulator
+	 * @param index
+	 */
+	@SuppressWarnings("unchecked")
+	private static void combinationsInternal(@SuppressWarnings("rawtypes") List inputSet, int k, @SuppressWarnings("rawtypes") List<List> results, @SuppressWarnings("rawtypes") ArrayList accumulator,
+			int index) {
+		int needToAccumulate = k - accumulator.size();
+		int canAcculumate = inputSet.size() - index;
+
+		if (accumulator.size() == k) {
+			results.add(new ArrayList<>(accumulator));
+		} else if (needToAccumulate <= canAcculumate) {
+			combinationsInternal(inputSet, k, results, accumulator, index + 1);
+			accumulator.add(inputSet.get(index));
+			combinationsInternal(inputSet, k, results, accumulator, index + 1);
+			accumulator.remove(accumulator.size() - 1);
+		}
+	}
+
+	/**
+	 * Method responsible for computing combinatorial
+	 * 
+	 * @param inputSet
+	 * @param k
+	 * @return
+	 */
+	@SuppressWarnings("rawtypes")
+	public static List<List> combinations(List inputSet, int k) {
+		List<List> results = new ArrayList<>();
+		combinationsInternal(inputSet, k, results, new ArrayList<>(), 0);
+		return results;
 	}
 
 	/**
@@ -1256,7 +1296,7 @@ public class Util {
 
 			List<String> list_domains = new ArrayList<>();
 
-			for (var domain : protein.domainScores.entrySet()) {
+			for (Entry<String, Double> domain : protein.domainScores.entrySet()) {
 				list_domains.add(domain.getKey() + "#Score: " + RoundScore(domain.getValue()));
 			}
 
@@ -1576,7 +1616,8 @@ public class Util {
 								res -> {
 
 									if (isNewDomainSet) {
-										if (domain.name.toLowerCase().equals("transmem"))
+										if (domain.name.toLowerCase().equals("transmem")
+												&& !(domain.eValue.isBlank() || domain.eValue.isEmpty()))
 											res.score = Double.parseDouble(domain.eValue);
 										else
 											res.score = 1;
