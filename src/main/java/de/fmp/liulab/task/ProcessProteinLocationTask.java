@@ -1697,6 +1697,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		// <DomainName, <Score, startAA#endAA>>
 		Map<String, Tuple2> proteinDomainScores = new HashMap<String, Tuple2>();
+		@SuppressWarnings({ "rawtypes" })
+		List<List> combinations = new ArrayList<List>();
 
 		int transmCount = 0;
 
@@ -1791,8 +1793,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						int k = (int) Math.max(newDomains_before_transm.stream().distinct().count(),
 								newDomains_after_transm.stream().distinct().count());
 
-						@SuppressWarnings({ "rawtypes" })
-						List<List> combinations = Util.combinations(newDomains, k);
+						combinations = Util.combinations(newDomains, k);
 
 						newDomains.add(transmem);
 
@@ -1978,14 +1979,20 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					protein.domains = newDomains.stream().distinct().collect(Collectors.toList());
 
+					if (protein.domains.size() > 10)
+						continue;
+
+					List<ProteinDomain> all_transmem = protein.domains.stream()
+							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
+							.collect(Collectors.toList());
+
 					// Compute the scores based on residues score
 					Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
 							.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
 
 					int k = groupedDomains.size();
 
-					@SuppressWarnings({ "rawtypes" })
-					List<List> combinations = new ArrayList<List>();
+					combinations.clear();
 					for (int j = k; j > 0; j--) {
 						combinations.addAll(Util.combinations(protein.domains, j));
 					}
@@ -2029,6 +2036,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 						groupedDomains = currentDomains.stream().collect(Collectors.groupingBy(w -> w.name));
 
+						List<ProteinDomain> currentTransms = new ArrayList<ProteinDomain>();
 						List<Double> pt_scores = new ArrayList<Double>();
 						List<Double> sol_scores = new ArrayList<Double>();
 						boolean isTransmem = false;
@@ -2044,11 +2052,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								isTransmem = false;
 
 							double partial_score = 0;
-							for (ProteinDomain evalue : proteinDomain.getValue()) {
-								if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty())) {
-									partial_score += Double.parseDouble(evalue.eValue);
-									nameStr.append("_" + (protein.domains.indexOf(evalue) + 1));
+							for (ProteinDomain domain : proteinDomain.getValue()) {
+								if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
+									partial_score += Double.parseDouble(domain.eValue);
+									nameStr.append("_" + (protein.domains.indexOf(domain) + 1));
 								}
+								if (isTransmem)
+									currentTransms.add(domain);
 							}
 
 							if (isTransmem) {
@@ -2075,8 +2085,23 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						// Contains Transmembrane
 						if (countTransmem > 0) {
 
-							// TODO: it's necessary to get the other transm score by using (1- score), that
-							// considers this part of protein as soluble
+							int total_transm = all_transmem.size();
+
+							// Get other transmembranes to compute soluble score
+							if (countTransmem != total_transm) {
+								List<ProteinDomain> not_present_transm = Util.findDifference(all_transmem,
+										currentTransms);
+
+								double soluble_score = 0;
+								for (ProteinDomain transm : not_present_transm) {
+									soluble_score += Double.parseDouble(transm.eValue);
+								}
+
+								soluble_score = 1 - soluble_score;
+								final_score *= soluble_score;
+
+							}
+
 							if (!protein.domainScores.containsKey(POTENTIAL_TRANSM + "_" + String.join("_", name))) {
 								protein.domainScores.put(POTENTIAL_TRANSM + "_" + String.join("_", name), final_score);
 							}
@@ -2086,9 +2111,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 								countTransmem = 0;
 								double soluble_score = 0;
-								for (ProteinDomain transmem : protein.domains.stream()
-										.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
-										.collect(Collectors.toList())) {
+								for (ProteinDomain transmem : all_transmem) {
 									soluble_score += Double.parseDouble(transmem.eValue);
 									countTransmem++;
 								}

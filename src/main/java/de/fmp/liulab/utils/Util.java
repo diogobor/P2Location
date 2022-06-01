@@ -192,6 +192,13 @@ public class Util {
 		return (float) (proteinLength);
 	}
 
+	@SuppressWarnings("unused")
+	public static <T> List<T> findDifference(List<T> first, List<T> second) {
+		List<T> diff = new ArrayList<>(first);
+		diff.removeAll(second);
+		return diff;
+	}
+
 	/**
 	 * Method responsible for computing partial combinatorial of comb form
 	 * 
@@ -202,7 +209,8 @@ public class Util {
 	 * @param index
 	 */
 	@SuppressWarnings("unchecked")
-	private static void combinationsInternal(@SuppressWarnings("rawtypes") List inputSet, int k, @SuppressWarnings("rawtypes") List<List> results, @SuppressWarnings("rawtypes") ArrayList accumulator,
+	private static void combinationsInternal(@SuppressWarnings("rawtypes") List inputSet, int k,
+			@SuppressWarnings("rawtypes") List<List> results, @SuppressWarnings("rawtypes") ArrayList accumulator,
 			int index) {
 		int needToAccumulate = k - accumulator.size();
 		int canAcculumate = inputSet.size() - index;
