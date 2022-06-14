@@ -1979,9 +1979,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					protein.domains = newDomains.stream().distinct().collect(Collectors.toList());
 
-					if (protein.domains.size() > 10)
-						continue;
-
 					List<ProteinDomain> all_transmem = protein.domains.stream()
 							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
 							.collect(Collectors.toList());
@@ -1993,8 +1990,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					int k = groupedDomains.size();
 
 					combinations.clear();
-					for (int j = k; j > 0; j--) {
-						combinations.addAll(Util.combinations(protein.domains, j));
+
+					if (protein.domains.size() > 10) {
+						combinations.addAll(Util.combinations(protein.domains, k));
+						combinations.addAll(Util.combinations(protein.domains, 1));
+					} else {
+						for (int j = k; j > 0; j--) {
+							combinations.addAll(Util.combinations(protein.domains, j));
+						}
 					}
 
 					List<String> name = new ArrayList<String>();
