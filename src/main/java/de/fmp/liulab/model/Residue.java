@@ -10,7 +10,7 @@ public class Residue {
 	public String predictedLocation;
 	public int position;
 	public Protein protein;
-	public double score;
+	public double score = -1;
 	public double conflicted_score = 0;
 	public int predicted_epoch = -1;
 	public Residue previous_residue;

@@ -25,7 +25,7 @@ public class Protein {
 	public Map<String, Double> domainScores;
 	public List<Residue> reactionSites;
 	public boolean isConflictedDomain;
-	public boolean isPredictedTransmem;
+	public boolean isPredictedBasedOnTransmemInfo;
 
 	/**
 	 * Constructor
@@ -42,7 +42,7 @@ public class Protein {
 		this.checksum = checksum;
 		this.pdbIds = pdbIds;
 		this.isConflictedDomain = false;
-		this.isPredictedTransmem = false;
+		this.isPredictedBasedOnTransmemInfo = false;
 	}
 
 	/**
@@ -62,7 +62,7 @@ public class Protein {
 		this.fullName = fullName;
 		this.domains = domains;
 		this.isConflictedDomain = false;
-		this.isPredictedTransmem = false;
+		this.isPredictedBasedOnTransmemInfo = false;
 	}
 
 	/**
@@ -78,7 +78,7 @@ public class Protein {
 		this.interLinks = interLinks;
 		this.intraLinks = intraLinks;
 		this.isConflictedDomain = false;
-		this.isPredictedTransmem = false;
+		this.isPredictedBasedOnTransmemInfo = false;
 	}
 
 	/**
@@ -93,7 +93,7 @@ public class Protein {
 		this.fullName = fullName;
 		this.location = location;
 		this.isConflictedDomain = false;
-		this.isPredictedTransmem = false;
+		this.isPredictedBasedOnTransmemInfo = false;
 	}
 
 	public Protein(String proteinID, String gene, String sequence) {
@@ -101,7 +101,7 @@ public class Protein {
 		this.gene = gene;
 		this.sequence = sequence;
 		this.isConflictedDomain = false;
-		this.isPredictedTransmem = false;
+		this.isPredictedBasedOnTransmemInfo = false;
 	}
 
 	public Protein(String proteinID, String gene) {
@@ -116,6 +116,6 @@ public class Protein {
 		this.pdbIds = new ArrayList<PDB>();
 		this.domains = new ArrayList<ProteinDomain>();
 		this.isConflictedDomain = false;
-		this.isPredictedTransmem = false;
+		this.isPredictedBasedOnTransmemInfo = false;
 	}
 }

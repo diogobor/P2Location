@@ -7,7 +7,7 @@
 	<properties>
 		<bundle.symbolicName>P2Location</bundle.symbolicName>
 		<bundle.namespace>de.fmp.liulab.internal</bundle.namespace>
-		<bundle.version>1.0.0</bundle.version>
+		<bundle.version>1.0.1</bundle.version>
 		<cytoscape.api.version>3.8.0</cytoscape.api.version>
 
 		<maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
@@ -19,7 +19,7 @@
 	<groupId>de.fmp.liulab</groupId>
 	<artifactId>P2Location</artifactId>
 	<packaging>bundle</packaging>
-	<version>1.0.0</version>
+	<version>1.0.1</version>
 
 	<name>P2Location</name>
 

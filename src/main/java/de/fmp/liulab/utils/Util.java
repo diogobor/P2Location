@@ -158,11 +158,13 @@ public class Util {
 	public static boolean getThreshold_score = false;
 	public static Integer neighborAA = 3;
 	public static Integer transmemNeighborAA = 3;
+	public static boolean dioLocalization_conflict = true;
 	public static double deltaScore = 0.5;
 	public static double transmemPredictionRegionsUpperScore = 0.7;
 	public static double transmemPredictionRegionsLowerScore = 0.015;
 	public static boolean considerConflict = true;
-	public static boolean fixDomainManually = false;
+	public static boolean fixDomainManually = true;
+	public static double initialResidueScore = 150.0;
 
 	// Map<Network name,List<Protein>
 	public static Map<String, List<Protein>> proteinsMap = new HashMap<String, List<Protein>>();
@@ -1624,16 +1626,18 @@ public class Util {
 								res -> {
 
 									if (isNewDomainSet) {
-										if (domain.name.toLowerCase().equals("transmem")
-												&& !(domain.eValue.isBlank() || domain.eValue.isEmpty()))
-											res.score = Double.parseDouble(domain.eValue);
-										else
-											res.score = 1;
+										if (domain.name.toLowerCase().equals("transmem")) {
+											if (!(domain.eValue.isBlank() || domain.eValue.isEmpty()))
+												res.score = Double.parseDouble(domain.eValue);
+											else
+												res.score = 1;
+										} else
+											res.score = Util.initialResidueScore;
 									} else if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
 										try {
 											res.score = Double.parseDouble(domain.eValue);
 										} catch (Exception e) {
-											res.score = 0;
+											res.score = -1;
 										}
 									}
 

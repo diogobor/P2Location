@@ -2,7 +2,6 @@ package de.fmp.liulab.task;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -23,7 +22,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -130,7 +130,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private final static String CYTOSOL = "cytoplasmic";
 	private final static String MATRIX = "matrix";
 	private final static String UNKNOWN_RESIDUE = "UK";
-	private final static String SOLUBLE_PROTEIN = "soluble";
+//	private final static String SOLUBLE_PROTEIN = "soluble";
 	private final static String POTENTIAL_TRANSM = "potential_transm";
 	private boolean predictLocation = false;
 	private boolean updateAnnotationDomain = false;
@@ -1428,6 +1428,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					StringTokenizer st2 = new StringTokenizer(rowstring, "\t");
 					for (int j = 0; st2.hasMoreTokens(); j++) {
 						value = (String) st2.nextToken();
+						value = value.replaceAll("\r", "").replaceAll("\n", "");
 						if (startRow + i < mainProteinDomainTable.getRowCount()
 								&& startCol + j < mainProteinDomainTable.getColumnCount()) {
 							mainProteinDomainTable.setValueAt(value, startRow + i, startCol + j);
@@ -1509,177 +1510,235 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		epochs = 1;
 		int old_number_uk_residues = 0;
+
+		if (compartments.get(UNKNOWN_RESIDUE) != null)
+			old_number_uk_residues = compartments.get(UNKNOWN_RESIDUE).size();
+		else
+			old_number_uk_residues = 0;
+
 		number_unknown_residues = new HashMap<Integer, Integer>();
 
 		processRoundLocation(taskMonitor, old_number_uk_residues);
-//		annotatePredictedLocation(taskMonitor, epochs);
-		labelPredictedTransmAsPredicted();
-		computeSolubleAndPotentialTransmDomainScore(taskMonitor);
+		annotatePredictedLocation(taskMonitor, epochs);
+		predictDomainsBasedOnTransmemInfo();
+		// delta is ONE, because => M[1-22],M[23-56] => difference between 23 and
+		// 22 is one.
+		UnifyProteinDomainsFromAllProteins();
 
-		if (Util.consider_domain_whole_ptn) {
-			UnifyProteinDomains(taskMonitor);
-//			do {
+		computeSolubleAndPotentialTransmDomainScore(taskMonitor);
+		updateResidueScoresBasedOnDomainScore(taskMonitor);
+		Util.updateXLStatus(taskMonitor, myNetwork, textLabel_status_result);
+		checkConflictProteinsDomains(taskMonitor);
+
+//		labelPredictedTransmAsPredicted();
+//		computeSolubleAndPotentialTransmDomainScore(taskMonitor);
+
+		epochs++;
+
+//		do {
 //
-//				// Call again the process to predict domains just to check if there is an
-//				// unknown domain
-//				processRoundLocation(taskMonitor, old_number_uk_residues);
-//			} while (checkConflictProteinDomains());
-		} else {
-			annotatePredictedLocation(taskMonitor, epochs);
-		}
+//			if (compartments.get(UNKNOWN_RESIDUE) != null)
+//				old_number_uk_residues = compartments.get(UNKNOWN_RESIDUE).size();
+//			else
+//				old_number_uk_residues = 0;
+//
+//			// Call again the process to predict domains just to check if there is an
+//			// unknown domain
+//			processRoundLocation(taskMonitor, old_number_uk_residues);
+//			annotatePredictedLocation(taskMonitor, epochs);
+//			if (Util.consider_domain_whole_ptn) {
+//				checkConflictProteinsDomains(taskMonitor);
+//			}
+//			computeSolubleAndPotentialTransmDomainScore(taskMonitor);
+////				computeSolubleAndPotentialTransmDomainScore(taskMonitor);
+////				updateResidueScoresBasedOnDomainScore(taskMonitor);
+////			} while (checkConflictProteinDomains());
+//		} while (checkUnknownResidues(taskMonitor, old_number_uk_residues));
 
 		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
 	}
 
-	/**
-	 * Method responsible for checking the conflict protein domains
-	 * 
-	 * @return true if there is conflict
-	 */
-	private boolean checkConflictProteinDomains() {
-		boolean isThereConflictProteinDomains = false;
+	private boolean checkUnknownResidues(TaskMonitor taskMonitor, int old_number_uk_residues) {
 
-		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+		if (!number_unknown_residues.containsKey(epochs)) {
+			OrganizeResidueCompartment(taskMonitor);
 
-		for (Protein protein : allProteins) {
-
-			if (!protein.isConflictedDomain && protein.domains != null && protein.domains.size() > 1) {
-
-				for (int i = 0; i < protein.domains.size() - 1; i++) {
-
-					if (!protein.domains.get(i).name.toLowerCase().contains(TRANSMEMBRANE)) {
-						if (!protein.domains.get(i).name.toLowerCase()
-								.equals(protein.domains.get(i + 1).name.toLowerCase())
-								&& !protein.domains.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
-							isThereConflictProteinDomains = true;
-							break;
-						}
-					}
-				}
-			}
+			if (compartments.get(UNKNOWN_RESIDUE) != null)
+				number_unknown_residues.put(epochs, compartments.get(UNKNOWN_RESIDUE).size());
+			else
+				number_unknown_residues.put(epochs, 0);
 		}
 
-		return isThereConflictProteinDomains;
+		int uk_res = number_unknown_residues.get(epochs);
+		// It means there is no possibility to predict more residues location
+		if (uk_res == old_number_uk_residues)
+			return false;
+
+		if (Util.getEpochs && (Util.epochs + 1) <= epochs)
+			return false;
+
+		return true;
+
 	}
 
 	/**
-	 * Method responsible for unifying different locations
+	 * Method responsible for checking the conflict domains of a specific protein
 	 * 
-	 * @param taskMonitor current task monitor
+	 * @param taskMonitor task monitor
+	 * @param protein     current protein
 	 */
-	private void UnifyProteinDomains(TaskMonitor taskMonitor) {
-
-		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+	private void checkConflictProteinDomains(TaskMonitor taskMonitor, Protein protein) {
 
 		List<String> unique_domain = new ArrayList<String>();
 
 		boolean isThereTransmem = false;
-		for (Protein protein : allProteins) {
 
-			isThereTransmem = false;
-			protein.isConflictedDomain = false;
-			if (protein.domains == null)
-				continue;
+		isThereTransmem = false;
+		protein.isConflictedDomain = false;
+		if (protein.domains == null)
+			return;
 
-			Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
-				@Override
-				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
-					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
-				}
-			});
-
-			if (protein.domains.stream().filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
-					.collect(Collectors.toList()).size() > 0)
-				isThereTransmem = true;
-
-			for (ProteinDomain domain : protein.domains.stream()
-					.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)).collect(Collectors.toList())) {
-
-				unique_domain.add(domain.name);
-
-				// if (!domain.name.toLowerCase().contains(TRANSMEMBRANE))
-//				else
-//					isThereTransmem = true;
+		Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+			@Override
+			public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+				return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
 			}
+		});
 
-			unique_domain = unique_domain.stream().distinct().collect(Collectors.toList());
-//			if (!isThereTransmem && unique_domain.size() == 1) {// There is no Transmembrane domain and there is more
-//																// than one domain
-//
-//				for (Residue residue : protein.reactionSites) {
-//					residue.location = protein.domains.get(0).name;
-//					residue.predictedLocation = protein.domains.get(0).name;
-//				}
-//
-//				boolean isPredicted = true;
-//				if (protein.domains.get(0).startId == 1 && protein.domains.get(0).endId == protein.sequence.length())
-//					isPredicted = false;
-//				ProteinDomain unifiedDomain = new ProteinDomain(protein.domains.get(0).name, 1,
-//						protein.sequence.length(), isPredicted, protein.domains.get(0).eValue);
-//				protein.domains.clear();
-//				protein.domains.add(unifiedDomain);
-//
-//			} else 
-			if (isThereTransmem) {
+		if (protein.domains.stream().filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
+				.collect(Collectors.toList()).size() > 0)
+			isThereTransmem = true;
 
-				unique_domain.clear();
+		for (ProteinDomain domain : protein.domains.stream()
+				.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)).collect(Collectors.toList())) {
+			unique_domain.add(domain.name);
+		}
 
-				// There are only Transmembrane domains
-				if (protein.domains.size() == 1)
-					continue;
+		unique_domain = unique_domain.stream().distinct().collect(Collectors.toList());
+		if (isThereTransmem) {
 
-				// Copy protein domains collection because it will be changed on
-				// UnifyResiduesDomains method
-				List<ProteinDomain> current_ptn_domain_list = protein.domains.stream().collect(Collectors.toList());
+			unique_domain.clear();
 
-				for (int i = 0; i < current_ptn_domain_list.size() - 1; i++) {
+			// There are only Transmembrane domains
+			if (protein.domains.size() == 1)
+				return;
 
-					if (!current_ptn_domain_list.get(i).name.toLowerCase().contains(TRANSMEMBRANE)) {
-						if (!current_ptn_domain_list.get(i).name.toLowerCase()
-								.equals(current_ptn_domain_list.get(i + 1).name.toLowerCase())
-								&& !current_ptn_domain_list.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
+			// Copy protein domains collection because it will be changed on
+			// UnifyResiduesDomains method
+			List<ProteinDomain> current_ptn_domain_list = protein.domains.stream().collect(Collectors.toList());
+
+			for (int i = 0; i < current_ptn_domain_list.size() - 1; i++) {
+
+				if (!current_ptn_domain_list.get(i).name.toLowerCase().contains(TRANSMEMBRANE)) {
+					if (!current_ptn_domain_list.get(i).name.toLowerCase()
+							.equals(current_ptn_domain_list.get(i + 1).name.toLowerCase())
+							&& !current_ptn_domain_list.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
+						if (Util.fixDomainManually) {
+							protein.isConflictedDomain = true;
+							break;
+						}
+					}
+
+					if (current_ptn_domain_list.size() - 2 > i) {
+						if (current_ptn_domain_list.get(i).name.toLowerCase()
+								.equals(current_ptn_domain_list.get(i + 2).name.toLowerCase())
+								&& current_ptn_domain_list.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
 							if (Util.fixDomainManually) {
 								protein.isConflictedDomain = true;
 								break;
 							}
 						}
-//						else {
-//							int offset = current_ptn_domain_list.get(i + 1).startId
-//									- current_ptn_domain_list.get(i).endId + 1;
-//							UnifyResiduesDomain(protein, i, offset, true);
-//						}
-
-						if (current_ptn_domain_list.size() - 2 > i) {
-							if (current_ptn_domain_list.get(i).name.toLowerCase()
-									.equals(current_ptn_domain_list.get(i + 2).name.toLowerCase())
-									&& current_ptn_domain_list.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)) {
-								if (Util.fixDomainManually) {
-									protein.isConflictedDomain = true;
-									break;
-								}
-							}
-						}
 					}
 				}
+			}
+		} else if (unique_domain.size() > 0) {
+			if (Util.fixDomainManually) {
+				protein.isConflictedDomain = true;
+				return;
+			}
+		}
 
-//				protein.domains = protein.domains.stream().filter(value -> !value.eValue.equals("invalid")).distinct()
-//						.collect(Collectors.toList());
+		unique_domain.clear();
 
-			} else if (unique_domain.size() > 0) {
-				if (Util.fixDomainManually) {
-					protein.isConflictedDomain = true;
-					break;
+	}
+
+	/**
+	 * Method responsible for checking the conflict domains of all proteins
+	 * 
+	 * @param taskMonitor current task monitor
+	 */
+	private void checkConflictProteinsDomains(TaskMonitor taskMonitor) {
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		for (Protein protein : allProteins) {
+			checkConflictProteinDomains(taskMonitor, protein);
+		}
+	}
+
+	/**
+	 * Method responsible for updating residue score based on domain score
+	 * 
+	 * @param taskMonitor
+	 */
+	private void updateResidueScoresBasedOnDomainScore(TaskMonitor taskMonitor) {
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		// Progress bar
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_compartments = allProteins.size();
+		for (Protein protein : allProteins) {
+
+			for (ProteinDomain domain : protein.domains) {
+
+				if (domain.eValue.isBlank() || domain.eValue.isEmpty() || domain.name.isBlank()
+						|| domain.name.isEmpty())
+					continue;
+				// Get all residues of a specific domain
+				List<Residue> residues = protein.reactionSites
+						.stream().filter(value -> value.score != Util.initialResidueScore
+								&& value.position >= domain.startId && value.position <= domain.endId)
+						.collect(Collectors.toList());
+
+				for (Residue residue : residues) {
+					if (domain.eValue.equals("predicted") || domain.eValue.isBlank() || domain.eValue.isEmpty())
+						continue;
+					residue.score = Double.parseDouble(domain.eValue);
+					residue.predictedLocation = domain.name;
+					residue.predicted_epoch = epochs;
 				}
 			}
 
-			unique_domain.clear();
+			summary_processed++;
+			Util.progressBar(summary_processed, old_progress, total_compartments, "Updating residue score: ",
+					taskMonitor, null);
+		}
+	}
+
+	/**
+	 * Method responsible for sorting domains based on their scores
+	 * 
+	 * @param map
+	 */
+	private void sortDomainScores(Protein protein) {
+
+		List<Entry<String, Double>> capitalList = new LinkedList<>(protein.domainScores.entrySet());
+
+		// call the sort() method of Collections
+		Collections.sort(capitalList, (l1, l2) -> l2.getValue().compareTo(l1.getValue()));
+
+		// create a new map
+		LinkedHashMap<String, Double> result = new LinkedHashMap<String, Double>();
+
+		// get entry from list to the map
+		for (Map.Entry<String, Double> entry : capitalList) {
+			result.put(entry.getKey(), entry.getValue());
 		}
 
-		predictDomainsBasedOnTransmemInfo();
-//		computeSolubleAndPotentialTransmDomainScore();
+		protein.domainScores = result;
 
-		Util.updateXLStatus(taskMonitor, myNetwork, textLabel_status_result);
-		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
 	}
 
 	private int startPos = 1;
@@ -1709,6 +1768,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		for (Protein protein : allProteins) {
 
+			protein.isConflictedDomain = false;
 			List<ProteinDomain> newDomains = new ArrayList<ProteinDomain>();
 			proteinDomainScores.clear();
 			transmCount = 0;
@@ -1739,402 +1799,737 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				// There is no Transmembrane domain
 
 				// There is only one non-predicted domain
-				if (protein.domains != null && protein.domains.size() == 1
-						&& protein.domains.get(0).endId == protein.sequence.length()
-						&& protein.domains.get(0).startId == 1)
+				if (protein.domains != null && protein.domains.size() == 1) {
+
+					if (!protein.domains.get(0).isPredicted)
+						continue;
+
+					protein.domains = ComputeDomainsScore(protein.reactionSites, 1, protein.sequence.length());
+					protein.domainScores.put(protein.domains.get(0).name,
+							Double.valueOf(protein.domains.get(0).eValue));
+					continue;
+				}
+
+				// Unified proteins -> e.g Matrix[11-30], Matrix [55-70] => Matrix [1-120]
+				// e.g. Matrix [11-30], IMS [55-70] => Matrix [1-120] and IMS [1-120]
+				protein.domains = ComputeDomainsScore(protein.reactionSites, 1, protein.sequence.length());
+				if (protein.domains.size() == 0)
 					continue;
 
-				newDomains.addAll(ComputeDomainsScore(protein.reactionSites, 1, protein.sequence.length()));
-
-				for (ProteinDomain proteinDomain : newDomains) {
+				for (ProteinDomain proteinDomain : protein.domains) {
 					protein.domainScores.put(proteinDomain.name, Double.valueOf(proteinDomain.eValue));
 				}
 
-				protein.domains = newDomains;
+				if (protein.domains.size() == 1) {
+					protein.isConflictedDomain = false;
+				} else {
+					if (!Util.dioLocalization_conflict) {
+						sortDomainScores(protein);
+						protein.isConflictedDomain = true;
+					} else {
+						protein.isConflictedDomain = false;
+					}
+				}
 
 			} else {
-//				unique_domain.clear();
 
 				if (transmCount == 1) {
+
+					// There is only one transmembrane
+					if (protein.domains.size() == 1)
+						continue;
 
 					ProteinDomain transmem = protein.domains.stream()
 							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
 							.collect(Collectors.toList()).get(0);
 
-					// Get all residues before transm region
-					List<Residue> residues_before_transm = protein.reactionSites.stream()
-							.filter(value -> value.position < transmem.startId).collect(Collectors.toList());
+					double transm_score = Double.parseDouble(transmem.eValue);
+					if (transm_score < Util.transmemPredictionRegionsUpperScore) {
 
-					// Get all residues after transm region
-					List<Residue> residues_after_transm = protein.reactionSites.stream()
-							.filter(value -> value.position > transmem.endId).collect(Collectors.toList());
-
-					List<ProteinDomain> newDomains_before_transm = ComputeDomainsScore(residues_before_transm, 1,
-							transmem.startId - 1);
-					List<ProteinDomain> newDomains_after_transm = ComputeDomainsScore(residues_after_transm,
-							transmem.endId + 1, protein.sequence.length());
-
-					newDomains.addAll(newDomains_before_transm);
-					newDomains.addAll(newDomains_after_transm);
-
-					double soluble_score = 1;
-					double potential_transm = 1;
-
-					if (!(transmem.eValue.isBlank() || transmem.eValue.isEmpty())) {
-						soluble_score -= Double.parseDouble(transmem.eValue);
-						potential_transm = Double.parseDouble(transmem.eValue);
-					}
-
-					// [ Domain1 | Domain2 | Transmem | Domain3 ]
-					// [ 1 - 60 | 1 - 60 | 61 - 80 | 81 - 120]
-					if (newDomains_before_transm.stream().distinct().count() > 0
-							&& newDomains_after_transm.stream().distinct().count() > 0) {
-
-						int k = (int) Math.max(newDomains_before_transm.stream().distinct().count(),
-								newDomains_after_transm.stream().distinct().count());
-
-						combinations = Util.combinations(newDomains, k);
-
-						newDomains.add(transmem);
-
-						Collections.sort(newDomains, new Comparator<ProteinDomain>() {
-							@Override
-							public int compare(ProteinDomain lhs, ProteinDomain rhs) {
-								return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
-							}
-						});
-
-						int index_transm = newDomains.indexOf(transmem);
-
-						boolean isGreaterThanTransm = false;
-						boolean isLessThanTransm = false;
-						for (var comb : combinations) {
-							isGreaterThanTransm = false;
-							isLessThanTransm = false;
-
-							for (@SuppressWarnings("unchecked")
-							Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
-								ProteinDomain domain = (ProteinDomain) iterator.next();
-
-								int current_index = newDomains.indexOf(domain);
-								if (current_index >= index_transm) {
-									isGreaterThanTransm = true;
-								} else {
-									isLessThanTransm = true;
-								}
-							}
-							if (!(isGreaterThanTransm && isLessThanTransm))
-								continue;
-
-							List<ProteinDomain> partialDomains = new ArrayList<ProteinDomain>();
-
-							for (@SuppressWarnings("unchecked")
-							Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
-								partialDomains.add((ProteinDomain) iterator.next());
-							}
-
-							double partial_score = 0;
-							List<String> name = new ArrayList<String>();
-							for (ProteinDomain domain : partialDomains) {
-								if ((!domain.eValue.isBlank() || domain.eValue.isEmpty())) {
-									name.add(domain.name);
-									partial_score += Double.parseDouble(domain.eValue);
-								}
-							}
-							// [ Domain1 | Transm | Domain2 ]
-							name.add(1, TRANSMEMBRANE);
-
-							if (potential_transm < 1) {
-								double partial_pt_score = potential_transm * partial_score;
-								protein.domainScores.put(POTENTIAL_TRANSM + "_" + String.join("_", name),
-										partial_pt_score);
-							}
-						}
-
-						// Compute soluble scores
-						// e.g. [Matrix1 | IMS1 | Transmem | Matrix2 | IMS2]
-						// soluble score 1 -> (Matrix1 + Matrix2) * soluble_transm_score
-						// soluble score 2 -> (IMS1 + IMS2) * soluble_transm_score
-
-						// Compute the scores based on residues score
-						Map<String, List<ProteinDomain>> groupedDomains = newDomains.stream()
-								.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE))
-								.collect(Collectors.groupingBy(w -> w.name));
-
-						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
-
-							double partial_score = 0;
-							for (ProteinDomain evalue : proteinDomain.getValue()) {
-								if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty()))
-									partial_score += Double.parseDouble(evalue.eValue);
-
-								double partial_soluble_score = soluble_score * partial_score;
-								if (partial_soluble_score > 0.0)
-									protein.domainScores.put(proteinDomain.getKey(), partial_soluble_score);
-							}
-						}
-
-					} else {
-
-						newDomains.add(transmem);
-
-						Collections.sort(newDomains, new Comparator<ProteinDomain>() {
-							@Override
-							public int compare(ProteinDomain lhs, ProteinDomain rhs) {
-								return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
-							}
-						});
-
-						// Compute the scores based on residues score
-						Map<String, List<ProteinDomain>> groupedDomains = newDomains.stream()
-								.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE))
-								.collect(Collectors.groupingBy(w -> w.name));
-
-						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
-
-							double partial_score = 0;
-							for (ProteinDomain evalue : proteinDomain.getValue()) {
-								if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty()))
-									partial_score += Double.parseDouble(evalue.eValue);
-							}
-
-							double partial_soluble_score = soluble_score * partial_score;
-							if (partial_soluble_score > 0.0)
-								protein.domainScores.put(proteinDomain.getKey(), partial_soluble_score);
-
-							if (potential_transm < 1.0) {
-								double partial_pt_score = potential_transm * partial_score;
-								protein.domainScores.put(POTENTIAL_TRANSM + "_" + proteinDomain.getKey(),
-										partial_pt_score);
-							}
-						}
-
-					}
-
-					protein.domains = newDomains;
-
-				} else { // There are more than one transmem
-
-					startPos = 1;
-					for (int i = 0; i < protein.domains.stream()
-							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
-							.collect(Collectors.toList()).size(); i++) {
-
-						ProteinDomain transmem = protein.domains.stream()
-								.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
-								.collect(Collectors.toList()).get(i);
-
-						// Get all residues before transmem region
-						List<Residue> residues_before_transm = protein.reactionSites.stream()
-								.filter(value -> value.position >= startPos && value.position < transmem.startId)
+						// Remove transmembrane domains from protein.domains and all 'predicted' domains
+						protein.domains = protein.domains.stream()
+								.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)
+										&& !value.eValue.equals("predicted"))
 								.collect(Collectors.toList());
-						newDomains.addAll(ComputeDomainsScore(residues_before_transm, startPos, transmem.startId - 1));
-						newDomains.add(transmem);
 
-						if ((i + 1) >= protein.domains.stream()
-								.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
-								.collect(Collectors.toList()).size()) {
-							// Get all residues after transmem region
-							List<Residue> residues_after_transm = protein.reactionSites.stream()
-									.filter(value -> value.position > transmem.endId).collect(Collectors.toList());
-							newDomains.addAll(ComputeDomainsScore(residues_after_transm, transmem.endId + 1,
-									protein.sequence.length()));
-							break;
-						}
-						ProteinDomain next_transmem = protein.domains.stream()
-								.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
-								.collect(Collectors.toList()).get(i + 1);
+						if (protein.domains.size() > 0)
+							protein.isConflictedDomain = true;
+						else
+							protein.isConflictedDomain = false;
 
-						if (next_transmem != null) {
+					} else {// it's transmembrane
 
-							// Get all residues after transmem region
-							List<Residue> residues_after_transm = protein.reactionSites.stream().filter(
-									value -> value.position > transmem.endId && value.position < next_transmem.startId)
-									.collect(Collectors.toList());
-							newDomains.addAll(ComputeDomainsScore(residues_after_transm, transmem.endId + 1,
-									next_transmem.startId - 1));
+						newDomains.clear();
 
-							startPos = transmem.endId + 1;
-
-//							newDomains.add(next_transmem);
-
-//							// Get all residues after transmem region
-//							List<Residue> residues_after_next_transm = protein.reactionSites.stream()
-//									.filter(value -> value.position > next_transmem.endId).collect(Collectors.toList());
-//
-//							newDomains.addAll(ComputeDomainsScore(residues_after_next_transm, next_transmem.endId + 1,
-//									protein.sequence.length()));
-
-						} else {
-
-							// Get all residues after transmem region
-							List<Residue> residues_after_transm = protein.reactionSites.stream()
-									.filter(value -> value.position > transmem.endId).collect(Collectors.toList());
-
-							newDomains.addAll(ComputeDomainsScore(residues_after_transm, transmem.endId + 1,
-									protein.sequence.length()));
-
-						}
-					}
-
-					protein.domains = newDomains.stream().distinct().collect(Collectors.toList());
-
-					List<ProteinDomain> all_transmem = protein.domains.stream()
-							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
-							.collect(Collectors.toList());
-
-					// Compute the scores based on residues score
-					Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
-							.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
-
-					int k = groupedDomains.size();
-
-					combinations.clear();
-
-					if (protein.domains.size() > 10) {
-						combinations.addAll(Util.combinations(protein.domains, k));
-						combinations.addAll(Util.combinations(protein.domains, 1));
-					} else {
-						for (int j = k; j > 0; j--) {
-							combinations.addAll(Util.combinations(protein.domains, j));
-						}
-					}
-
-					List<String> name = new ArrayList<String>();
-					for (var comb : combinations) {
-
-						name.clear();
-						List<ProteinDomain> currentDomains = new ArrayList<ProteinDomain>();
-						for (@SuppressWarnings("unchecked")
-						Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
-							ProteinDomain domain = (ProteinDomain) iterator.next();
-							currentDomains.add(domain);
-						}
-
-						groupedDomains = currentDomains.stream()
+						// Group domains based on the range position
+						Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+								.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)
+										&& !value.eValue.equals("predicted"))
 								.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
 
+						// Select the domain with highest score (before and after transm domain)
 						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
-							if (proteinDomain.getValue().size() > 1)
+
+							ProteinDomain domain_with_highest_score = proteinDomain.getValue().get(0);
+							for (ProteinDomain evalue : proteinDomain.getValue()) {
+								if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty())) {
+									double score = Double.parseDouble(evalue.eValue);
+									if (Double.parseDouble(domain_with_highest_score.eValue) < score)
+										domain_with_highest_score = evalue;
+								}
+							}
+							newDomains.add(domain_with_highest_score);
+						}
+
+						newDomains.addAll(protein.domains.stream().filter(value -> value.eValue.equals("predicted"))
+								.collect(Collectors.toList()));
+						newDomains.add(transmem);
+						protein.domains = newDomains;
+
+						Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+							@Override
+							public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+								return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+							}
+						});
+
+						for (ProteinDomain proteinDomain : protein.domains.stream()
+								.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)
+										&& !value.eValue.equals("predicted"))
+								.collect(Collectors.toList())) {
+							if (proteinDomain.eValue.isBlank() || proteinDomain.eValue.isEmpty())
 								continue;
+							protein.domainScores.put(proteinDomain.name, Double.valueOf(proteinDomain.eValue));
 						}
 
-						int isTransmembrane = 0;
-						for (@SuppressWarnings("unchecked")
-						Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
-							ProteinDomain domain = (ProteinDomain) iterator.next();
-							if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
-								isTransmembrane++;
-							else
-								isTransmembrane--;
-						}
+						checkConflictProteinDomains(taskMonitor, protein);
 
-						if (isTransmembrane > 0)// [Transm | Transm | Matrix]
-							continue;
-
-						if (currentDomains.size() <= 2 && currentDomains.stream()
-								.filter(value -> ((ProteinDomain) value).name.toLowerCase().contains(TRANSMEMBRANE))
-								.collect(Collectors.toList()).size() == 1)
-							continue;
-
-						groupedDomains = currentDomains.stream().collect(Collectors.groupingBy(w -> w.name));
-
-						List<ProteinDomain> currentTransms = new ArrayList<ProteinDomain>();
-						List<Double> pt_scores = new ArrayList<Double>();
-						List<Double> sol_scores = new ArrayList<Double>();
-						boolean isTransmem = false;
-						int countTransmem = 0;
-
-						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
-							StringBuilder nameStr = new StringBuilder();
-							nameStr.append(proteinDomain.getKey());
-
-							if (proteinDomain.getKey().toLowerCase().contains(TRANSMEMBRANE)) {
-								isTransmem = true;
-							} else
-								isTransmem = false;
-
-							double partial_score = 0;
-							for (ProteinDomain domain : proteinDomain.getValue()) {
-								if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
-									partial_score += Double.parseDouble(domain.eValue);
-									nameStr.append("_" + (protein.domains.indexOf(domain) + 1));
-								}
-								if (isTransmem)
-									currentTransms.add(domain);
-							}
-
-							if (isTransmem) {
-								countTransmem = proteinDomain.getValue().size();
-								partial_score /= countTransmem;
-							}
-
-							pt_scores.add(partial_score);
-
-							if (!isTransmem)
-								sol_scores.add(partial_score);
-
-							if (countTransmem > 0)
-								name.add(nameStr.toString());
-							else
-								name.add(proteinDomain.getKey());
-						}
-
-						double final_score = 1;
-						for (double score : pt_scores) {
-							final_score *= score;
-						}
-
-						// Contains Transmembrane
-						if (countTransmem > 0) {
-
-							int total_transm = all_transmem.size();
-
-							// Get other transmembranes to compute soluble score
-							if (countTransmem != total_transm) {
-								List<ProteinDomain> not_present_transm = Util.findDifference(all_transmem,
-										currentTransms);
-
-								double soluble_score = 0;
-								for (ProteinDomain transm : not_present_transm) {
-									soluble_score += Double.parseDouble(transm.eValue);
-								}
-
-								soluble_score = 1 - soluble_score;
-								final_score *= soluble_score;
-
-							}
-
-							if (!protein.domainScores.containsKey(POTENTIAL_TRANSM + "_" + String.join("_", name))) {
-								protein.domainScores.put(POTENTIAL_TRANSM + "_" + String.join("_", name), final_score);
-							}
-						} else {
-
-							if (!protein.domainScores.containsKey(String.join("_", name))) {
-
-								countTransmem = 0;
-								double soluble_score = 0;
-								for (ProteinDomain transmem : all_transmem) {
-									soluble_score += Double.parseDouble(transmem.eValue);
-									countTransmem++;
-								}
-
-								soluble_score /= countTransmem;
-								soluble_score = 1 - soluble_score;
-								sol_scores.add(soluble_score);
-
-								final_score = 1;
-								for (double score : sol_scores) {
-									final_score *= score;
-								}
-
-								protein.domainScores.put(String.join("_", name), final_score);
-							}
-						}
 					}
-				}
 
+//					// Get all residues before transm region
+//					List<Residue> residues_before_transm = protein.reactionSites.stream()
+//							.filter(value -> value.position < transmem.startId).collect(Collectors.toList());
+//
+//					// Get all residues after transm region
+//					List<Residue> residues_after_transm = protein.reactionSites.stream()
+//							.filter(value -> value.position > transmem.endId).collect(Collectors.toList());
+//
+//					List<ProteinDomain> newDomains_before_transm = ComputeDomainsScore(residues_before_transm, 1,
+//							transmem.startId - 1);
+//
+//					Collections.sort(newDomains_before_transm, new Comparator<ProteinDomain>() {
+//						@Override
+//						public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+//							return Double.parseDouble(rhs.eValue) > Double.parseDouble(lhs.eValue) ? 1
+//									: Double.parseDouble(rhs.eValue) < Double.parseDouble(lhs.eValue) ? -1 : 0;
+//						}
+//					});
+//
+//					List<ProteinDomain> newDomains_after_transm = ComputeDomainsScore(residues_after_transm,
+//							transmem.endId + 1, protein.sequence.length());
+//
+//					Collections.sort(newDomains_after_transm, new Comparator<ProteinDomain>() {
+//						@Override
+//						public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+//							return Double.parseDouble(rhs.eValue) > Double.parseDouble(lhs.eValue) ? 1
+//									: Double.parseDouble(rhs.eValue) < Double.parseDouble(lhs.eValue) ? -1 : 0;
+//						}
+//					});
+//
+//					boolean isPotentialTransm = true;
+//					if (transm_score < Util.transmemPredictionRegionsUpperScore) {
+//						isPotentialTransm = false;
+//					}
+//
+//					if (isPotentialTransm) {
+//						newDomains = ComputeDomainsScore(protein.reactionSites, 1, protein.sequence.length());
+//
+//						Collections.sort(newDomains, new Comparator<ProteinDomain>() {
+//							@Override
+//							public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+//								return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+//							}
+//						});
+//
+//						// Compute the scores based on residues score
+//						Map<String, List<ProteinDomain>> groupedDomains = newDomains.stream()
+//								.collect(Collectors.groupingBy(w -> w.name));
+//
+//						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
+//
+//							double partial_score = 0;
+//							for (ProteinDomain evalue : proteinDomain.getValue()) {
+//								if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty()))
+//									partial_score += Double.parseDouble(evalue.eValue);
+//
+//								double partial_soluble_score = partial_score;
+//								if (partial_soluble_score > 0.0)
+//									protein.domainScores.put(proteinDomain.getKey(), partial_soluble_score);
+//							}
+//						}
+//
+//					} else {// Transmem region
+//
+//						newDomains.addAll(newDomains_before_transm);
+//						newDomains.add(transmem);
+//						newDomains.addAll(newDomains_after_transm);
+//
+//						// There is only transmem
+//						if (newDomains.stream().filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE))
+//								.collect(Collectors.toList()).size() == 0)
+//							continue;
+//
+//						double potential_transm = 1;
+//
+//						if (!(transmem.eValue.isBlank() || transmem.eValue.isEmpty())) {
+//							potential_transm = Double.parseDouble(transmem.eValue);
+//						}
+//
+//						double partial_score = 0;
+//						for (ProteinDomain domain : newDomains.stream()
+//								.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE))
+//								.collect(Collectors.toList())) {
+//							if ((!domain.eValue.isBlank() || domain.eValue.isEmpty())) {
+//								partial_score += Double.parseDouble(domain.eValue);
+//							}
+//						}
+//
+//						double partial_pt_score = potential_transm * partial_score;
+//						protein.domainScores.put(POTENTIAL_TRANSM, partial_pt_score);
+//					}
+//					protein.domains = newDomains;
+//
+//					
+//					
+//					
+//					
+//					
+//					
+//					
+//					
+//					
+//					
+//					
+//					
+//					
+//					
+//					
+//					// [ Domain1 | Domain2 | Transmem | Domain3 ]
+//					// [ 1 - 60 | 1 - 60 | 61 - 80 | 81 - 120]
+//					if (newDomains_before_transm.stream().distinct().count() > 0
+//							&& newDomains_after_transm.stream().distinct().count() > 0) {
+//
+//						int k = (int) Math.max(newDomains_before_transm.stream().distinct().count(),
+//								newDomains_after_transm.stream().distinct().count());
+//
+//						combinations = Util.combinations(newDomains, k);
+//
+//						newDomains.add(transmem);
+//
+//						Collections.sort(newDomains, new Comparator<ProteinDomain>() {
+//							@Override
+//							public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+//								return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+//							}
+//						});
+//
+//						int index_transm = newDomains.indexOf(transmem);
+//
+//						boolean isGreaterThanTransm = false;
+//						boolean isLessThanTransm = false;
+//						for (var comb : combinations) {
+//							isGreaterThanTransm = false;
+//							isLessThanTransm = false;
+//
+//							for (@SuppressWarnings("unchecked")
+//							Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
+//								ProteinDomain domain = (ProteinDomain) iterator.next();
+//
+//								int current_index = newDomains.indexOf(domain);
+//								if (current_index >= index_transm) {
+//									isGreaterThanTransm = true;
+//								} else {
+//									isLessThanTransm = true;
+//								}
+//							}
+//							if (!(isGreaterThanTransm && isLessThanTransm))
+//								continue;
+//
+//							List<ProteinDomain> partialDomains = new ArrayList<ProteinDomain>();
+//
+//							for (@SuppressWarnings("unchecked")
+//							Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
+//								partialDomains.add((ProteinDomain) iterator.next());
+//							}
+//
+//							double partial_score = 0;
+//							List<String> name = new ArrayList<String>();
+//							for (ProteinDomain domain : partialDomains) {
+//								if ((!domain.eValue.isBlank() || domain.eValue.isEmpty())) {
+//									name.add(domain.name);
+//									partial_score += Double.parseDouble(domain.eValue);
+//								}
+//							}
+//							// [ Domain1 | Transm | Domain2 ]
+//							name.add(1, TRANSMEMBRANE);
+//
+//							if (potential_transm < 1) {
+//								double partial_pt_score = potential_transm * partial_score;
+//								protein.domainScores.put(POTENTIAL_TRANSM + "_" + String.join("_", name),
+//										partial_pt_score);
+//							}
+//						}
+//
+//						// Compute soluble scores
+//						// e.g. [Matrix1 | IMS1 | Transmem | Matrix2 | IMS2]
+//						// soluble score 1 -> (Matrix1 + Matrix2) * soluble_transm_score
+//						// soluble score 2 -> (IMS1 + IMS2) * soluble_transm_score
+//
+//						// Compute the scores based on residues score
+//						Map<String, List<ProteinDomain>> groupedDomains = newDomains.stream()
+//								.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE))
+//								.collect(Collectors.groupingBy(w -> w.name));
+//
+//						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
+//
+//							double partial_score = 0;
+//							for (ProteinDomain evalue : proteinDomain.getValue()) {
+//								if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty()))
+//									partial_score += Double.parseDouble(evalue.eValue);
+//
+//								double partial_soluble_score = soluble_score * partial_score;
+//								if (partial_soluble_score > 0.0)
+//									protein.domainScores.put(proteinDomain.getKey(), partial_soluble_score);
+//							}
+//						}
+//
+//					} else {
+//
+//						newDomains.add(transmem);
+//
+//						Collections.sort(newDomains, new Comparator<ProteinDomain>() {
+//							@Override
+//							public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+//								return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+//							}
+//						});
+//
+//						// Compute the scores based on residues score
+//						Map<String, List<ProteinDomain>> groupedDomains = newDomains.stream()
+//								.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE))
+//								.collect(Collectors.groupingBy(w -> w.name));
+//
+//						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
+//
+//							double partial_score = 0;
+//							for (ProteinDomain evalue : proteinDomain.getValue()) {
+//								if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty()))
+//									partial_score += Double.parseDouble(evalue.eValue);
+//							}
+//
+//							double partial_soluble_score = soluble_score * partial_score;
+//							if (partial_soluble_score > 0.0)
+//								protein.domainScores.put(proteinDomain.getKey(), partial_soluble_score);
+//
+//							if (potential_transm < 1.0) {
+//								double partial_pt_score = potential_transm * partial_score;
+//								protein.domainScores.put(POTENTIAL_TRANSM + "_" + proteinDomain.getKey(),
+//										partial_pt_score);
+//							}
+//						}
+//
+//					}
+//
+//					protein.domains = newDomains;
+
+				}
 			}
+//					else { // There are more than one transmem
+//
+//					startPos = 1;
+//
+//					// Get only transmembrane regions that contain score >= UpperScore
+//					List<ProteinDomain> all_transmem = protein.domains.stream()
+//							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE)
+//									&& Double.parseDouble(value.eValue) >= Util.transmemPredictionRegionsUpperScore)
+//							.collect(Collectors.toList());
+//
+//					for (int i = 0; i < all_transmem.size(); i++) {
+//
+//						ProteinDomain transmem = all_transmem.get(i);
+//
+//						// Get all residues before transmem region
+//						List<Residue> residues_before_transm = protein.reactionSites.stream()
+//								.filter(value -> value.position >= startPos && value.position < transmem.startId)
+//								.collect(Collectors.toList());
+//						newDomains.addAll(ComputeDomainsScore(residues_before_transm, startPos, transmem.startId - 1));
+//						newDomains.add(transmem);
+//
+//						if ((i + 1) >= all_transmem.size()) {
+//							// Get all residues after transmem region
+//							List<Residue> residues_after_transm = protein.reactionSites.stream()
+//									.filter(value -> value.position > transmem.endId).collect(Collectors.toList());
+//							newDomains.addAll(ComputeDomainsScore(residues_after_transm, transmem.endId + 1,
+//									protein.sequence.length()));
+//							break;
+//						}
+//						ProteinDomain next_transmem = all_transmem.get(i + 1);
+//
+//						if (next_transmem != null) {
+//
+//							// Get all residues after transmem region
+//							List<Residue> residues_after_transm = protein.reactionSites.stream().filter(
+//									value -> value.position > transmem.endId && value.position < next_transmem.startId)
+//									.collect(Collectors.toList());
+//							newDomains.addAll(ComputeDomainsScore(residues_after_transm, transmem.endId + 1,
+//									next_transmem.startId - 1));
+//
+//							startPos = transmem.endId + 1;
+//
+//						} else {
+//
+//							// Get all residues after transmem region
+//							List<Residue> residues_after_transm = protein.reactionSites.stream()
+//									.filter(value -> value.position > transmem.endId).collect(Collectors.toList());
+//
+//							newDomains.addAll(ComputeDomainsScore(residues_after_transm, transmem.endId + 1,
+//									protein.sequence.length()));
+//
+//						}
+//					}
+//					protein.domains = newDomains.stream().distinct().collect(Collectors.toList());
+//
+//					// There is only transmem
+//					if (protein.domains.stream().filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE))
+//							.collect(Collectors.toList()).size() == 0)
+//						continue;
+//
+//					// Compute the scores based on residues score
+//					Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+//							.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+//
+//					int k = groupedDomains.size();
+//
+//					combinations.clear();
+//					combinations.addAll(Util.combinations(protein.domains, k));
+//					combinations.addAll(Util.combinations(protein.domains, 1));
+//
+//					List<String> name = new ArrayList<String>();
+//					for (@SuppressWarnings("rawtypes")
+//					List comb : combinations) {
+//
+//						name.clear();
+//						List<ProteinDomain> currentDomains = new ArrayList<ProteinDomain>();
+//						for (@SuppressWarnings("unchecked")
+//						Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
+//							ProteinDomain domain = (ProteinDomain) iterator.next();
+//							currentDomains.add(domain);
+//						}
+//
+//						groupedDomains = currentDomains.stream()
+//								.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+//
+//						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
+//							if (proteinDomain.getValue().size() > 1)
+//								continue;
+//						}
+//
+//						int lastEndIndex = 0;
+//						int isTransmembrane = 0;
+//						for (@SuppressWarnings("unchecked")
+//						Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
+//							ProteinDomain domain = (ProteinDomain) iterator.next();
+//
+//							if (lastEndIndex == 0 || (lastEndIndex + 1) == domain.startId) {
+//								if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
+//									isTransmembrane++;
+//								else
+//									isTransmembrane--;
+//							}
+//							lastEndIndex = domain.endId;
+//						}
+//
+//						if (isTransmembrane > 0)// [Transm | Transm | Matrix]
+//							continue;
+//
+//						// There is no Transmem
+//						if (currentDomains.stream()
+//								.filter(value -> ((ProteinDomain) value).name.toLowerCase().contains(TRANSMEMBRANE))
+//								.collect(Collectors.toList()).size() == 0)
+//							continue;
+//
+//						groupedDomains = currentDomains.stream().collect(Collectors.groupingBy(w -> w.name));
+//
+//						List<ProteinDomain> currentTransms = new ArrayList<ProteinDomain>();
+//						List<Double> pt_scores = new ArrayList<Double>();
+//						boolean isTransmem = false;
+//						int countTransmem = 0;
+//
+//						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
+//							StringBuilder nameStr = new StringBuilder();
+//							nameStr.append(proteinDomain.getKey());
+//
+//							if (proteinDomain.getKey().toLowerCase().contains(TRANSMEMBRANE)) {
+//								isTransmem = true;
+//							} else
+//								isTransmem = false;
+//
+//							double partial_score = 0;
+//							for (ProteinDomain domain : proteinDomain.getValue()) {
+//								if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
+//									partial_score += Double.parseDouble(domain.eValue);
+//									nameStr.append("_" + (protein.domains.indexOf(domain) + 1));
+//								}
+//								if (isTransmem)
+//									currentTransms.add(domain);
+//							}
+//
+//							if (isTransmem) {
+//								countTransmem = proteinDomain.getValue().size();
+//								partial_score /= countTransmem;
+//							}
+//
+//							pt_scores.add(partial_score);
+//
+//							if (countTransmem > 0)
+//								name.add(nameStr.toString());
+//							else
+//								name.add(proteinDomain.getKey());
+//						}
+//
+//						double final_score = 1;
+//						for (double score : pt_scores) {
+//							final_score *= score;
+//						}
+//
+//						// Contains Transmembrane
+//						if (countTransmem > 0) {
+//
+//							if (!protein.domainScores.containsKey(POTENTIAL_TRANSM + "_" + String.join("_", name))) {
+//								protein.domainScores.put(POTENTIAL_TRANSM + "_" + String.join("_", name), final_score);
+//							}
+//						}
+//					}
+//
+////					for (int i = 0; i < protein.domains.stream()
+////							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
+////							.collect(Collectors.toList()).size(); i++) {
+////
+////						ProteinDomain transmem = protein.domains.stream()
+////								.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
+////								.collect(Collectors.toList()).get(i);
+////
+////						// Get all residues before transmem region
+////						List<Residue> residues_before_transm = protein.reactionSites.stream()
+////								.filter(value -> value.position >= startPos && value.position < transmem.startId)
+////								.collect(Collectors.toList());
+////						newDomains.addAll(ComputeDomainsScore(residues_before_transm, startPos, transmem.startId - 1));
+////						newDomains.add(transmem);
+////
+////						if ((i + 1) >= protein.domains.stream()
+////								.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
+////								.collect(Collectors.toList()).size()) {
+////							// Get all residues after transmem region
+////							List<Residue> residues_after_transm = protein.reactionSites.stream()
+////									.filter(value -> value.position > transmem.endId).collect(Collectors.toList());
+////							newDomains.addAll(ComputeDomainsScore(residues_after_transm, transmem.endId + 1,
+////									protein.sequence.length()));
+////							break;
+////						}
+////						ProteinDomain next_transmem = protein.domains.stream()
+////								.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
+////								.collect(Collectors.toList()).get(i + 1);
+////
+////						if (next_transmem != null) {
+////
+////							// Get all residues after transmem region
+////							List<Residue> residues_after_transm = protein.reactionSites.stream().filter(
+////									value -> value.position > transmem.endId && value.position < next_transmem.startId)
+////									.collect(Collectors.toList());
+////							newDomains.addAll(ComputeDomainsScore(residues_after_transm, transmem.endId + 1,
+////									next_transmem.startId - 1));
+////
+////							startPos = transmem.endId + 1;
+////
+//////							newDomains.add(next_transmem);
+////
+//////							// Get all residues after transmem region
+//////							List<Residue> residues_after_next_transm = protein.reactionSites.stream()
+//////									.filter(value -> value.position > next_transmem.endId).collect(Collectors.toList());
+//////
+//////							newDomains.addAll(ComputeDomainsScore(residues_after_next_transm, next_transmem.endId + 1,
+//////									protein.sequence.length()));
+////
+////						} else {
+////
+////							// Get all residues after transmem region
+////							List<Residue> residues_after_transm = protein.reactionSites.stream()
+////									.filter(value -> value.position > transmem.endId).collect(Collectors.toList());
+////
+////							newDomains.addAll(ComputeDomainsScore(residues_after_transm, transmem.endId + 1,
+////									protein.sequence.length()));
+////
+////						}
+////					}
+//
+////					protein.domains = newDomains.stream().distinct().collect(Collectors.toList());
+////
+////					List<ProteinDomain> all_transmem = protein.domains.stream()
+////							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
+////							.collect(Collectors.toList());
+////
+////					// Compute the scores based on residues score
+////					Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+////							.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+////
+////					int k = groupedDomains.size();
+////
+////					combinations.clear();
+////
+////					if (protein.domains.size() > 10) {
+////						combinations.addAll(Util.combinations(protein.domains, k));
+////						combinations.addAll(Util.combinations(protein.domains, 1));
+////					} else {
+////						for (int j = k; j > 0; j--) {
+////							combinations.addAll(Util.combinations(protein.domains, j));
+////						}
+////					}
+////
+////					List<String> name = new ArrayList<String>();
+////					for (var comb : combinations) {
+////
+////						name.clear();
+////						List<ProteinDomain> currentDomains = new ArrayList<ProteinDomain>();
+////						for (@SuppressWarnings("unchecked")
+////						Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
+////							ProteinDomain domain = (ProteinDomain) iterator.next();
+////							currentDomains.add(domain);
+////						}
+////
+////						groupedDomains = currentDomains.stream()
+////								.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+////
+////						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
+////							if (proteinDomain.getValue().size() > 1)
+////								continue;
+////						}
+////
+////						int isTransmembrane = 0;
+////						for (@SuppressWarnings("unchecked")
+////						Iterator<ProteinDomain> iterator = comb.iterator(); iterator.hasNext();) {
+////							ProteinDomain domain = (ProteinDomain) iterator.next();
+////							if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
+////								isTransmembrane++;
+////							else
+////								isTransmembrane--;
+////						}
+////
+////						if (isTransmembrane > 0)// [Transm | Transm | Matrix]
+////							continue;
+////
+////						if (currentDomains.size() <= 2 && currentDomains.stream()
+////								.filter(value -> ((ProteinDomain) value).name.toLowerCase().contains(TRANSMEMBRANE))
+////								.collect(Collectors.toList()).size() == 1)
+////							continue;
+////
+////						groupedDomains = currentDomains.stream().collect(Collectors.groupingBy(w -> w.name));
+////
+////						List<ProteinDomain> currentTransms = new ArrayList<ProteinDomain>();
+////						List<Double> pt_scores = new ArrayList<Double>();
+////						List<Double> sol_scores = new ArrayList<Double>();
+////						boolean isTransmem = false;
+////						int countTransmem = 0;
+////
+////						for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
+////							StringBuilder nameStr = new StringBuilder();
+////							nameStr.append(proteinDomain.getKey());
+////
+////							if (proteinDomain.getKey().toLowerCase().contains(TRANSMEMBRANE)) {
+////								isTransmem = true;
+////							} else
+////								isTransmem = false;
+////
+////							double partial_score = 0;
+////							for (ProteinDomain domain : proteinDomain.getValue()) {
+////								if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
+////									partial_score += Double.parseDouble(domain.eValue);
+////									nameStr.append("_" + (protein.domains.indexOf(domain) + 1));
+////								}
+////								if (isTransmem)
+////									currentTransms.add(domain);
+////							}
+////
+////							if (isTransmem) {
+////								countTransmem = proteinDomain.getValue().size();
+////								partial_score /= countTransmem;
+////							}
+////
+////							pt_scores.add(partial_score);
+////
+////							if (!isTransmem)
+////								sol_scores.add(partial_score);
+////
+////							if (countTransmem > 0)
+////								name.add(nameStr.toString());
+////							else
+////								name.add(proteinDomain.getKey());
+////						}
+////
+////						double final_score = 1;
+////						for (double score : pt_scores) {
+////							final_score *= score;
+////						}
+////
+////						// Contains Transmembrane
+////						if (countTransmem > 0) {
+////
+////							int total_transm = all_transmem.size();
+////
+////							// Get other transmembranes to compute soluble score
+////							if (countTransmem != total_transm) {
+////								List<ProteinDomain> not_present_transm = Util.findDifference(all_transmem,
+////										currentTransms);
+////
+////								double soluble_score = 0;
+////								for (ProteinDomain transm : not_present_transm) {
+////									soluble_score += Double.parseDouble(transm.eValue);
+////								}
+////
+////								soluble_score = 1 - soluble_score;
+////								final_score *= soluble_score;
+////
+////							}
+////
+////							if (!protein.domainScores.containsKey(POTENTIAL_TRANSM + "_" + String.join("_", name))) {
+////								protein.domainScores.put(POTENTIAL_TRANSM + "_" + String.join("_", name), final_score);
+////							}
+////						} else {
+////
+////							if (!protein.domainScores.containsKey(String.join("_", name))) {
+////
+////								countTransmem = 0;
+////								double soluble_score = 0;
+////								for (ProteinDomain transmem : all_transmem) {
+////									soluble_score += Double.parseDouble(transmem.eValue);
+////									countTransmem++;
+////								}
+////
+////								soluble_score /= countTransmem;
+////								soluble_score = 1 - soluble_score;
+////								sol_scores.add(soluble_score);
+////
+////								final_score = 1;
+////								for (double score : sol_scores) {
+////									final_score *= score;
+////								}
+////
+////								protein.domainScores.put(String.join("_", name), final_score);
+////							}
+////						}
+////					}
+//				}
+//
+//			}
 
 			summary_processed++;
 			Util.progressBar(summary_processed, old_progress, total_compartments, "Computing domains score: ",
@@ -2154,9 +2549,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		int count_transmem = 0;
 		List<String> unique_domain = new ArrayList<String>();
 
-		// int count_protein = 0;
+		int count_protein = 0;
 
-		for (Protein protein : allProteins.stream().filter(value -> !value.isPredictedTransmem)
+		for (Protein protein : allProteins.stream().filter(value -> !value.isPredictedBasedOnTransmemInfo)
 				.collect(Collectors.toList())) {
 			try {
 				if (protein.domains == null)
@@ -2281,7 +2676,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						}
 						current_domain.isPredicted = true;
 						new_domain_list.add(current_domain);
-						protein.isPredictedTransmem = true;
+						protein.isPredictedBasedOnTransmemInfo = true;
 
 					}
 
@@ -2400,9 +2795,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				}
 
 			} catch (Exception e) {
-				// System.out.println(count_protein);
+				System.out.println(count_protein);
 			}
-			// count_protein++;
+			count_protein++;
 		}
 	}
 
@@ -2565,18 +2960,20 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private void processRoundLocation(TaskMonitor taskMonitor, int old_number_uk_residues) {
 		do {
 
-			OrganizeResidueCompartment(taskMonitor);
+			if (!number_unknown_residues.containsKey(epochs)) {
+				OrganizeResidueCompartment(taskMonitor);
 
-			if (epochs == 1) {
-				all_unknownResidues = compartments.get(UNKNOWN_RESIDUE);
-				if (all_unknownResidues == null)
-					break;
+				if (epochs == 1) {
+					all_unknownResidues = compartments.get(UNKNOWN_RESIDUE);
+					if (all_unknownResidues == null)
+						break;
+				}
+
+				if (compartments.get(UNKNOWN_RESIDUE) != null)
+					number_unknown_residues.put(epochs, compartments.get(UNKNOWN_RESIDUE).size());
+				else
+					number_unknown_residues.put(epochs, 0);
 			}
-
-			if (compartments.get(UNKNOWN_RESIDUE) != null)
-				number_unknown_residues.put(epochs, compartments.get(UNKNOWN_RESIDUE).size());
-			else
-				number_unknown_residues.put(epochs, 0);
 
 			int uk_res = number_unknown_residues.get(epochs);
 			// It means there is no possibility to predict more residues location
@@ -2586,6 +2983,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			if (Util.getEpochs && (Util.epochs + 1) <= epochs)
 				break;
 
+			ComputeResiduesScore(taskMonitor);
 			ComputeNewResidues(taskMonitor, all_unknownResidues, false);
 			if (compartments.get(UNKNOWN_RESIDUE) != null)
 				old_number_uk_residues = compartments.get(UNKNOWN_RESIDUE).size();
@@ -2632,6 +3030,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		int total_ptns = allProteins.size();
 
 		for (final Protein protein : allProteins) {
+
+			// Select only residues from proteins that don't contain conflict domains
+			if (protein.isConflictedDomain)
+				continue;
+
 			List<Residue> residues = protein.reactionSites;
 
 			if (residues == null)
@@ -2683,6 +3086,65 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	}
 
 	/**
+	 * Method responsible for computing initial residues scoring
+	 * 
+	 * @param taskMonitor current task monitor
+	 */
+	private static void ComputeResiduesScore(TaskMonitor taskMonitor) {
+
+		// Sqrt(Sum[xl_score^2] / # xl)
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_ptns = allProteins.size();
+
+		for (final Protein protein : allProteins) {
+			summary_processed++;
+			Util.progressBar(summary_processed, old_progress, total_ptns, "Computing residues score: ", taskMonitor,
+					null);
+
+			List<Residue> residues = protein.reactionSites;
+
+			if (residues == null)
+				continue;
+
+			for (Residue residue : residues) {
+
+				// It means the residue belongs to a localization marker
+				if (residue.score == Util.initialResidueScore || residue.location.toLowerCase().equals(TRANSMEMBRANE))
+					continue;
+
+				// It means the score has already been computed
+				if (-Math.log10(residue.score) < 0)
+					continue;
+
+				int pos = residue.position;
+
+				List<CrossLink> all_links = new ArrayList<CrossLink>();
+				if (protein.intraLinks != null) {
+					all_links.addAll(protein.intraLinks.stream()
+							.filter(value -> value.pos_site_a == pos || value.pos_site_b == pos)
+							.collect(Collectors.toList()));
+				}
+				if (protein.interLinks != null)
+					all_links.addAll(protein.interLinks.stream()
+							.filter(value -> (value.protein_a.equals(protein.proteinID) && value.pos_site_a == pos)
+									|| (value.protein_b.equals(protein.proteinID) && value.pos_site_b == pos))
+							.collect(Collectors.toList()));
+
+				double residue_score = 0;
+				for (CrossLink crossLink : all_links) {
+					residue_score += Math.pow(crossLink.score, 2);
+				}
+				if (residue_score > 0)
+					residue.score = Math.sqrt(residue_score / all_links.size());
+			}
+		}
+	}
+
+	/**
 	 * Method responsible for computing new residue location
 	 * 
 	 * @param epochs
@@ -2702,6 +3164,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				continue;
 
 			for (Residue residue : compartment.getValue()) {
+
+				summary_processed++;
+				Util.progressBar(summary_processed, old_progress, total_compartments,
+						"Epoch: " + epochs + "\nPredicting residue location: ", taskMonitor, null);
 
 				if ((residue.predictedLocation != null && residue.predictedLocation.toLowerCase().equals(TRANSMEMBRANE))
 						|| (residue.location != null && residue.location.toLowerCase().equals(TRANSMEMBRANE)))
@@ -2733,9 +3199,20 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& value.predicted_epoch == -1)
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
+
+								// current residue
 								Residue res = isResiduePresent.get();
-								double score = Math.sqrt(Math.pow(crossLink.score * residue.score, 2) / epochs);
-								// -Math.log10(crossLink.score) * 1 / epochs;
+								// Res.score contains the score that takes into account the crosslink.score
+
+								double score = 0;
+
+								if (-Math.log10(res.score) < 0)
+									// if it's negative, it means that -Log10 has already been applied in previous
+									// epochs
+									score = Math.sqrt(res.score * residue.score / epochs);
+								else
+									// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
+									score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
 
 								boolean saveConflict = true;
 								if (score >= res.score) {
@@ -2744,7 +3221,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& !res.predictedLocation.equals(residue.predictedLocation))
 											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == 0))
+										if (!(isKnownResidues && res.score == -1))
 											saveConflict = false;
 
 										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
@@ -2830,10 +3307,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										boolean isValid = false;
 
 										if (Util.getThreshold_score) {
-											if (Util.threshold_score >= -Math.log10(crossLink.score)) {
+											if (Util.threshold_score >= -Math.log10(res.score)) {
 												isValid = true;
 												crossLink.location = "";
 											}
+										} else if (Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
+											isValid = true;
 										} else {
 											isValid = false;
 										}
@@ -2855,9 +3334,19 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& value.predicted_epoch == -1)
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
+								// current residue
 								Residue res = isResiduePresent.get();
-								double score = Math.sqrt(Math.pow(crossLink.score * residue.score, 2) / epochs);
-								// -Math.log10(crossLink.score) * 1 / epochs;
+								// Res.score contains the score that takes into account the crosslink.score
+
+								double score = 0;
+
+								if (-Math.log10(res.score) < 0)
+									// if it's negative, it means that -Log10 has already been applied in previous
+									// epochs
+									score = Math.sqrt(res.score * residue.score / epochs);
+								else
+									// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
+									score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
 
 								boolean saveConflict = true;
 								if (score >= res.score) {
@@ -2866,7 +3355,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& !res.predictedLocation.equals(residue.predictedLocation))
 											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == 0))
+										if (!(isKnownResidues && res.score == -1))
 											saveConflict = false;
 
 										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
@@ -2951,10 +3440,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										boolean isValid = false;
 
 										if (Util.getThreshold_score) {
-											if (Util.threshold_score >= -Math.log10(crossLink.score)) {
+											if (Util.threshold_score >= -Math.log10(res.score)) {
 												isValid = true;
 												crossLink.location = "";
 											}
+										} else if (Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
+											isValid = true;
 										} else {
 											isValid = false;
 										}
@@ -2991,9 +3482,19 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									.findFirst();
 
 							if (isResiduePresent.isPresent()) {
+								// current residue
 								Residue res = isResiduePresent.get();
-								double score = Math.sqrt(Math.pow(crossLink.score * residue.score, 2) / epochs);
-								// -Math.log10(crossLink.score) * 1 / epochs;
+								// Res.score contains the score that takes into account the crosslink.score
+
+								double score = 0;
+
+								if (-Math.log10(res.score) < 0)
+									// if it's negative, it means that -Log10 has already been applied in previous
+									// epochs
+									score = Math.sqrt(res.score * residue.score / epochs);
+								else
+									// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
+									score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
 
 								boolean saveConflict = true;
 								if (score >= res.score) {
@@ -3002,7 +3503,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& !res.predictedLocation.equals(residue.predictedLocation))
 											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == 0))
+										if (!(isKnownResidues && res.score == -1))
 											saveConflict = false;
 
 										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
@@ -3088,10 +3589,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										boolean isValid = false;
 
 										if (Util.getThreshold_score) {
-											if (Util.threshold_score >= -Math.log10(crossLink.score)) {
+											if (Util.threshold_score >= -Math.log10(res.score)) {
 												isValid = true;
 												crossLink.location = "";
 											}
+										} else if (Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
+											isValid = true;
 										} else {
 											isValid = false;
 										}
@@ -3113,9 +3616,19 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& value.predicted_epoch == -1)
 									.findFirst();
 							if (isResiduePresent.isPresent()) {
+								// current residue
 								Residue res = isResiduePresent.get();
-								double score = Math.sqrt(Math.pow(crossLink.score * residue.score, 2) / epochs);
-								// -Math.log10(crossLink.score) * 1 / epochs;
+								// Res.score contains the score that takes into account the crosslink.score
+
+								double score = 0;
+
+								if (-Math.log10(res.score) < 0)
+									// if it's negative, it means that -Log10 has already been applied in previous
+									// epochs
+									score = Math.sqrt(res.score * residue.score / epochs);
+								else
+									// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
+									score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
 
 								boolean saveConflict = true;
 								if (score >= res.score) {
@@ -3124,7 +3637,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& !res.predictedLocation.equals(residue.predictedLocation))
 											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == 0))
+										if (!(isKnownResidues && res.score == -1))
 											saveConflict = false;
 
 										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
@@ -3210,10 +3723,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 										boolean isValid = false;
 
 										if (Util.getThreshold_score) {
-											if (Util.threshold_score >= -Math.log10(crossLink.score)) {
+											if (Util.threshold_score >= -Math.log10(res.score)) {
 												isValid = true;
 												crossLink.location = "";
 											}
+										} else if (Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
+											isValid = true;
 										} else {
 											isValid = false;
 										}
@@ -3262,11 +3777,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						uk_residue.previous_residue = residue;
 					}
 				}
-
-				summary_processed++;
-				Util.progressBar(summary_processed, old_progress, total_compartments,
-						"Epoch: " + epochs + "\nPredicting residue location: ", taskMonitor, null);
-
 			}
 		}
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Epoch: " + epochs + "\nPredicting residue location: 100%");
@@ -3285,8 +3795,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	}
 
 	/**
-	 * Method responsible for labeling predicted transm as Predicted, because in the
-	 * beginning they are labeled as no predicted
+	 * Method responsible for labeling predicted transmem as Predicted, because in
+	 * the beginning they are labeled as no predicted
 	 * 
 	 * @param taskMonitor
 	 * @param epoch
@@ -3470,6 +3980,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		// Compute the scores based on residues score
 		Map<String, List<Residue>> groupedResidues = residues.stream()
+				.filter(value -> value.score != Util.initialResidueScore)
 				.collect(Collectors.groupingBy(w -> w.predictedLocation));
 
 		for (Entry<String, List<Residue>> entry : groupedResidues.entrySet()) {
@@ -3484,6 +3995,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			}
 
 			score = Math.sqrt(score / entry.getValue().size());
+
+			// Transmem regions that contain score lower then UpperScore will not be
+			// considered
+			if (entry.getKey().toLowerCase().contains(TRANSMEMBRANE)
+					&& score < Util.transmemPredictionRegionsUpperScore)
+				continue;
 
 			ProteinDomain new_domain = new ProteinDomain(entry.getKey(), start_pos, end_pos, true,
 					Util.RoundScore(score));
@@ -3577,6 +4094,162 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							.RoundScore(ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
 				}
 			}
+		}
+	}
+
+	private void UnifyProteinDomainsFromAllProteins() {
+
+		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		for (Protein protein : allProteins) {
+
+			if (protein.domains == null)
+				continue;
+
+			UnifyProteinDomains(protein, 1);
+		}
+	}
+
+	private void UnifyProteinDomains(Protein protein, int delta_aa) {
+
+		// Select all domains that are far from delta_aa
+
+		List<ProteinDomain> current_ptn_domain_list = new ArrayList<ProteinDomain>();
+		List<ProteinDomain> final_domain_list = new ArrayList<ProteinDomain>();
+
+		// Group domains by name
+		Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+				.collect(Collectors.groupingBy(w -> w.name));
+
+		for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
+
+			if (proteinDomain.getKey().toLowerCase().equals(TRANSMEMBRANE)) {
+
+				final_domain_list.addAll(proteinDomain.getValue());
+				continue;
+			}
+
+			for (int i = 0; i < proteinDomain.getValue().size(); i++) {
+
+				current_ptn_domain_list.clear();
+				ProteinDomain ptnDomain = proteinDomain.getValue().get(i);
+				try {
+
+					current_ptn_domain_list.add((ProteinDomain) ptnDomain.clone());
+				} catch (Exception e) {
+					// TODO: handle exception
+				}
+
+				if (proteinDomain.getValue().size() == 1) {
+					try {
+
+						final_domain_list.add((ProteinDomain) ptnDomain.clone());
+					} catch (Exception e) {
+						// TODO: handle exception
+					}
+					continue;
+				}
+
+				boolean isProcessed = false;
+				int j;
+				for (j = i + 1; j < proteinDomain.getValue().size(); j++) {
+					ProteinDomain ptnDomain2 = proteinDomain.getValue().get(j);
+
+					if (ptnDomain2 != null && ptnDomain.endId + delta_aa == ptnDomain2.startId) {
+
+						isProcessed = false;
+						try {
+
+							current_ptn_domain_list.add((ProteinDomain) ptnDomain2.clone());
+						} catch (Exception e) {
+							// TODO: handle exception
+						}
+
+						i++;
+						ptnDomain = proteinDomain.getValue().get(i);
+
+					} else {
+
+						isProcessed = true;
+						current_ptn_domain_list = current_ptn_domain_list.stream().distinct()
+								.collect(Collectors.toList());
+						if (current_ptn_domain_list.size() == 0)
+							break;
+
+						Collections.sort(current_ptn_domain_list, new Comparator<ProteinDomain>() {
+							@Override
+							public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+								return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+							}
+						});
+
+						ProteinDomain initial_domain = current_ptn_domain_list.get(0);
+						ProteinDomain final_domain = current_ptn_domain_list.get(current_ptn_domain_list.size() - 1);
+						initial_domain.endId = final_domain.endId;
+						initial_domain.eValue = Util
+								.RoundScore(ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
+
+						if (initial_domain.eValue.equals("0E0"))
+							initial_domain.eValue = "predicted";
+						else if (initial_domain.eValue.equals("1.5E2")) {
+							initial_domain.eValue = "";
+							initial_domain.isPredicted = false;
+						}
+						final_domain_list.add(initial_domain);
+						break;
+					}
+				}
+
+				if (!isProcessed) {
+					current_ptn_domain_list = current_ptn_domain_list.stream().distinct().collect(Collectors.toList());
+					if (current_ptn_domain_list.size() == 0)
+						break;
+
+					Collections.sort(current_ptn_domain_list, new Comparator<ProteinDomain>() {
+						@Override
+						public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+							return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+						}
+					});
+
+					ProteinDomain initial_domain = current_ptn_domain_list.get(0);
+					ProteinDomain final_domain = current_ptn_domain_list.get(current_ptn_domain_list.size() - 1);
+					initial_domain.endId = final_domain.endId;
+					initial_domain.eValue = Util
+							.RoundScore(ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
+
+					if (initial_domain.eValue.equals("0E0"))
+						initial_domain.eValue = "predicted";
+					else if (initial_domain.eValue.equals("1.5E2")) {
+						initial_domain.eValue = "";
+						initial_domain.isPredicted = false;
+					}
+					final_domain_list.add(initial_domain);
+
+				} else if (j == proteinDomain.getValue().size()) {
+					try {
+
+						final_domain_list.add((ProteinDomain) ptnDomain.clone());
+					} catch (Exception e) {
+						// TODO: handle exception
+					}
+				}
+
+				i = j - 1;
+
+			}
+		}
+
+		if (final_domain_list.size() > 0) {
+			protein.domains = final_domain_list.stream().distinct().collect(Collectors.toList());
+
+			Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+				@Override
+				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+				}
+			});
+
 		}
 	}
 
