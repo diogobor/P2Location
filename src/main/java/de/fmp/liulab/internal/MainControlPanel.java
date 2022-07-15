@@ -99,7 +99,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JCheckBox enable_score;
 	private static JCheckBox enable_specCount;
 //	private static JCheckBox enable_conflict;
-	private static JCheckBox dioLocalization_conflict;
+	private static JCheckBox deoLocalization_conflict;
 	private static JCheckBox show_monolinks;
 
 	private static JSpinner spinner_font_size_link_legend;
@@ -952,17 +952,17 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		fix_conflict_panel.setLayout(null);
 		protein_domains_prediction_panel.add(fix_conflict_panel);
 		
-		dioLocalization_conflict = new JCheckBox("Diolocalization protein");
-		dioLocalization_conflict.setBackground(Color.WHITE);
-		dioLocalization_conflict.setSelected(Util.dioLocalization_conflict);
-		dioLocalization_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		deoLocalization_conflict = new JCheckBox("Deo localization protein");
+		deoLocalization_conflict.setBackground(Color.WHITE);
+		deoLocalization_conflict.setSelected(Util.dioLocalization_conflict);
+		deoLocalization_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		if (Util.isWindows())
-			dioLocalization_conflict.setBounds(5, offset_y + 5, 155, 20);
+			deoLocalization_conflict.setBounds(5, offset_y + 5, 155, 20);
 		else
-			dioLocalization_conflict.setBounds(5, offset_y + 5, 170, 20);
-		fix_conflict_panel.add(dioLocalization_conflict);
+			deoLocalization_conflict.setBounds(5, offset_y + 5, 170, 20);
+		fix_conflict_panel.add(deoLocalization_conflict);
 		offset_y += 20;
-		dioLocalization_conflict.addItemListener(new ItemListener() {
+		deoLocalization_conflict.addItemListener(new ItemListener() {
 			@Override
 			public void itemStateChanged(ItemEvent e) {
 				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
@@ -1167,8 +1167,8 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			enable_score.setEnabled(enable);
 		if (enable_specCount != null)
 			enable_specCount.setEnabled(enable);
-		if (dioLocalization_conflict != null)
-			dioLocalization_conflict.setEnabled(enable);
+		if (deoLocalization_conflict != null)
+			deoLocalization_conflict.setEnabled(enable);
 		
 //		if (enable_conflict != null)
 //			enable_conflict.setEnabled(enable);
@@ -1228,7 +1228,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		enable_epochs.setSelected(false);
 		enable_score.setSelected(false);
 		enable_specCount.setSelected(false);
-		dioLocalization_conflict.setSelected(false);
+		deoLocalization_conflict.setSelected(false);
 		
 		// Except this checkbox
 //		enable_conflict.setSelected(true);
