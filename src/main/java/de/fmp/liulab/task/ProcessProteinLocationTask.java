@@ -953,6 +953,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							if (Util.considerConflict) {
 								OrganizeResidueCompartment(taskMonitor);
 								all_knownResidues = getAllKnownResidues();
+								computeResiduesScore(taskMonitor);
 								computeNewResidues(taskMonitor, all_knownResidues, true);
 							}
 							Util.updateProteins(taskMonitor, myNetwork, textLabel_status_result, false, false);
@@ -1452,7 +1453,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		List<Residue> all_knownResidues = new ArrayList<Residue>();
 		for (Map.Entry<String, List<Residue>> compartment : compartments.entrySet()) {
 
-			if (compartment.getKey().equals(UNKNOWN_RESIDUE))
+			if (compartment.getKey().equals(UNKNOWN_RESIDUE)
+					|| compartment.getKey().toLowerCase().equals(TRANSMEMBRANE))
 				continue;
 
 			all_knownResidues.addAll(compartment.getValue());
@@ -2813,7 +2815,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& !res.predictedLocation.equals(residue.predictedLocation))
 											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == -1))
+										if (!(isKnownResidues && res.score == Util.initialResidueScore))
 											saveConflict = false;
 
 										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
@@ -2903,7 +2905,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 												isValid = true;
 												crossLink.location = "";
 											}
-										} else if (Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
+										} else if (!isKnownResidues && Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
 											isValid = true;
 										} else {
 											isValid = false;
@@ -2947,7 +2949,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& !res.predictedLocation.equals(residue.predictedLocation))
 											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == -1))
+										if (!(isKnownResidues && res.score == Util.initialResidueScore))
 											saveConflict = false;
 
 										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
@@ -3036,7 +3038,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 												isValid = true;
 												crossLink.location = "";
 											}
-										} else if (Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
+										} else if (!isKnownResidues && Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
 											isValid = true;
 										} else {
 											isValid = false;
@@ -3095,7 +3097,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& !res.predictedLocation.equals(residue.predictedLocation))
 											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == -1))
+										if (!(isKnownResidues && res.score == Util.initialResidueScore))
 											saveConflict = false;
 
 										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
@@ -3185,7 +3187,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 												isValid = true;
 												crossLink.location = "";
 											}
-										} else if (Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
+										} else if (!isKnownResidues && Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
 											isValid = true;
 										} else {
 											isValid = false;
@@ -3229,7 +3231,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& !res.predictedLocation.equals(residue.predictedLocation))
 											|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == -1))
+										if (!(isKnownResidues && res.score == Util.initialResidueScore))
 											saveConflict = false;
 
 										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
@@ -3319,7 +3321,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 												isValid = true;
 												crossLink.location = "";
 											}
-										} else if (Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
+										} else if (!isKnownResidues && Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
 											isValid = true;
 										} else {
 											isValid = false;
