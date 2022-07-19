@@ -99,7 +99,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JCheckBox enable_score;
 	private static JCheckBox enable_specCount;
 //	private static JCheckBox enable_conflict;
-	private static JCheckBox deoLocalization_conflict;
+	private static JCheckBox dualLocalization_conflict;
 	private static JCheckBox show_monolinks;
 
 	private static JSpinner spinner_font_size_link_legend;
@@ -696,43 +696,43 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		int offset_y = 25;
 		transmem_regions_prediction_panel = new JPanel();
 		transmem_regions_prediction_panel.setBackground(Color.WHITE);
-		transmem_regions_prediction_panel.setBorder(BorderFactory.createTitledBorder("Transmembrane regions"));
-		transmem_regions_prediction_panel.setBounds(10, offset_y, WIDTH_PANEL - 20, 85);
+		transmem_regions_prediction_panel.setBorder(BorderFactory.createTitledBorder("Transmembrane domains"));
+		transmem_regions_prediction_panel.setBounds(10, offset_y, WIDTH_PANEL - 20, 55);
 		transmem_regions_prediction_panel.setLayout(null);
 		prediction_panel.add(transmem_regions_prediction_panel);
 
-		offset_y -= 10;
-		JLabel upperScoreLabel = new JLabel("Cutoff Score:");
-		upperScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		upperScoreLabel.setBounds(10, offset_y, 150, 40);
-		transmem_regions_prediction_panel.add(upperScoreLabel);
-
-		offset_y += 8;
-
-		SpinnerModel model_transmemUpperCutoffScore = new SpinnerNumberModel(Util.transmemPredictionRegionsUpperScore, // initial
-				// value
-				0, // min
-				1, // max
-				0.1); // step
-		spinner_transmemUpperCutoffScore = new JSpinner(model_transmemUpperCutoffScore);
-		spinner_transmemUpperCutoffScore.setBounds(offset_x, offset_y, 60, 20);
-		JComponent comp_transmemUpperCutoffScore = spinner_transmemUpperCutoffScore.getEditor();
-		JFormattedTextField field_transmemUpperCutoffScore = (JFormattedTextField) comp_transmemUpperCutoffScore.getComponent(0);
-		DefaultFormatter formatter_transmemUpperCutoffScore = (DefaultFormatter) field_transmemUpperCutoffScore.getFormatter();
-		formatter_transmemUpperCutoffScore.setCommitsOnValidEdit(true);
-		spinner_transmemUpperCutoffScore.addChangeListener(new ChangeListener() {
-
-			@Override
-			public void stateChanged(ChangeEvent e) {
-				Util.transmemPredictionRegionsUpperScore = (Double) spinner_transmemUpperCutoffScore.getValue();
-				P2LocationProps.setProperty("p2location.transmemPredictionRegionsScore",
-						String.valueOf(Util.transmemPredictionRegionsUpperScore));
-
-			}
-		});
-		spinner_transmemUpperCutoffScore.setToolTipText("Set a value between 0 and 1.");
-		transmem_regions_prediction_panel.add(spinner_transmemUpperCutoffScore);
-		offset_y += 30;
+//		offset_y -= 10;
+//		JLabel upperScoreLabel = new JLabel("Cutoff Score:");
+//		upperScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+//		upperScoreLabel.setBounds(10, offset_y, 150, 40);
+//		transmem_regions_prediction_panel.add(upperScoreLabel);
+//
+//		offset_y += 8;
+//
+//		SpinnerModel model_transmemUpperCutoffScore = new SpinnerNumberModel(Util.transmemPredictionRegionsUpperScore, // initial
+//				// value
+//				0, // min
+//				1, // max
+//				0.1); // step
+//		spinner_transmemUpperCutoffScore = new JSpinner(model_transmemUpperCutoffScore);
+//		spinner_transmemUpperCutoffScore.setBounds(offset_x, offset_y, 60, 20);
+//		JComponent comp_transmemUpperCutoffScore = spinner_transmemUpperCutoffScore.getEditor();
+//		JFormattedTextField field_transmemUpperCutoffScore = (JFormattedTextField) comp_transmemUpperCutoffScore.getComponent(0);
+//		DefaultFormatter formatter_transmemUpperCutoffScore = (DefaultFormatter) field_transmemUpperCutoffScore.getFormatter();
+//		formatter_transmemUpperCutoffScore.setCommitsOnValidEdit(true);
+//		spinner_transmemUpperCutoffScore.addChangeListener(new ChangeListener() {
+//
+//			@Override
+//			public void stateChanged(ChangeEvent e) {
+//				Util.transmemPredictionRegionsUpperScore = (Double) spinner_transmemUpperCutoffScore.getValue();
+//				P2LocationProps.setProperty("p2location.transmemPredictionRegionsScore",
+//						String.valueOf(Util.transmemPredictionRegionsUpperScore));
+//
+//			}
+//		});
+//		spinner_transmemUpperCutoffScore.setToolTipText("Set a value between 0 and 1.");
+//		transmem_regions_prediction_panel.add(spinner_transmemUpperCutoffScore);
+//		offset_y += 30;
 		
 //		JLabel lowerScoreLabel = new JLabel("Lower Score:");
 //		lowerScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
@@ -830,9 +830,41 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		protein_domains_prediction_panel = new JPanel();
 		protein_domains_prediction_panel.setBackground(Color.WHITE);
 		protein_domains_prediction_panel.setBorder(BorderFactory.createTitledBorder("Protein domains"));
-		protein_domains_prediction_panel.setBounds(10, offset_y + 90, WIDTH_PANEL - 20, 230);
+		protein_domains_prediction_panel.setBounds(10, offset_y + 60, WIDTH_PANEL - 20, 260);
 		protein_domains_prediction_panel.setLayout(null);
 		prediction_panel.add(protein_domains_prediction_panel);
+		
+		offset_y -= 10;
+		JLabel upperScoreLabel = new JLabel("Transmembrane cutoff score:");
+		upperScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		upperScoreLabel.setBounds(10, offset_y, 180, 40);
+		protein_domains_prediction_panel.add(upperScoreLabel);
+
+		offset_y += 8;
+
+		SpinnerModel model_transmemUpperCutoffScore = new SpinnerNumberModel(Util.transmemPredictionRegionsUpperScore, // initial
+				// value
+				0, // min
+				1, // max
+				0.1); // step
+		spinner_transmemUpperCutoffScore = new JSpinner(model_transmemUpperCutoffScore);
+		spinner_transmemUpperCutoffScore.setBounds(offset_x, offset_y, 60, 20);
+		JComponent comp_transmemUpperCutoffScore = spinner_transmemUpperCutoffScore.getEditor();
+		JFormattedTextField field_transmemUpperCutoffScore = (JFormattedTextField) comp_transmemUpperCutoffScore.getComponent(0);
+		DefaultFormatter formatter_transmemUpperCutoffScore = (DefaultFormatter) field_transmemUpperCutoffScore.getFormatter();
+		formatter_transmemUpperCutoffScore.setCommitsOnValidEdit(true);
+		spinner_transmemUpperCutoffScore.addChangeListener(new ChangeListener() {
+
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				Util.transmemPredictionRegionsUpperScore = (Double) spinner_transmemUpperCutoffScore.getValue();
+				P2LocationProps.setProperty("p2location.transmemPredictionRegionsScore",
+						String.valueOf(Util.transmemPredictionRegionsUpperScore));
+
+			}
+		});
+		spinner_transmemUpperCutoffScore.setToolTipText("Set a value between 0 and 1.");
+		protein_domains_prediction_panel.add(spinner_transmemUpperCutoffScore);
 
 //		enable_conflict = new JCheckBox("Fix conflicts manually");
 //		enable_conflict.setBackground(Color.WHITE);
@@ -862,7 +894,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 //		});
 
 		this.init_fix_conflict(offset_x, button_width + 20, button_height);
-		offset_y += 85;
+		offset_y += 115;
 
 		processButton = new JButton("Run");
 		processButton.setBounds(offset_x + 5, offset_y, button_width, button_height);
@@ -948,29 +980,29 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		fix_conflict_panel = new JPanel();
 		fix_conflict_panel.setBackground(Color.WHITE);
 		fix_conflict_panel.setBorder(BorderFactory.createTitledBorder("Fix conflicts"));
-		fix_conflict_panel.setBounds(10, offset_y + 10, WIDTH_PANEL - 40, 80);
+		fix_conflict_panel.setBounds(10, offset_y + 40, WIDTH_PANEL - 40, 80);
 		fix_conflict_panel.setLayout(null);
 		protein_domains_prediction_panel.add(fix_conflict_panel);
 		
-		deoLocalization_conflict = new JCheckBox("Deo localization protein");
-		deoLocalization_conflict.setBackground(Color.WHITE);
-		deoLocalization_conflict.setSelected(Util.dioLocalization_conflict);
-		deoLocalization_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		dualLocalization_conflict = new JCheckBox("Dual localizing protein");
+		dualLocalization_conflict.setBackground(Color.WHITE);
+		dualLocalization_conflict.setSelected(Util.dualLocalization_conflict);
+		dualLocalization_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		if (Util.isWindows())
-			deoLocalization_conflict.setBounds(5, offset_y + 5, 155, 20);
+			dualLocalization_conflict.setBounds(5, offset_y + 5, 155, 20);
 		else
-			deoLocalization_conflict.setBounds(5, offset_y + 5, 170, 20);
-		fix_conflict_panel.add(deoLocalization_conflict);
+			dualLocalization_conflict.setBounds(5, offset_y + 5, 170, 20);
+		fix_conflict_panel.add(dualLocalization_conflict);
 		offset_y += 20;
-		deoLocalization_conflict.addItemListener(new ItemListener() {
+		dualLocalization_conflict.addItemListener(new ItemListener() {
 			@Override
 			public void itemStateChanged(ItemEvent e) {
 				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
-					Util.dioLocalization_conflict = true;
+					Util.dualLocalization_conflict = true;
 					P2LocationProps.setProperty("p2location.dioLocalization_conflict", "true");
 
 				} else {
-					Util.dioLocalization_conflict = false;
+					Util.dualLocalization_conflict = false;
 					P2LocationProps.setProperty("p2location.dioLocalization_conflict", "false");
 				}
 			}
@@ -1022,7 +1054,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		display_prediction_panel = new JPanel();
 		display_prediction_panel.setBackground(Color.WHITE);
 		display_prediction_panel.setBorder(BorderFactory.createTitledBorder("Display"));
-		display_prediction_panel.setBounds(10, offset_y + 105, WIDTH_PANEL - 40, 85);
+		display_prediction_panel.setBounds(10, offset_y + 135, WIDTH_PANEL - 40, 85);
 		display_prediction_panel.setLayout(null);
 		protein_domains_prediction_panel.add(display_prediction_panel);
 
@@ -1167,8 +1199,8 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			enable_score.setEnabled(enable);
 		if (enable_specCount != null)
 			enable_specCount.setEnabled(enable);
-		if (deoLocalization_conflict != null)
-			deoLocalization_conflict.setEnabled(enable);
+		if (dualLocalization_conflict != null)
+			dualLocalization_conflict.setEnabled(enable);
 		
 //		if (enable_conflict != null)
 //			enable_conflict.setEnabled(enable);
@@ -1228,7 +1260,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		enable_epochs.setSelected(false);
 		enable_score.setSelected(false);
 		enable_specCount.setSelected(false);
-		deoLocalization_conflict.setSelected(false);
+		dualLocalization_conflict.setSelected(false);
 		
 		// Except this checkbox
 //		enable_conflict.setSelected(true);

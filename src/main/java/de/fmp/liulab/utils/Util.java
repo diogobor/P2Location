@@ -158,7 +158,7 @@ public class Util {
 	public static boolean getThreshold_score = false;
 	public static Integer neighborAA = 3;
 	public static Integer transmemNeighborAA = 3;
-	public static boolean dioLocalization_conflict = true;
+	public static boolean dualLocalization_conflict = true;
 	public static double deltaScore = 0.5;
 	public static double transmemPredictionRegionsUpperScore = 0.7;
 	public static double transmemPredictionRegionsLowerScore = 0.015;
