@@ -1234,7 +1234,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						String[] colRange = domainsArray[1].split("-");
 						int startId = Integer.parseInt(colRange[0]);
 						int endId = Integer.parseInt(colRange[1]);
-						proteinDomains.add(new ProteinDomain(domainName, startId, endId, ""));
+
+						if (domainName.toLowerCase().equals(TRANSMEMBRANE))
+							proteinDomains.add(new ProteinDomain(domainName, startId, endId,
+									String.valueOf(Util.initialTransmembraneScore)));
+						else
+							proteinDomains.add(new ProteinDomain(domainName, startId, endId,
+									String.valueOf(Util.initialResidueScore)));
 					}
 				} catch (Exception e) {
 					sbError.append("ERROR: Row: " + (row + 1)
@@ -1473,6 +1479,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
 
+		if (allProteins == null || allProteins.size() == 0)
+			return;
+
 		int old_progress = 0;
 		int summary_processed = 0;
 		int total_ptns = allProteins.size();
@@ -1666,9 +1675,48 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
 
+		if (allProteins == null || allProteins.size() == 0)
+			return;
+
 		for (Protein protein : allProteins) {
 			checkConflictProteinDomains(taskMonitor, protein);
 		}
+	}
+
+	/**
+	 * Method responsible for updating the residue location of a specific protein
+	 * 
+	 * @param protein current proteinF
+	 */
+	private void updateResiduesLocationAndScore(Protein protein) {
+
+		if (protein.domains == null)
+			return;
+
+		for (ProteinDomain domain : protein.domains) {
+
+			if (domain.eValue.isBlank() || domain.eValue.isEmpty() || domain.eValue.equals("predicted")
+					|| domain.name.isBlank() || domain.name.isEmpty())
+				continue;
+
+			// Get all residues of a specific domain
+			List<Residue> residues = protein.reactionSites
+					.stream().filter(value -> value.score != Util.initialResidueScore
+							&& value.position >= domain.startId && value.position <= domain.endId)
+					.collect(Collectors.toList());
+
+			for (Residue residue : residues) {
+
+				if (!domain.name.toLowerCase().equals(TRANSMEMBRANE))
+					residue.score = Double.parseDouble(domain.eValue);
+				else
+					residue.score = -1;
+				residue.location = domain.name;
+				residue.predictedLocation = domain.name;
+				residue.predicted_epoch = epochs;
+			}
+		}
+
 	}
 
 	/**
@@ -1680,35 +1728,18 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
 
+		if (allProteins == null || allProteins.size() == 0)
+			return;
+
+		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Updating residue score: 0%");
+
 		// Progress bar
 		int old_progress = 0;
 		int summary_processed = 0;
 		int total_compartments = allProteins.size();
 		for (Protein protein : allProteins) {
 
-			for (ProteinDomain domain : protein.domains) {
-
-				if (domain.eValue.isBlank() || domain.eValue.isEmpty() || domain.name.isBlank()
-						|| domain.name.isEmpty())
-					continue;
-				// Get all residues of a specific domain
-				List<Residue> residues = protein.reactionSites
-						.stream().filter(value -> value.score != Util.initialResidueScore
-								&& value.position >= domain.startId && value.position <= domain.endId)
-						.collect(Collectors.toList());
-
-				for (Residue residue : residues) {
-					if (domain.eValue.equals("predicted") || domain.eValue.isBlank() || domain.eValue.isEmpty())
-						continue;
-
-					if (!domain.name.toLowerCase().equals(TRANSMEMBRANE))
-						residue.score = Double.parseDouble(domain.eValue);
-					else
-						residue.score = -1;
-					residue.predictedLocation = domain.name;
-					residue.predicted_epoch = epochs;
-				}
-			}
+			updateResiduesLocationAndScore(protein);
 
 			summary_processed++;
 			Util.progressBar(summary_processed, old_progress, total_compartments, "Updating residue score: ",
@@ -1752,6 +1783,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
 
+		if (allProteins == null || allProteins.size() == 0)
+			return;
+
 		// <DomainName, <Score, startAA#endAA>>
 		Map<String, Tuple2> proteinDomainScores = new HashMap<String, Tuple2>();
 
@@ -1782,11 +1816,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						}
 					});
 
-					for (ProteinDomain domain : protein.domains) {
+					transmCount = protein.domains.stream()
+							.filter(value -> value.name.toLowerCase().equals(TRANSMEMBRANE))
+							.collect(Collectors.toList()).size();
 
-						if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
-							transmCount++;
-					}
 				}
 
 				if (protein.domainScores == null)
@@ -1858,7 +1891,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
 								.collect(Collectors.toList()).get(0);
 
-						double transm_score = Double.parseDouble(transmem.eValue);
+						double transm_score = Util.initialTransmembraneScore;
+						if (!(transmem.eValue.isBlank() || transmem.eValue.isEmpty()))
+							transm_score = Double.parseDouble(transmem.eValue);
+
 						if (transm_score < Util.transmemPredictionRegionsUpperScore) {
 
 							// Remove transmembrane domains from protein.domains and all 'predicted' domains
@@ -2113,7 +2149,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			}
 		} catch (Exception e) {
 			// TODO: handle exception
-			System.out.println(summary_processed);
+			System.out.println("ERROR: computeFinalDomainScore -> index:" + summary_processed);
 		}
 	}
 
@@ -2124,6 +2160,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private void predictDomainsBasedOnTransmemInfo() {
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		if (allProteins == null || allProteins.size() == 0)
+			return;
 
 		int count_transmem = 0;
 		List<String> unique_domain = new ArrayList<String>();
@@ -2370,11 +2409,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						}
 					}
 
-					updateResiduesLocation(protein);
+					updateResiduesLocationAndScore(protein);
 				}
 
 			} catch (Exception e) {
-				System.out.println(count_protein);
+				System.out.println("ERROR: predictDomainsBasedOnTransmemInfo -> index:" + count_protein);
 			}
 			count_protein++;
 		}
@@ -2441,29 +2480,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				}
 			}
 		}
-	}
-
-	/**
-	 * Method responsible for updating the residue location of a specific protein
-	 * 
-	 * @param protein current proteinF
-	 */
-	private void updateResiduesLocation(Protein protein) {
-
-		for (ProteinDomain domain : protein.domains) {
-
-			List<Residue> current_residues = protein.reactionSites.stream()
-					.filter(value -> value.position >= domain.startId && value.position <= domain.endId)
-					.collect(Collectors.toList());
-
-			for (Residue residue : current_residues) {
-				if (!residue.isConflicted) {
-					residue.location = domain.name;
-					residue.predictedLocation = domain.name;
-				}
-			}
-		}
-
 	}
 
 	/**
@@ -2555,8 +2571,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			}
 
 			int uk_res = number_unknown_residues.get(epochs);
+
+			// It means there are no unknown residues to be predicted
+			if (uk_res == 0)
+				break;
+
 			// It means there is no possibility to predict more residues location
-			if (uk_res == old_number_uk_residues)
+			if (epochs > 1 && uk_res == old_number_uk_residues)
 				break;
 
 			if (Util.getEpochs && (Util.epochs + 1) <= epochs)
@@ -2618,6 +2639,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private static void OrganizeResidueCompartment(TaskMonitor taskMonitor) {
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		if (allProteins == null || allProteins.size() == 0)
+			return;
+
 		compartments = new HashMap<String, List<Residue>>();
 
 		int old_progress = 0;
@@ -2636,6 +2661,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				continue;
 
 			for (Residue residue : residues) {
+
+				if (residue.isConflicted)
+					continue;
+
 				int pos = residue.position;
 				// Check if the current residue contains CSM
 				long amount = 0;
@@ -2690,6 +2719,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		// Sqrt(Sum[xl_score^2] / # xl)
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		if (allProteins == null || allProteins.size() == 0)
+			return;
 
 		int old_progress = 0;
 		int summary_processed = 0;
@@ -2753,626 +2785,649 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		int qtd_residues = compartments.values().stream().mapToInt(d -> d.size()).sum();
 		int total_compartments = compartments.size() * qtd_residues;
 
-		for (Map.Entry<String, List<Residue>> compartment : compartments.entrySet()) {
+		try {
+			for (Map.Entry<String, List<Residue>> compartment : compartments.entrySet()) {
 
-			if (compartment.getKey().equals(UNKNOWN_RESIDUE)
-					|| compartment.getKey().toLowerCase().equals(TRANSMEMBRANE))
-				continue;
-
-			for (Residue residue : compartment.getValue()) {
-
-				summary_processed++;
-				Util.progressBar(summary_processed, old_progress, total_compartments,
-						"Epoch: " + epochs + "\nPredicting residue location: ", taskMonitor, null);
-
-				Protein protein = residue.protein;
-
-				if (protein.isConflictedDomain)
+				if (compartment.getKey().equals(UNKNOWN_RESIDUE)
+						|| compartment.getKey().toLowerCase().equals(TRANSMEMBRANE)) {
+					summary_processed += compartment.getValue().size();
 					continue;
+				}
 
-				List<Residue> current_uk_residues = new ArrayList<Residue>();
-				int pos = residue.position;
+				for (Residue residue : compartment.getValue()) {
 
-				List<CrossLink> links;
+					summary_processed++;
+					Util.progressBar(summary_processed, old_progress, total_compartments,
+							"Epoch: " + epochs + "\nPredicting residue location: ", taskMonitor, null);
 
-				// Check if the current residue contains CSM
+					if (residue.isConflicted)
+						continue;
 
-				if (protein.intraLinks != null && protein.intraLinks.size() > 0) {
+					Protein protein = residue.protein;
 
-					links = (List<CrossLink>) protein.intraLinks.stream()
-							.filter(value -> value.pos_site_a == pos || value.pos_site_b == pos)
-							.collect(Collectors.toList());
+					if (protein.isConflictedDomain)
+						continue;
 
-					for (CrossLink crossLink : links) {
+					List<Residue> current_uk_residues = new ArrayList<Residue>();
+					int pos = residue.position;
 
-						// It means that the current residue is A
-						if (crossLink.pos_site_a == pos) {
-							Optional<Residue> isResiduePresent = residue_collection.stream()
-									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
-											&& value.position == crossLink.pos_site_b && !value.isConflicted
-											&& value.predicted_epoch == -1)
-									.findFirst();
-							if (isResiduePresent.isPresent()) {
+					List<CrossLink> links;
 
-								// current residue
-								Residue res = isResiduePresent.get();
-								// Res.score contains the score that takes into account the crosslink.score
+					// Check if the current residue contains CSM
 
-								double score = 0;
+					if (protein.intraLinks != null && protein.intraLinks.size() > 0) {
 
-								if (-Math.log10(res.score) < 0)
-									// if it's negative, it means that -Log10 has already been applied in previous
-									// epochs
-									score = Math.sqrt(res.score * residue.score / epochs);
-								else
-									// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
-									score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
+						links = (List<CrossLink>) protein.intraLinks.stream()
+								.filter(value -> value.pos_site_a == pos || value.pos_site_b == pos)
+								.collect(Collectors.toList());
 
-								boolean saveConflict = true;
-								if (score >= res.score) {
+						for (CrossLink crossLink : links) {
 
-									if (Util.considerConflict && ((!isKnownResidues
-											&& !res.predictedLocation.equals(residue.predictedLocation))
-											|| (isKnownResidues && !res.location.equals(residue.location)))) {
+							// It means that the current residue is A
+							if (crossLink.pos_site_a == pos) {
+								Optional<Residue> isResiduePresent = residue_collection.stream()
+										.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
+												&& value.position == crossLink.pos_site_b && !value.isConflicted
+												&& value.predicted_epoch == -1)
+										.findFirst();
+								if (isResiduePresent.isPresent()) {
 
-										if (!(isKnownResidues && res.score == Util.initialResidueScore))
+									// current residue
+									Residue res = isResiduePresent.get();
+									// Res.score contains the score that takes into account the crosslink.score
+
+									double score = 0;
+
+									if (-Math.log10(res.score) < 0)
+										// if it's negative, it means that -Log10 has already been applied in previous
+										// epochs
+										score = Math.sqrt(res.score * residue.score / epochs);
+									else
+										// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
+										score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
+
+									boolean saveConflict = true;
+									if (score >= res.score) {
+
+										if (Util.considerConflict && ((!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation))
+												|| (isKnownResidues && !res.location.equals(residue.location)))) {
+
+											if (!(isKnownResidues && res.score == Util.initialResidueScore))
+												saveConflict = false;
+
+											if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
+												Protein current_ptn_rs = res.protein;
+												List<Residue> neighbors = current_ptn_rs.reactionSites.stream()
+														.filter(value -> value.position >= (res.position
+																- Util.transmemNeighborAA)
+																&& value.position <= (res.position
+																		+ Util.transmemNeighborAA))
+														.collect(Collectors.toList());
+
+												if (neighbors.size() > 0) {
+													for (Residue neighbor : neighbors) {
+														if (!neighbor.predictedLocation.toLowerCase()
+																.contains(TRANSMEMBRANE)) {
+															res.score = score;
+															current_uk_residues.add(res);
+															crossLink.location = res.location;
+															saveConflict = false;
+															break;
+														}
+													}
+												}
+											} else if (!isKnownResidues
+													&& !res.predictedLocation.equals(residue.predictedLocation)) {
+												// It will save the new prediction if the current process is not 'known
+												// residues'
+												res.score = score;
+												current_uk_residues.add(res);
+												crossLink.location = res.location;
+											}
+										} else {
 											saveConflict = false;
 
-										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
-											Protein current_ptn_rs = res.protein;
-											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
-													value -> value.position >= (res.position - Util.transmemNeighborAA)
-															&& value.position <= (res.position
-																	+ Util.transmemNeighborAA))
-													.collect(Collectors.toList());
+											if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
+												Protein current_ptn_rs = residue.protein;
+												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
+														.filter(value -> value.startId <= (res.position
+																+ Util.transmemNeighborAA)
+																&& value.startId >= (res.position
+																		- Util.transmemNeighborAA))
+														.collect(Collectors.toList());
 
-											if (neighbors.size() > 0) {
-												for (Residue neighbor : neighbors) {
-													if (!neighbor.predictedLocation.toLowerCase()
-															.contains(TRANSMEMBRANE)) {
-														res.score = score;
-														current_uk_residues.add(res);
-														crossLink.location = res.location;
-														saveConflict = false;
-														break;
-													}
-												}
-											}
-										} else if (!isKnownResidues
-												&& !res.predictedLocation.equals(residue.predictedLocation)) {
-											// It will save the new prediction if the current process is not 'known
-											// residues'
-											res.score = score;
-											current_uk_residues.add(res);
-											crossLink.location = res.location;
-										}
-									} else {
-										saveConflict = false;
+												if (neighbors.size() > 0) {
+													for (ProteinDomain neighbor : neighbors) {
+														if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
+															res.score = score;
+															crossLink.location = res.location;
+															saveConflict = false;
 
-										if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
-											Protein current_ptn_rs = residue.protein;
-											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
-													value -> value.startId <= (res.position + Util.transmemNeighborAA)
-															&& value.startId >= (res.position
-																	- Util.transmemNeighborAA))
-													.collect(Collectors.toList());
+															if (res.predicted_epoch != epochs) {
+																Residue current_res = new Residue(residue.aminoacid,
+																		residue.location, residue.position,
+																		residue.protein);
+																current_res.history_residues = residue.history_residues;
+																current_res.predicted_epoch = residue.predicted_epoch;
+																current_res.predictedLocation = residue.predictedLocation;
+																current_res.previous_residue = residue.previous_residue;
+																current_res.score = residue.score;
+																current_res.isConflicted = residue.isConflicted;
+																current_res.conflicted_residue = residue.conflicted_residue;
+																res.addHistoryResidue(current_res);
+															}
 
-											if (neighbors.size() > 0) {
-												for (ProteinDomain neighbor : neighbors) {
-													if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
-														res.score = score;
-														crossLink.location = res.location;
-														saveConflict = false;
+															res.predictedLocation = neighbor.name;
+															res.predicted_epoch = epochs;
+															res.previous_residue = residue;
 
-														if (res.predicted_epoch != epochs) {
-															Residue current_res = new Residue(residue.aminoacid,
-																	residue.location, residue.position,
-																	residue.protein);
-															current_res.history_residues = residue.history_residues;
-															current_res.predicted_epoch = residue.predicted_epoch;
-															current_res.predictedLocation = residue.predictedLocation;
-															current_res.previous_residue = residue.previous_residue;
-															current_res.score = residue.score;
-															current_res.isConflicted = residue.isConflicted;
-															current_res.conflicted_residue = residue.conflicted_residue;
-															res.addHistoryResidue(current_res);
+															break;
 														}
-
-														res.predictedLocation = neighbor.name;
-														res.predicted_epoch = epochs;
-														res.previous_residue = residue;
-
-														break;
 													}
 												}
+											} else if (!isKnownResidues
+													&& !res.predictedLocation.equals(residue.predictedLocation)) {
+												// It will save the new prediction if the current process is not 'known
+												// residues'
+												res.score = score;
+												current_uk_residues.add(res);
+												crossLink.location = res.location;
 											}
-										} else if (!isKnownResidues
-												&& !res.predictedLocation.equals(residue.predictedLocation)) {
-											// It will save the new prediction if the current process is not 'known
-											// residues'
-											res.score = score;
-											current_uk_residues.add(res);
-											crossLink.location = res.location;
 										}
-									}
 
-									if (saveConflict && Util.fixDomainManually) {
+										if (saveConflict && Util.fixDomainManually) {
 
-										boolean isValid = false;
+											boolean isValid = false;
 
-										if (Util.getThreshold_score) {
-											if (Util.threshold_score >= -Math.log10(res.score)) {
+											if (Util.getThreshold_score) {
+												if (Util.threshold_score >= -Math.log10(res.score)) {
+													isValid = true;
+													crossLink.location = "";
+												}
+											} else if (!isKnownResidues
+													&& Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
 												isValid = true;
-												crossLink.location = "";
+											} else {
+												isValid = false;
 											}
-										} else if (!isKnownResidues && Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
-											isValid = true;
-										} else {
-											isValid = false;
-										}
 
-										if (!isValid) {
-											res.isConflicted = true;
-											res.conflicted_residue = residue;
-											res.predictedLocation = "UK";
-											res.conflicted_score = score;
+											if (!isValid) {
+												res.isConflicted = true;
+												res.conflicted_residue = residue;
+												res.predictedLocation = "UK";
+												res.conflicted_score = score;
+											}
 										}
 									}
 								}
-							}
-						} else {// It means the current residue is B
+							} else {// It means the current residue is B
 
-							Optional<Residue> isResiduePresent = residue_collection.stream()
-									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
-											&& value.position == crossLink.pos_site_a && !value.isConflicted
-											&& value.predicted_epoch == -1)
-									.findFirst();
-							if (isResiduePresent.isPresent()) {
-								// current residue
-								Residue res = isResiduePresent.get();
-								// Res.score contains the score that takes into account the crosslink.score
+								Optional<Residue> isResiduePresent = residue_collection.stream()
+										.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
+												&& value.position == crossLink.pos_site_a && !value.isConflicted
+												&& value.predicted_epoch == -1)
+										.findFirst();
+								if (isResiduePresent.isPresent()) {
+									// current residue
+									Residue res = isResiduePresent.get();
+									// Res.score contains the score that takes into account the crosslink.score
 
-								double score = 0;
+									double score = 0;
 
-								if (-Math.log10(res.score) < 0)
-									// if it's negative, it means that -Log10 has already been applied in previous
-									// epochs
-									score = Math.sqrt(res.score * residue.score / epochs);
-								else
-									// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
-									score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
+									if (-Math.log10(res.score) < 0)
+										// if it's negative, it means that -Log10 has already been applied in previous
+										// epochs
+										score = Math.sqrt(res.score * residue.score / epochs);
+									else
+										// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
+										score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
 
-								boolean saveConflict = true;
-								if (score >= res.score) {
+									boolean saveConflict = true;
+									if (score >= res.score) {
 
-									if (Util.considerConflict && ((!isKnownResidues
-											&& !res.predictedLocation.equals(residue.predictedLocation))
-											|| (isKnownResidues && !res.location.equals(residue.location)))) {
+										if (Util.considerConflict && ((!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation))
+												|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == Util.initialResidueScore))
+											if (!(isKnownResidues && res.score == Util.initialResidueScore))
+												saveConflict = false;
+
+											if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
+												Protein current_ptn_rs = res.protein;
+												List<Residue> neighbors = current_ptn_rs.reactionSites.stream()
+														.filter(value -> value.position >= (res.position
+																- Util.transmemNeighborAA)
+																&& value.position <= (res.position
+																		+ Util.transmemNeighborAA))
+														.collect(Collectors.toList());
+
+												if (neighbors.size() > 0) {
+													for (Residue neighbor : neighbors) {
+														if (!neighbor.predictedLocation.toLowerCase()
+																.contains(TRANSMEMBRANE)) {
+															res.score = score;
+															current_uk_residues.add(res);
+															crossLink.location = res.location;
+															saveConflict = false;
+															break;
+														}
+													}
+												}
+											} else if (!isKnownResidues
+													&& !res.predictedLocation.equals(residue.predictedLocation)) {
+												// It will save the new prediction if the current process is not 'known
+												// residues'
+												res.score = score;
+												current_uk_residues.add(res);
+												crossLink.location = res.location;
+											}
+										} else {
 											saveConflict = false;
 
-										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
-											Protein current_ptn_rs = res.protein;
-											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
-													value -> value.position >= (res.position - Util.transmemNeighborAA)
-															&& value.position <= (res.position
-																	+ Util.transmemNeighborAA))
-													.collect(Collectors.toList());
+											if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
+												Protein current_ptn_rs = residue.protein;
+												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
+														.filter(value -> value.startId >= (res.position
+																- Util.transmemNeighborAA)
+																|| value.endId <= (res.position
+																		+ Util.transmemNeighborAA))
+														.collect(Collectors.toList());
 
-											if (neighbors.size() > 0) {
-												for (Residue neighbor : neighbors) {
-													if (!neighbor.predictedLocation.toLowerCase()
-															.contains(TRANSMEMBRANE)) {
-														res.score = score;
-														current_uk_residues.add(res);
-														crossLink.location = res.location;
-														saveConflict = false;
-														break;
-													}
-												}
-											}
-										} else if (!isKnownResidues
-												&& !res.predictedLocation.equals(residue.predictedLocation)) {
-											// It will save the new prediction if the current process is not 'known
-											// residues'
-											res.score = score;
-											current_uk_residues.add(res);
-											crossLink.location = res.location;
-										}
-									} else {
-										saveConflict = false;
+												if (neighbors.size() > 0) {
+													for (ProteinDomain neighbor : neighbors) {
+														if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
+															res.score = score;
+															crossLink.location = res.location;
+															saveConflict = false;
 
-										if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
-											Protein current_ptn_rs = residue.protein;
-											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
-													value -> value.startId >= (res.position - Util.transmemNeighborAA)
-															|| value.endId <= (res.position + Util.transmemNeighborAA))
-													.collect(Collectors.toList());
+															if (res.predicted_epoch != epochs) {
+																Residue current_res = new Residue(residue.aminoacid,
+																		residue.location, residue.position,
+																		residue.protein);
+																current_res.history_residues = residue.history_residues;
+																current_res.predicted_epoch = residue.predicted_epoch;
+																current_res.predictedLocation = residue.predictedLocation;
+																current_res.previous_residue = residue.previous_residue;
+																current_res.score = residue.score;
+																current_res.isConflicted = residue.isConflicted;
+																current_res.conflicted_residue = residue.conflicted_residue;
+																res.addHistoryResidue(current_res);
+															}
 
-											if (neighbors.size() > 0) {
-												for (ProteinDomain neighbor : neighbors) {
-													if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
-														res.score = score;
-														crossLink.location = res.location;
-														saveConflict = false;
+															res.predictedLocation = neighbor.name;
+															res.predicted_epoch = epochs;
+															res.previous_residue = residue;
 
-														if (res.predicted_epoch != epochs) {
-															Residue current_res = new Residue(residue.aminoacid,
-																	residue.location, residue.position,
-																	residue.protein);
-															current_res.history_residues = residue.history_residues;
-															current_res.predicted_epoch = residue.predicted_epoch;
-															current_res.predictedLocation = residue.predictedLocation;
-															current_res.previous_residue = residue.previous_residue;
-															current_res.score = residue.score;
-															current_res.isConflicted = residue.isConflicted;
-															current_res.conflicted_residue = residue.conflicted_residue;
-															res.addHistoryResidue(current_res);
+															break;
 														}
-
-														res.predictedLocation = neighbor.name;
-														res.predicted_epoch = epochs;
-														res.previous_residue = residue;
-
-														break;
 													}
 												}
+											} else if (!isKnownResidues
+													&& !res.predictedLocation.equals(residue.predictedLocation)) {
+												// It will save the new prediction if the current process is not 'known
+												// residues'
+												res.score = score;
+												current_uk_residues.add(res);
+												crossLink.location = res.location;
 											}
-										} else if (!isKnownResidues
-												&& !res.predictedLocation.equals(residue.predictedLocation)) {
-											// It will save the new prediction if the current process is not 'known
-											// residues'
-											res.score = score;
-											current_uk_residues.add(res);
-											crossLink.location = res.location;
 										}
-									}
 
-									if (saveConflict && Util.fixDomainManually) {
+										if (saveConflict && Util.fixDomainManually) {
 
-										boolean isValid = false;
+											boolean isValid = false;
 
-										if (Util.getThreshold_score) {
-											if (Util.threshold_score >= -Math.log10(res.score)) {
+											if (Util.getThreshold_score) {
+												if (Util.threshold_score >= -Math.log10(res.score)) {
+													isValid = true;
+													crossLink.location = "";
+												}
+											} else if (!isKnownResidues
+													&& Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
 												isValid = true;
-												crossLink.location = "";
+											} else {
+												isValid = false;
 											}
-										} else if (!isKnownResidues && Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
-											isValid = true;
-										} else {
-											isValid = false;
-										}
 
-										if (!isValid) {
-											res.isConflicted = true;
-											res.conflicted_residue = residue;
-											res.predictedLocation = "UK";
-											res.conflicted_score = score;
+											if (!isValid) {
+												res.isConflicted = true;
+												res.conflicted_residue = residue;
+												res.predictedLocation = "UK";
+												res.conflicted_score = score;
+											}
 										}
 									}
 								}
 							}
 						}
 					}
-				}
 
-				if (protein.interLinks != null && protein.interLinks.size() > 0) {
+					if (protein.interLinks != null && protein.interLinks.size() > 0) {
 
-					links = (List<CrossLink>) protein.interLinks.stream()
-							.filter(value -> (value.protein_a.equals(protein.proteinID) && value.pos_site_a == pos)
-									|| (value.protein_b.equals(protein.proteinID) && value.pos_site_b == pos))
-							.collect(Collectors.toList());
+						links = (List<CrossLink>) protein.interLinks.stream()
+								.filter(value -> (value.protein_a.equals(protein.proteinID) && value.pos_site_a == pos)
+										|| (value.protein_b.equals(protein.proteinID) && value.pos_site_b == pos))
+								.collect(Collectors.toList());
 
-					for (CrossLink crossLink : links) {
+						for (CrossLink crossLink : links) {
 
-						// It means the current residue is A
-						if (crossLink.protein_a.equals(protein.proteinID) && crossLink.pos_site_a == pos) {
+							// It means the current residue is A
+							if (crossLink.protein_a.equals(protein.proteinID) && crossLink.pos_site_a == pos) {
 
-							Optional<Residue> isResiduePresent = residue_collection.stream()
-									.filter(value -> value.protein.proteinID.equals(crossLink.protein_b)
-											&& value.position == crossLink.pos_site_b && !value.isConflicted
-											&& value.predicted_epoch == -1)
-									.findFirst();
+								Optional<Residue> isResiduePresent = residue_collection.stream()
+										.filter(value -> value.protein.proteinID.equals(crossLink.protein_b)
+												&& value.position == crossLink.pos_site_b && !value.isConflicted
+												&& value.predicted_epoch == -1)
+										.findFirst();
 
-							if (isResiduePresent.isPresent()) {
-								// current residue
-								Residue res = isResiduePresent.get();
-								// Res.score contains the score that takes into account the crosslink.score
+								if (isResiduePresent.isPresent()) {
+									// current residue
+									Residue res = isResiduePresent.get();
+									// Res.score contains the score that takes into account the crosslink.score
 
-								double score = 0;
+									double score = 0;
 
-								if (-Math.log10(res.score) < 0)
-									// if it's negative, it means that -Log10 has already been applied in previous
-									// epochs
-									score = Math.sqrt(res.score * residue.score / epochs);
-								else
-									// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
-									score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
+									if (-Math.log10(res.score) < 0)
+										// if it's negative, it means that -Log10 has already been applied in previous
+										// epochs
+										score = Math.sqrt(res.score * residue.score / epochs);
+									else
+										// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
+										score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
 
-								boolean saveConflict = true;
-								if (score >= res.score) {
+									boolean saveConflict = true;
+									if (score >= res.score) {
 
-									if (Util.considerConflict && ((!isKnownResidues
-											&& !res.predictedLocation.equals(residue.predictedLocation))
-											|| (isKnownResidues && !res.location.equals(residue.location)))) {
+										if (Util.considerConflict && ((!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation))
+												|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == Util.initialResidueScore))
+											if (!(isKnownResidues && res.score == Util.initialResidueScore))
+												saveConflict = false;
+
+											if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
+												Protein current_ptn_rs = res.protein;
+												List<Residue> neighbors = current_ptn_rs.reactionSites.stream()
+														.filter(value -> value.position >= (res.position
+																- Util.transmemNeighborAA)
+																&& value.position <= (res.position
+																		+ Util.transmemNeighborAA))
+														.collect(Collectors.toList());
+
+												if (neighbors.size() > 0) {
+													for (Residue neighbor : neighbors) {
+														if (!neighbor.predictedLocation.toLowerCase()
+																.contains(TRANSMEMBRANE)) {
+															res.score = score;
+															current_uk_residues.add(res);
+															crossLink.location = res.location;
+															saveConflict = false;
+															break;
+														}
+													}
+												}
+											} else if (!isKnownResidues
+													&& !res.predictedLocation.equals(residue.predictedLocation)) {
+												// It will save the new prediction if the current process is not 'known
+												// residues'
+												res.score = score;
+												current_uk_residues.add(res);
+												crossLink.location = res.location;
+											}
+										} else {
 											saveConflict = false;
 
-										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
-											Protein current_ptn_rs = res.protein;
-											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
-													value -> value.position >= (res.position - Util.transmemNeighborAA)
-															&& value.position <= (res.position
-																	+ Util.transmemNeighborAA))
-													.collect(Collectors.toList());
+											if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
+												Protein current_ptn_rs = residue.protein;
+												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
+														.filter(value -> value.startId <= (res.position
+																+ Util.transmemNeighborAA)
+																&& value.startId >= (res.position
+																		- Util.transmemNeighborAA))
+														.collect(Collectors.toList());
 
-											if (neighbors.size() > 0) {
-												for (Residue neighbor : neighbors) {
-													if (!neighbor.predictedLocation.toLowerCase()
-															.contains(TRANSMEMBRANE)) {
-														res.score = score;
-														current_uk_residues.add(res);
-														crossLink.location = res.location;
-														saveConflict = false;
-														break;
-													}
-												}
-											}
-										} else if (!isKnownResidues
-												&& !res.predictedLocation.equals(residue.predictedLocation)) {
-											// It will save the new prediction if the current process is not 'known
-											// residues'
-											res.score = score;
-											current_uk_residues.add(res);
-											crossLink.location = res.location;
-										}
-									} else {
-										saveConflict = false;
+												if (neighbors.size() > 0) {
+													for (ProteinDomain neighbor : neighbors) {
+														if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
+															res.score = score;
+															crossLink.location = res.location;
+															saveConflict = false;
 
-										if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
-											Protein current_ptn_rs = residue.protein;
-											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
-													value -> value.startId <= (res.position + Util.transmemNeighborAA)
-															&& value.startId >= (res.position
-																	- Util.transmemNeighborAA))
-													.collect(Collectors.toList());
+															if (res.predicted_epoch != epochs) {
+																Residue current_res = new Residue(residue.aminoacid,
+																		residue.location, residue.position,
+																		residue.protein);
+																current_res.history_residues = residue.history_residues;
+																current_res.predicted_epoch = residue.predicted_epoch;
+																current_res.predictedLocation = residue.predictedLocation;
+																current_res.previous_residue = residue.previous_residue;
+																current_res.score = residue.score;
+																current_res.isConflicted = residue.isConflicted;
+																current_res.conflicted_residue = residue.conflicted_residue;
+																res.addHistoryResidue(current_res);
+															}
 
-											if (neighbors.size() > 0) {
-												for (ProteinDomain neighbor : neighbors) {
-													if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
-														res.score = score;
-														crossLink.location = res.location;
-														saveConflict = false;
+															res.predictedLocation = neighbor.name;
+															res.predicted_epoch = epochs;
+															res.previous_residue = residue;
 
-														if (res.predicted_epoch != epochs) {
-															Residue current_res = new Residue(residue.aminoacid,
-																	residue.location, residue.position,
-																	residue.protein);
-															current_res.history_residues = residue.history_residues;
-															current_res.predicted_epoch = residue.predicted_epoch;
-															current_res.predictedLocation = residue.predictedLocation;
-															current_res.previous_residue = residue.previous_residue;
-															current_res.score = residue.score;
-															current_res.isConflicted = residue.isConflicted;
-															current_res.conflicted_residue = residue.conflicted_residue;
-															res.addHistoryResidue(current_res);
+															break;
 														}
-
-														res.predictedLocation = neighbor.name;
-														res.predicted_epoch = epochs;
-														res.previous_residue = residue;
-
-														break;
 													}
 												}
+											} else if (!isKnownResidues
+													&& !res.predictedLocation.equals(residue.predictedLocation)) {
+												// It will save the new prediction if the current process is not 'known
+												// residues'
+												res.score = score;
+												current_uk_residues.add(res);
+												crossLink.location = res.location;
 											}
-										} else if (!isKnownResidues
-												&& !res.predictedLocation.equals(residue.predictedLocation)) {
-											// It will save the new prediction if the current process is not 'known
-											// residues'
-											res.score = score;
-											current_uk_residues.add(res);
-											crossLink.location = res.location;
 										}
-									}
 
-									if (saveConflict && Util.fixDomainManually) {
+										if (saveConflict && Util.fixDomainManually) {
 
-										boolean isValid = false;
+											boolean isValid = false;
 
-										if (Util.getThreshold_score) {
-											if (Util.threshold_score >= -Math.log10(res.score)) {
+											if (Util.getThreshold_score) {
+												if (Util.threshold_score >= -Math.log10(res.score)) {
+													isValid = true;
+													crossLink.location = "";
+												}
+											} else if (!isKnownResidues
+													&& Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
 												isValid = true;
-												crossLink.location = "";
+											} else {
+												isValid = false;
 											}
-										} else if (!isKnownResidues && Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
-											isValid = true;
-										} else {
-											isValid = false;
-										}
 
-										if (!isValid) {
-											res.isConflicted = true;
-											res.conflicted_residue = residue;
-											res.predictedLocation = "UK";
-											res.conflicted_score = score;
+											if (!isValid) {
+												res.isConflicted = true;
+												res.conflicted_residue = residue;
+												res.predictedLocation = "UK";
+												res.conflicted_score = score;
+											}
 										}
 									}
 								}
-							}
-						} else {// It means the current residue is B
+							} else {// It means the current residue is B
 
-							Optional<Residue> isResiduePresent = residue_collection.stream()
-									.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
-											&& value.position == crossLink.pos_site_a && !value.isConflicted
-											&& value.predicted_epoch == -1)
-									.findFirst();
-							if (isResiduePresent.isPresent()) {
-								// current residue
-								Residue res = isResiduePresent.get();
-								// Res.score contains the score that takes into account the crosslink.score
+								Optional<Residue> isResiduePresent = residue_collection.stream()
+										.filter(value -> value.protein.proteinID.equals(crossLink.protein_a)
+												&& value.position == crossLink.pos_site_a && !value.isConflicted
+												&& value.predicted_epoch == -1)
+										.findFirst();
+								if (isResiduePresent.isPresent()) {
+									// current residue
+									Residue res = isResiduePresent.get();
+									// Res.score contains the score that takes into account the crosslink.score
 
-								double score = 0;
+									double score = 0;
 
-								if (-Math.log10(res.score) < 0)
-									// if it's negative, it means that -Log10 has already been applied in previous
-									// epochs
-									score = Math.sqrt(res.score * residue.score / epochs);
-								else
-									// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
-									score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
+									if (-Math.log10(res.score) < 0)
+										// if it's negative, it means that -Log10 has already been applied in previous
+										// epochs
+										score = Math.sqrt(res.score * residue.score / epochs);
+									else
+										// e.g. sqrt(((-log10 res_score) * previous_residue_score) / epochs)
+										score = Math.sqrt(-Math.log10(res.score) * residue.score / epochs);
 
-								boolean saveConflict = true;
-								if (score >= res.score) {
+									boolean saveConflict = true;
+									if (score >= res.score) {
 
-									if (Util.considerConflict && ((!isKnownResidues
-											&& !res.predictedLocation.equals(residue.predictedLocation))
-											|| (isKnownResidues && !res.location.equals(residue.location)))) {
+										if (Util.considerConflict && ((!isKnownResidues
+												&& !res.predictedLocation.equals(residue.predictedLocation))
+												|| (isKnownResidues && !res.location.equals(residue.location)))) {
 
-										if (!(isKnownResidues && res.score == Util.initialResidueScore))
+											if (!(isKnownResidues && res.score == Util.initialResidueScore))
+												saveConflict = false;
+
+											if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
+												Protein current_ptn_rs = res.protein;
+												List<Residue> neighbors = current_ptn_rs.reactionSites.stream()
+														.filter(value -> value.position >= (res.position
+																- Util.transmemNeighborAA)
+																&& value.position <= (res.position
+																		+ Util.transmemNeighborAA))
+														.collect(Collectors.toList());
+
+												if (neighbors.size() > 0) {
+													for (Residue neighbor : neighbors) {
+														if (!neighbor.predictedLocation.toLowerCase()
+																.contains(TRANSMEMBRANE)) {
+															res.score = score;
+															current_uk_residues.add(res);
+															crossLink.location = res.location;
+															saveConflict = false;
+															break;
+														}
+													}
+												}
+											} else if (!isKnownResidues
+													&& !res.predictedLocation.equals(residue.predictedLocation)) {
+												// It will save the new prediction if the current process is not 'known
+												// residues'
+												res.score = score;
+												current_uk_residues.add(res);
+												crossLink.location = res.location;
+											}
+										} else {
 											saveConflict = false;
 
-										if (res.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
-											Protein current_ptn_rs = res.protein;
-											List<Residue> neighbors = current_ptn_rs.reactionSites.stream().filter(
-													value -> value.position >= (res.position - Util.transmemNeighborAA)
-															&& value.position <= (res.position
-																	+ Util.transmemNeighborAA))
-													.collect(Collectors.toList());
+											if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
+												Protein current_ptn_rs = residue.protein;
+												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
+														.filter(value -> value.startId <= (res.position
+																+ Util.transmemNeighborAA)
+																&& value.startId >= (res.position
+																		- Util.transmemNeighborAA))
+														.collect(Collectors.toList());
 
-											if (neighbors.size() > 0) {
-												for (Residue neighbor : neighbors) {
-													if (!neighbor.predictedLocation.toLowerCase()
-															.contains(TRANSMEMBRANE)) {
-														res.score = score;
-														current_uk_residues.add(res);
-														crossLink.location = res.location;
-														saveConflict = false;
-														break;
-													}
-												}
-											}
-										} else if (!isKnownResidues
-												&& !res.predictedLocation.equals(residue.predictedLocation)) {
-											// It will save the new prediction if the current process is not 'known
-											// residues'
-											res.score = score;
-											current_uk_residues.add(res);
-											crossLink.location = res.location;
-										}
-									} else {
-										saveConflict = false;
+												if (neighbors.size() > 0) {
+													for (ProteinDomain neighbor : neighbors) {
+														if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
+															res.score = score;
+															crossLink.location = res.location;
+															saveConflict = false;
 
-										if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
-											Protein current_ptn_rs = residue.protein;
-											List<ProteinDomain> neighbors = current_ptn_rs.domains.stream().filter(
-													value -> value.startId <= (res.position + Util.transmemNeighborAA)
-															&& value.startId >= (res.position
-																	- Util.transmemNeighborAA))
-													.collect(Collectors.toList());
+															if (res.predicted_epoch != epochs) {
+																Residue current_res = new Residue(residue.aminoacid,
+																		residue.location, residue.position,
+																		residue.protein);
+																current_res.history_residues = residue.history_residues;
+																current_res.predicted_epoch = residue.predicted_epoch;
+																current_res.predictedLocation = residue.predictedLocation;
+																current_res.previous_residue = residue.previous_residue;
+																current_res.score = residue.score;
+																current_res.isConflicted = residue.isConflicted;
+																current_res.conflicted_residue = residue.conflicted_residue;
+																res.addHistoryResidue(current_res);
+															}
 
-											if (neighbors.size() > 0) {
-												for (ProteinDomain neighbor : neighbors) {
-													if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
-														res.score = score;
-														crossLink.location = res.location;
-														saveConflict = false;
+															res.predictedLocation = neighbor.name;
+															res.predicted_epoch = epochs;
+															res.previous_residue = residue;
 
-														if (res.predicted_epoch != epochs) {
-															Residue current_res = new Residue(residue.aminoacid,
-																	residue.location, residue.position,
-																	residue.protein);
-															current_res.history_residues = residue.history_residues;
-															current_res.predicted_epoch = residue.predicted_epoch;
-															current_res.predictedLocation = residue.predictedLocation;
-															current_res.previous_residue = residue.previous_residue;
-															current_res.score = residue.score;
-															current_res.isConflicted = residue.isConflicted;
-															current_res.conflicted_residue = residue.conflicted_residue;
-															res.addHistoryResidue(current_res);
+															break;
 														}
-
-														res.predictedLocation = neighbor.name;
-														res.predicted_epoch = epochs;
-														res.previous_residue = residue;
-
-														break;
 													}
 												}
+											} else if (!isKnownResidues
+													&& !res.predictedLocation.equals(residue.predictedLocation)) {
+												// It will save the new prediction if the current process is not 'known
+												// residues'
+												res.score = score;
+												current_uk_residues.add(res);
+												crossLink.location = res.location;
 											}
-										} else if (!isKnownResidues
-												&& !res.predictedLocation.equals(residue.predictedLocation)) {
-											// It will save the new prediction if the current process is not 'known
-											// residues'
-											res.score = score;
-											current_uk_residues.add(res);
-											crossLink.location = res.location;
 										}
-									}
 
-									if (saveConflict && Util.fixDomainManually) {
+										if (saveConflict && Util.fixDomainManually) {
 
-										boolean isValid = false;
+											boolean isValid = false;
 
-										if (Util.getThreshold_score) {
-											if (Util.threshold_score >= -Math.log10(res.score)) {
+											if (Util.getThreshold_score) {
+												if (Util.threshold_score >= -Math.log10(res.score)) {
+													isValid = true;
+													crossLink.location = "";
+												}
+											} else if (!isKnownResidues
+													&& Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
 												isValid = true;
-												crossLink.location = "";
+											} else {
+												isValid = false;
 											}
-										} else if (!isKnownResidues && Math.abs(-Math.log10(res.score) - score) > Util.deltaScore) {
-											isValid = true;
-										} else {
-											isValid = false;
-										}
 
-										if (!isValid) {
-											res.isConflicted = true;
-											res.conflicted_residue = residue;
-											res.predictedLocation = "UK";
-											res.conflicted_score = score;
+											if (!isValid) {
+												res.isConflicted = true;
+												res.conflicted_residue = residue;
+												res.predictedLocation = "UK";
+												res.conflicted_score = score;
+											}
 										}
 									}
 								}
 							}
 						}
 					}
-				}
 
-				for (Residue uk_residue : current_uk_residues) {
+					for (Residue uk_residue : current_uk_residues) {
 
-					boolean isValid = false;
+						boolean isValid = false;
 
-					if (Util.getThreshold_score) {
-						if (Util.threshold_score >= -Math.log10(uk_residue.score))
+						if (Util.getThreshold_score) {
+							if (Util.threshold_score >= -Math.log10(uk_residue.score))
+								isValid = true;
+						} else {
 							isValid = true;
-					} else {
-						isValid = true;
-					}
-
-					if (isValid) {
-
-						if (uk_residue.predicted_epoch != epochs) {
-							Residue current_res = new Residue(residue.aminoacid, residue.location, residue.position,
-									residue.protein);
-							current_res.history_residues = residue.history_residues;
-							current_res.predicted_epoch = residue.predicted_epoch;
-							current_res.predictedLocation = residue.predictedLocation;
-							current_res.previous_residue = residue.previous_residue;
-							current_res.score = residue.score;
-							current_res.isConflicted = residue.isConflicted;
-							current_res.conflicted_residue = residue.conflicted_residue;
-							uk_residue.addHistoryResidue(current_res);
 						}
 
-						uk_residue.predictedLocation = residue.predictedLocation;
-						uk_residue.predicted_epoch = epochs;
-						uk_residue.previous_residue = residue;
+						if (isValid) {
+
+							if (uk_residue.predicted_epoch != epochs) {
+								Residue current_res = new Residue(residue.aminoacid, residue.location, residue.position,
+										residue.protein);
+								current_res.history_residues = residue.history_residues;
+								current_res.predicted_epoch = residue.predicted_epoch;
+								current_res.predictedLocation = residue.predictedLocation;
+								current_res.previous_residue = residue.previous_residue;
+								current_res.score = residue.score;
+								current_res.isConflicted = residue.isConflicted;
+								current_res.conflicted_residue = residue.conflicted_residue;
+								uk_residue.addHistoryResidue(current_res);
+							}
+
+							uk_residue.predictedLocation = residue.predictedLocation;
+							uk_residue.predicted_epoch = epochs;
+							uk_residue.previous_residue = residue;
+						}
 					}
 				}
 			}
+		} catch (Exception e) {
+			System.out.println("ERROR: computeNewResidues -> index:" + summary_processed);
 		}
+
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Epoch: " + epochs + "\nPredicting residue location: 100%");
 	}
 
@@ -3381,6 +3436,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 */
 	private void removeUnknownProteinDomains() {
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		if (allProteins == null || allProteins.size() == 0)
+			return;
 
 		for (Protein protein : allProteins) {
 			if (protein.domains != null && protein.domains.size() > 0)
@@ -3398,6 +3456,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private void labelPredictedTransmAsPredicted() {
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		if (allProteins == null || allProteins.size() == 0)
+			return;
 
 		for (Protein protein : allProteins) {
 
@@ -3431,6 +3492,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		removeUnknownProteinDomains();
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		if (allProteins == null || allProteins.size() == 0)
+			return;
 
 		int countProtein = 0;
 		try {
@@ -3534,7 +3598,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				countProtein++;
 			}
 		} catch (Exception e) {
-			System.out.println(countProtein);
+			System.out.println("ERROR: annotatePredictedLocation -> index:" + countProtein);
 		}
 
 		if (!Util.consider_domain_whole_ptn) {
@@ -3628,6 +3692,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
 
+		if (allProteins == null || allProteins.size() == 0)
+			return;
+
 		int limit_range = Util.neighborAA * 2;
 
 		for (Protein protein : allProteins) {
@@ -3709,6 +3776,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private void UnifyProteinDomainsFromAllProteins() {
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		if (allProteins == null || allProteins.size() == 0)
+			return;
 
 		for (Protein protein : allProteins) {
 
@@ -3987,6 +4057,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private void UnifyResiduesDomainsFromAllProteins() {
 
 		List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+		if (allProteins == null || allProteins.size() == 0)
+			return;
 
 		for (Protein protein : allProteins) {
 

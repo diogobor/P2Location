@@ -733,7 +733,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 //		spinner_transmemUpperCutoffScore.setToolTipText("Set a value between 0 and 1.");
 //		transmem_regions_prediction_panel.add(spinner_transmemUpperCutoffScore);
 //		offset_y += 30;
-		
+
 //		JLabel lowerScoreLabel = new JLabel("Lower Score:");
 //		lowerScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 //		lowerScoreLabel.setBounds(10, offset_y, 150, 40);
@@ -833,7 +833,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		protein_domains_prediction_panel.setBounds(10, offset_y + 60, WIDTH_PANEL - 20, 260);
 		protein_domains_prediction_panel.setLayout(null);
 		prediction_panel.add(protein_domains_prediction_panel);
-		
+
 		offset_y -= 10;
 		JLabel upperScoreLabel = new JLabel("Transmembrane cutoff score:");
 		upperScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
@@ -850,8 +850,10 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		spinner_transmemUpperCutoffScore = new JSpinner(model_transmemUpperCutoffScore);
 		spinner_transmemUpperCutoffScore.setBounds(offset_x, offset_y, 60, 20);
 		JComponent comp_transmemUpperCutoffScore = spinner_transmemUpperCutoffScore.getEditor();
-		JFormattedTextField field_transmemUpperCutoffScore = (JFormattedTextField) comp_transmemUpperCutoffScore.getComponent(0);
-		DefaultFormatter formatter_transmemUpperCutoffScore = (DefaultFormatter) field_transmemUpperCutoffScore.getFormatter();
+		JFormattedTextField field_transmemUpperCutoffScore = (JFormattedTextField) comp_transmemUpperCutoffScore
+				.getComponent(0);
+		DefaultFormatter formatter_transmemUpperCutoffScore = (DefaultFormatter) field_transmemUpperCutoffScore
+				.getFormatter();
 		formatter_transmemUpperCutoffScore.setCommitsOnValidEdit(true);
 		spinner_transmemUpperCutoffScore.addChangeListener(new ChangeListener() {
 
@@ -905,54 +907,79 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 					if (myNetwork != null && processProteinLocationTaskFactory != null && dialogTaskManager != null) {
 
-						TaskIterator ti = processProteinLocationTaskFactory.createTaskIterator(true, false);
+						boolean valid = true;
 
-						TaskObserver observer = new TaskObserver() {
+						// Check if there are some conflict residues (from localization markers) before
+						// proceeding the prediction
 
-							@Override
-							public void taskFinished(ObservableTask task) {
+						if (Util.isThereConflictResidue(null, myNetwork, null)) {
 
-							}
+							int input = JOptionPane.showConfirmDialog(null,
+									"There are some conflict residues in the network. \nDo you want to continue with the prediction?",
+									"P2Location - Information", JOptionPane.YES_NO_OPTION);
 
-							@SuppressWarnings({ "unchecked", "rawtypes" })
-							@Override
-							public void allFinished(FinishStatus finishStatus) {
+							if (input == 1)
+								valid = false;
+						}
 
-								// The last epoch is equal to the before last
-								int real_epochs = 1;
-								if (ProcessProteinLocationTask.epochs > 1)
-									real_epochs = ProcessProteinLocationTask.epochs - 1;
+						if (valid) {
+							TaskIterator ti = processProteinLocationTaskFactory.createTaskIterator(true, false);
 
-								int uk_residue_location = 0;
-								if (Util.isKeyPresent(ProcessProteinLocationTask.number_unknown_residues, real_epochs))
-									uk_residue_location = ProcessProteinLocationTask.number_unknown_residues
-											.get(real_epochs);
-								JOptionPane.showMessageDialog(null,
-										"Prediction has been done successfully!\nEpoch(s): " + real_epochs
-												+ "\n# Unknown Residue location: " + uk_residue_location,
-										"P2Location - Information", JOptionPane.INFORMATION_MESSAGE,
-										new ImageIcon(getClass().getResource("/images/logo.png")));
+							TaskObserver observer = new TaskObserver() {
 
-								List<String> epochsList = new ArrayList<String>();
-								for (int i = 1; i <= ProcessProteinLocationTask.epochs - 1; i++) {
-									epochsList.add(Integer.toString(i));
+								@Override
+								public void taskFinished(ObservableTask task) {
+
 								}
 
-								epochCombobox.setModel(new DefaultComboBoxModel(epochsList.toArray()));
-								epochCombobox.setSelectedIndex(epochsList.size() - 1);
-								current_epoch = Integer.parseInt(epochsList.get(epochsList.size() - 1));
-								enable_disableDisplayBox(true, false);
-								enable_disable_predictBox(true);
-								enable_disable_transmemBox(true);
-								processButton.setEnabled(true);
-							}
-						};
+								@SuppressWarnings({ "unchecked", "rawtypes" })
+								@Override
+								public void allFinished(FinishStatus finishStatus) {
 
-						processButton.setEnabled(false);
-						dialogTaskManager.execute(ti, observer);
+									// The last epoch is equal to the before last
+									int real_epochs = 1;
+									if (ProcessProteinLocationTask.epochs > 1)
+										real_epochs = ProcessProteinLocationTask.epochs - 1;
 
-						enable_disable_predictBox(false);
-						enable_disable_transmemBox(false);
+									int uk_residue_location = 0;
+									if (Util.isKeyPresent(ProcessProteinLocationTask.number_unknown_residues,
+											real_epochs))
+										uk_residue_location = ProcessProteinLocationTask.number_unknown_residues
+												.get(real_epochs);
+									JOptionPane.showMessageDialog(null,
+											"Prediction has been done successfully!\nEpoch(s): " + real_epochs
+													+ "\n# Unknown Residue location: " + uk_residue_location,
+											"P2Location - Information", JOptionPane.INFORMATION_MESSAGE,
+											new ImageIcon(getClass().getResource("/images/logo.png")));
+
+									if (ProcessProteinLocationTask.epochs > 1) {
+										List<String> epochsList = new ArrayList<String>();
+										for (int i = 1; i <= ProcessProteinLocationTask.epochs - 1; i++) {
+											epochsList.add(Integer.toString(i));
+										}
+
+										epochCombobox.setModel(new DefaultComboBoxModel(epochsList.toArray()));
+										epochCombobox.setSelectedIndex(epochsList.size() - 1);
+										current_epoch = Integer.parseInt(epochsList.get(epochsList.size() - 1));
+										enable_disableDisplayBox(true, false);
+									} else {
+										enable_disableDisplayBox(false, false);
+
+									}
+									enable_disable_predictBox(true);
+									enable_disable_transmemBox(true);
+									enable_disable_spinners(true);
+									processButton.setEnabled(true);
+								}
+							};
+
+							processButton.setEnabled(false);
+							dialogTaskManager.execute(ti, observer);
+
+							enable_disable_predictBox(false);
+							enable_disable_transmemBox(false);
+
+						}
 
 					} else {
 						JOptionPane.showMessageDialog(null, "No network has been loaded!", "P2Location - Alert",
@@ -983,7 +1010,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		fix_conflict_panel.setBounds(10, offset_y + 40, WIDTH_PANEL - 40, 80);
 		fix_conflict_panel.setLayout(null);
 		protein_domains_prediction_panel.add(fix_conflict_panel);
-		
+
 		dualLocalization_conflict = new JCheckBox("Dual localizing protein");
 		dualLocalization_conflict.setBackground(Color.WHITE);
 		dualLocalization_conflict.setSelected(Util.dualLocalization_conflict);
@@ -1201,9 +1228,6 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			enable_specCount.setEnabled(enable);
 		if (dualLocalization_conflict != null)
 			dualLocalization_conflict.setEnabled(enable);
-		
-//		if (enable_conflict != null)
-//			enable_conflict.setEnabled(enable);
 	}
 
 	public static void enable_disable_spinners(boolean enable) {
@@ -1213,6 +1237,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			spinner_score.setEnabled(enable);
 		if (spinner_specCount != null)
 			spinner_specCount.setEnabled(enable);
+
 	}
 
 	/**
@@ -1244,13 +1269,6 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 		if (processTransmemButton != null)
 			processTransmemButton.setEnabled(enable);
-
-		if (spinner_transmemUpperCutoffScore != null)
-			spinner_transmemUpperCutoffScore.setEnabled(enable);
-		
-		if (spinner_transmemLowerCutoffScore != null)
-			spinner_transmemLowerCutoffScore.setEnabled(enable);
-
 	}
 
 	/**
@@ -1261,7 +1279,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		enable_score.setSelected(false);
 		enable_specCount.setSelected(false);
 		dualLocalization_conflict.setSelected(false);
-		
+
 		// Except this checkbox
 //		enable_conflict.setSelected(true);
 	}

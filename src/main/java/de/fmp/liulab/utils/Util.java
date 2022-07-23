@@ -165,6 +165,7 @@ public class Util {
 	public static boolean considerConflict = true;
 	public static boolean fixDomainManually = true;
 	public static double initialResidueScore = 150.0;
+	public static double initialTransmembraneScore = 1.0;
 
 	// Map<Network name,List<Protein>
 	public static Map<String, List<Protein>> proteinsMap = new HashMap<String, List<Protein>>();
@@ -962,8 +963,7 @@ public class Util {
 	 * @param textLabel_status_result current text label status
 	 */
 	@SuppressWarnings("unchecked")
-	public static void getXLsOneProtein(TaskMonitor taskMonitor, Protein protein, CyNetwork myNetwork,
-			JLabel textLabel_status_result) {
+	public static void getXLsOneProtein(TaskMonitor taskMonitor, Protein protein, CyNetwork myNetwork) {
 
 		if (taskMonitor != null)
 			taskMonitor.setTitle("Getting cross-links of protein: " + protein.gene);
@@ -1012,7 +1012,7 @@ public class Util {
 		try {
 			for (final Protein protein : proteinList) {
 
-				getXLsOneProtein(taskMonitor, protein, myNetwork, textLabel_status_result);
+				getXLsOneProtein(taskMonitor, protein, myNetwork);
 
 				summary_processed++;
 				progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ", taskMonitor,
@@ -1066,6 +1066,46 @@ public class Util {
 	}
 
 	/**
+	 * Method responsible for checking whether there are some conflict residues
+	 * 
+	 * @param taskMonitor             current task monitor
+	 * @param myNetwork               current network
+	 * @param textLabel_status_result current text label status
+	 * @return true if contains conflict residue
+	 */
+	public static boolean isThereConflictResidue(TaskMonitor taskMonitor, CyNetwork myNetwork,
+			JLabel textLabel_status_result) {
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Checking whether there are some conflict residues");
+
+		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
+			return false;
+
+		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		if (proteinList == null || proteinList.size() == 0)
+			return false;
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_rows = proteinList.size();
+
+		for (final Protein protein : proteinList) {
+
+			summary_processed++;
+			progressBar(summary_processed, old_progress, total_rows,
+					"Checking whether there are some conflict residues: ", taskMonitor, textLabel_status_result);
+
+			if (protein.reactionSites.stream().filter(value -> value.isConflicted).collect(Collectors.toList())
+					.size() > 0)
+				return true;
+
+		}
+
+		return false;
+	}
+
+	/**
 	 * Update Protein domain column
 	 * 
 	 * @param taskMonitor task monitor
@@ -1106,7 +1146,7 @@ public class Util {
 			 */
 			if (getXLs) {
 				if (protein.interLinks == null && protein.intraLinks == null)
-					getXLsOneProtein(taskMonitor, protein, myNetwork, textLabel_status_result);
+					getXLsOneProtein(taskMonitor, protein, myNetwork);
 			}
 
 			summary_processed++;
@@ -1273,7 +1313,7 @@ public class Util {
 					if (!(domain.eValue.isBlank() || domain.eValue.isEmpty()))
 						score = domain.eValue;
 					else
-						score = "1.0";
+						score = String.valueOf(initialTransmembraneScore);
 					list_original_domains.add(domain.name + "#Score:" + score + "[" + Integer.toString(domain.startId)
 							+ "-" + Integer.toString(domain.endId) + "]");
 				} else {
