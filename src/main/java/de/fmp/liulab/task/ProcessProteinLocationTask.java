@@ -951,6 +951,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							// Check conflict among stored residues
 							if (Util.considerConflict) {
+								epochs = 1;
 								OrganizeResidueCompartment(taskMonitor);
 								all_knownResidues = getAllKnownResidues();
 								computeResiduesScore(taskMonitor);
@@ -2704,7 +2705,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			summary_processed++;
 
 			Util.progressBar(summary_processed, old_progress, total_ptns,
-					"Epoch: " + epochs + "\nOrganizing residue compartments: ", taskMonitor, null);
+					"Epoch: " + epochs + "\nOrganizing residue compartments: ", taskMonitor, textLabel_status_result);
 
 		}
 	}
@@ -2730,7 +2731,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		for (final Protein protein : allProteins) {
 			summary_processed++;
 			Util.progressBar(summary_processed, old_progress, total_ptns, "Computing residues score: ", taskMonitor,
-					null);
+					textLabel_status_result);
 
 			List<Residue> residues = protein.reactionSites;
 

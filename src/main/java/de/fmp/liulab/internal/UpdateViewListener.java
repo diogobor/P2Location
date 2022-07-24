@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import javax.swing.DefaultComboBoxModel;
+
 import org.cytoscape.application.CyApplicationManager;
 import org.cytoscape.application.events.SetCurrentNetworkEvent;
 import org.cytoscape.application.events.SetCurrentNetworkListener;
@@ -135,7 +137,7 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 		nodes_suids.clear();
 
 		try {
-			// First see if this even has anything to do with selections
+			// First see if this event has anything to do with selections
 			if (!e.containsColumn(CyNetwork.SELECTED)) {
 				// Nope, we're done
 				return;
@@ -333,6 +335,13 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 				return;
 
 			current_network_name = myNetwork.toString();
+			
+			int network_index = Util.myCyNetworkList.indexOf(myNetwork);
+
+			if (network_index == 0 && ProcessProteinLocationTask.number_unknown_residues != null
+					&& ProcessProteinLocationTask.number_unknown_residues.size() > 0) {
+				MainControlPanel.setEpochCombobox();
+			}
 
 			Collection<CyNetworkView> views = networkViewManager.getNetworkViews(myNetwork);
 			if (views.size() != 0)
@@ -414,8 +423,11 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 			}
 
 			createAuxiliarColumnsTable();
-		}
 
+			MainControlPanel.enable_disableDisplayBox(false, true);
+			MainControlPanel.enable_disable_spinners(true);
+			MainControlPanel.unselectCheckboxes();
+		}
 	}
 
 	/**
@@ -453,7 +465,7 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 				Util.proteinsWithPredTransmDict.remove(current_network_name);
 			}
 
-			// Check if the node exists in the network
+			// Check if the network exists in the network list
 			Optional<CyNetwork> isNetworkPresent = Util.myCyNetworkList.stream().filter(new Predicate<CyNetwork>() {
 				public boolean test(CyNetwork o) {
 					return o.getSUID() == myNetwork.getSUID();
@@ -467,7 +479,7 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 
 		}
 
-		MainControlPanel.enable_disableDisplayBox(false, false);
+		MainControlPanel.enable_disableDisplayBox(false, true);
 		MainControlPanel.enable_disable_spinners(false);
 		MainControlPanel.unselectCheckboxes();
 		MainControlPanel.myNetwork = null;

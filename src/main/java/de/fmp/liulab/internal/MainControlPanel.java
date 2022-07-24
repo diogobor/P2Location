@@ -119,7 +119,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JSpinner spinner_width_node_border;
 	private static JSpinner spinner_deltaScore;
 	private static JSpinner spinner_transmemUpperCutoffScore;
-	private static JSpinner spinner_transmemLowerCutoffScore;
+//	private static JSpinner spinner_transmemLowerCutoffScore;
 
 	private static JComboBox epochCombobox;
 	private static Integer current_epoch;
@@ -1263,6 +1263,22 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 				epochCombobox.setSelectedIndex(epochsList.size() - 1);
 			}
 		}
+	}
+	
+	/**
+	 * Method responsible for setting correct epoch
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static void setEpochCombobox() {
+		List<String> epochsList = new ArrayList<String>();
+		for (int i = 1; i <= ProcessProteinLocationTask.epochs - 1; i++) {
+			epochsList.add(Integer.toString(i));
+		}
+
+		epochCombobox.setModel(new DefaultComboBoxModel(epochsList.toArray()));
+		epochCombobox.setSelectedIndex(epochsList.size() - 1);
+		current_epoch = Integer.parseInt(epochsList.get(epochsList.size() - 1));
+		enable_disableDisplayBox(true, false);
 	}
 
 	public static void enable_disable_transmemBox(boolean enable) {
