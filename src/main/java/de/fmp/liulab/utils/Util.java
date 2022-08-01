@@ -1168,8 +1168,18 @@ public class Util {
 		for (Residue residue : protein.reactionSites) {
 			if (residue.isConflicted) {
 				if (residue.predicted_epoch <= ProcessProteinLocationTask.epochs) {
-					list_residues.add(
-							Character.toString(residue.aminoacid) + "[" + Integer.toString(residue.position) + "]");
+
+					String residues = "";
+//					if (residue.conflicted_residue != null) {
+//						residues = Character.toString(residue.aminoacid) + "[" + Integer.toString(residue.position)
+//								+ "] \n Scores:\n (1) " + residue.conflicted_score + " => " + residue.location
+//								+ "\n (2) " + residue.conflicted_residue.conflicted_score + " => "
+//								+ residue.conflicted_residue.location + "\n";
+//					} else
+						residues = Character.toString(residue.aminoacid) + "[" + Integer.toString(residue.position)
+								+ "]";
+
+					list_residues.add(residues);
 				}
 			}
 		}
@@ -2921,12 +2931,22 @@ public class Util {
 		if (isPredicted) {
 			if (!residue.isConflicted)
 				tooltip = "<html><p><b>Residue: </b>" + residue.aminoacid + " [" + residue.position
-						+ "]<br/><b>Predicted: </b>" + (residue.predicted_epoch != -1) + "<br/><b>Epoch: </b>"
-						+ residue.predicted_epoch + "<br/><b>Score: </b>" + Math.floor(residue.score * 100) / 100;
-			else
-				tooltip = "<html><p><b>Residue: </b>" + residue.aminoacid + " [" + residue.position
-						+ "]<br/><b>Predicted: </b>" + (residue.predicted_epoch != -1) + "<br/><b>Epoch: </b>"
-						+ residue.predicted_epoch + "<br/><u><i>There is a conflict.</i></u>";
+						+ "]<br/><b>Predicted: </b>true<br/><b>Epoch: </b>" + residue.predicted_epoch
+						+ "<br/><b>Score: </b>" + Math.floor(residue.score * 100) / 100 + "</html>";
+			else {
+				if (residue.conflicted_residue != null)
+//					tooltip = "<html><p><b>Residue: </b>" + residue.aminoacid + " [" + residue.position
+//					+ "]<br/><b>Predicted: </b>true<br/><b>Epoch: </b>" + residue.predicted_epoch
+//					+ "<br/><u><i>There is a conflict.</i></u><br/><b>Scores:</b><br/>&nbsp;"
+//					+ residue.conflicted_score + " (" + residue.location + ")<br/>&nbsp;"
+//					+ residue.conflicted_residue.conflicted_score + " (" + residue.conflicted_residue.location
+//					+ ")</html>";
+//				else
+					tooltip = "<html><p><b>Residue: </b>" + residue.aminoacid + " [" + residue.position
+							+ "]<br/><b>Predicted: </b>" + (residue.predicted_epoch != -1) + "<br/><b>Epoch: </b>"
+							+ residue.predicted_epoch + "<br/><u><i>There is a conflict.</i></u><br/></html>";
+
+			}
 		} else {
 			if (!residue.isConflicted)
 				tooltip = "<html><p><b>Residue: </b> " + residue.aminoacid + " [" + residue.position + "]<br/>";
@@ -4750,6 +4770,16 @@ public class Util {
 						new_link.append(_xl[2]);
 						new_link.append("#");
 						new_link.append(_xl[3]);
+						return new_link.toString().split("#");
+					} else if (_xl.length == 5) {// second node has dashes
+						// [,10,AA,BBB,20]
+						new_link.append(_xl[1]);
+						new_link.append("#");
+						new_link.append(_xl[2]);
+						new_link.append("-");
+						new_link.append(_xl[3]);
+						new_link.append("#");
+						new_link.append(_xl[4]);
 						return new_link.toString().split("#");
 					}
 				} else {// name-position-selected_node_name-position

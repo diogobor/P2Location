@@ -117,7 +117,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JSpinner spinner_font_size_node;
 	private static JSpinner spinner_opacity_node_border;
 	private static JSpinner spinner_width_node_border;
-	private static JSpinner spinner_deltaScore;
+	private static JSpinner spinner_deltaScore_domainLevel;
 	private static JSpinner spinner_transmemUpperCutoffScore;
 //	private static JSpinner spinner_transmemLowerCutoffScore;
 
@@ -1035,10 +1035,10 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			}
 		});
 
-		JLabel epochLabel = new JLabel("\u0394 score:");
-		epochLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		epochLabel.setBounds(10, offset_y, 150, 40);
-		fix_conflict_panel.add(epochLabel);
+		JLabel deltaScoreLabel = new JLabel("\u0394 score:");
+		deltaScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		deltaScoreLabel.setBounds(10, offset_y, 150, 40);
+		fix_conflict_panel.add(deltaScoreLabel);
 
 		offset_y += 8;
 		offset_x -= 10;
@@ -1048,24 +1048,25 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 				0, // min
 				100, // max
 				0.1); // step
-		spinner_deltaScore = new JSpinner(model_deltaScore);
-		spinner_deltaScore.setBounds(offset_x, offset_y, 60, 20);
-		JComponent comp_deltaScore = spinner_deltaScore.getEditor();
+		spinner_deltaScore_domainLevel = new JSpinner(model_deltaScore);
+		spinner_deltaScore_domainLevel.setBounds(offset_x, offset_y, 60, 20);
+		JComponent comp_deltaScore = spinner_deltaScore_domainLevel.getEditor();
 		JFormattedTextField field_deltaScore = (JFormattedTextField) comp_deltaScore.getComponent(0);
 		DefaultFormatter formatter_deltaScore = (DefaultFormatter) field_deltaScore.getFormatter();
 		formatter_deltaScore.setCommitsOnValidEdit(true);
-		spinner_deltaScore.addChangeListener(new ChangeListener() {
+		spinner_deltaScore_domainLevel.addChangeListener(new ChangeListener() {
 
 			@Override
 			public void stateChanged(ChangeEvent e) {
-				Util.deltaScore = (Double) spinner_deltaScore.getValue();
+				Util.deltaScore = (Double) spinner_deltaScore_domainLevel.getValue();
 				P2LocationProps.setProperty("p2location.deltaScore", String.valueOf(Util.deltaScore));
 
 			}
 		});
-		spinner_deltaScore.setToolTipText("Set a value between 0 and 100.");
-		fix_conflict_panel.add(spinner_deltaScore);
+		spinner_deltaScore_domainLevel.setToolTipText("Set a value between 0 and 100.");
+		fix_conflict_panel.add(spinner_deltaScore_domainLevel);
 
+		
 	}
 
 	/**
