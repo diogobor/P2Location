@@ -2330,7 +2330,14 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 								List<ProteinDomain> new_domains = ComputeDomainsScore(protein.reactionSites,
 										start_range, protein.sequence.length());
+								new_domains.removeIf(value -> value.name.toLowerCase().equals(TRANSMEMBRANE));
 								new_domain_list.addAll(new_domains);
+
+								// Add localization markers (domains that have not been predicted)
+								new_domain_list.addAll(protein.domains.stream()
+										.filter(value -> !value.isPredicted && value.startId >= start_range)
+										.collect(Collectors.toList()));
+
 								break;
 
 							}
