@@ -1066,6 +1066,38 @@ public class Util {
 	}
 
 	/**
+	 * Method responsible for checking whether there are localization markers in the
+	 * network
+	 * 
+	 * @param taskMonitor             current task monitor
+	 * @param myNetwork               current network
+	 * @param textLabel_status_result current text label status
+	 * @return true if contains localization markers
+	 */
+	public static boolean isThereLocalizationMarker(TaskMonitor taskMonitor, CyNetwork myNetwork,
+			JLabel textLabel_status_result) {
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Checking whether there are some conflict residues");
+
+		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
+			return false;
+
+		if (ProcessProteinLocationTask.compartments != null && ProcessProteinLocationTask.compartments.size() > 0) {
+			if (ProcessProteinLocationTask.compartments.size() == 1) {
+				if (ProcessProteinLocationTask.compartments.containsKey(ProcessProteinLocationTask.UNKNOWN_RESIDUE))
+					return false;
+				else
+					return true;
+			} else
+				return true;
+
+		} else
+			return false;
+
+	}
+
+	/**
 	 * Method responsible for checking whether there are some conflict residues
 	 * 
 	 * @param taskMonitor             current task monitor
@@ -1176,8 +1208,7 @@ public class Util {
 //								+ "\n (2) " + residue.conflicted_residue.conflicted_score + " => "
 //								+ residue.conflicted_residue.location + "\n";
 //					} else
-						residues = Character.toString(residue.aminoacid) + "[" + Integer.toString(residue.position)
-								+ "]";
+					residues = Character.toString(residue.aminoacid) + "[" + Integer.toString(residue.position) + "]";
 
 					list_residues.add(residues);
 				}

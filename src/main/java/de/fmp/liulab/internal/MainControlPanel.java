@@ -909,10 +909,21 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 						boolean valid = true;
 
+						// Check if there are localization markers
+						if (!Util.isThereLocalizationMarker(null, myNetwork, null)) {
+
+							int input = JOptionPane.showConfirmDialog(null,
+									"No localization markers have been found. \nDo you want to continue with the prediction?",
+									"P2Location - Information", JOptionPane.YES_NO_OPTION);
+
+							if (input == 1)
+								valid = false;
+						}
+
 						// Check if there are some conflict residues (from localization markers) before
 						// proceeding the prediction
 
-						if (Util.isThereConflictResidue(null, myNetwork, null)) {
+						if (valid && Util.isThereConflictResidue(null, myNetwork, null)) {
 
 							int input = JOptionPane.showConfirmDialog(null,
 									"There are some conflict residues in the network. \nDo you want to continue with the prediction?",
@@ -1066,7 +1077,6 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		spinner_deltaScore_domainLevel.setToolTipText("Set a value between 0 and 100.");
 		fix_conflict_panel.add(spinner_deltaScore_domainLevel);
 
-		
 	}
 
 	/**
@@ -1265,7 +1275,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			}
 		}
 	}
-	
+
 	/**
 	 * Method responsible for setting correct epoch
 	 */
