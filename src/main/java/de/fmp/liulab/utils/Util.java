@@ -2,6 +2,8 @@ package de.fmp.liulab.utils;
 
 import java.awt.Color;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
@@ -9,6 +11,7 @@ import java.math.RoundingMode;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.security.SecureRandom;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
@@ -68,6 +71,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
+import de.fmp.liulab.core.PythonManager;
 import de.fmp.liulab.internal.UpdateViewListener;
 import de.fmp.liulab.internal.view.JTableRowRenderer;
 import de.fmp.liulab.model.CrossLink;
@@ -78,6 +82,7 @@ import de.fmp.liulab.model.PredictedTransmem;
 import de.fmp.liulab.model.Protein;
 import de.fmp.liulab.model.ProteinDomain;
 import de.fmp.liulab.model.Residue;
+import de.fmp.liulab.parser.ReaderWriterTextFile;
 import de.fmp.liulab.task.MainSingleNodeTask;
 import de.fmp.liulab.task.ProcessProteinLocationTask;
 
@@ -90,6 +95,7 @@ import de.fmp.liulab.task.ProcessProteinLocationTask;
 public class Util {
 
 	private static String PROJECT_NAME = "p2l_";
+	public static final SecureRandom random = new SecureRandom();
 	public static String PROTEIN_SCALING_FACTOR_COLUMN_NAME = PROJECT_NAME + "scaling_factor";
 	public static String HORIZONTAL_EXPANSION_COLUMN_NAME = PROJECT_NAME + "is_horizontal_expansion";
 	public static String PROTEIN_DOMAIN_COLUMN = PROJECT_NAME + "domain_annotation";
@@ -1083,6 +1089,7 @@ public class Util {
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return false;
 
+		// Localization markers have been loaded
 		if (ProcessProteinLocationTask.compartments != null && ProcessProteinLocationTask.compartments.size() > 0) {
 			if (ProcessProteinLocationTask.compartments.size() == 1) {
 				if (ProcessProteinLocationTask.compartments.containsKey(ProcessProteinLocationTask.UNKNOWN_RESIDUE))
@@ -1092,8 +1099,22 @@ public class Util {
 			} else
 				return true;
 
-		} else
+		} else {
+
+			// Check if transmembrane regions have been predicted
+
+			List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
+
+			if (allProteins == null || allProteins.size() == 0)
+				return false;
+
+			for (Protein protein : allProteins) {
+				if (protein.domains != null && protein.domains.size() > 0)
+					return true;
+			}
+
 			return false;
+		}
 
 	}
 
@@ -4884,8 +4905,88 @@ public class Util {
 	 * @param proteins
 	 * @param taskMonitor
 	 * @return map Proteins and their predicted transmem
+	 * @throws IOException
 	 */
-	public static Map<Protein, List<PredictedTransmem>> predictTransmemRegions(List<Protein> proteins,
+	public static Map<Protein, List<PredictedTransmem>> predictTransmemRegionsFromDeepTMHMM(List<Protein> proteins,
+			TaskMonitor taskMonitor) throws IOException {
+
+		if (proteins.size() == 0)
+			return new HashMap<Protein, List<PredictedTransmem>>();
+
+		Map<Protein, List<PredictedTransmem>> final_result = new HashMap<Protein, List<PredictedTransmem>>();
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO,
+					"Running script to predict transmembrane regions by using DeepTMHMM...");
+
+		String installBiolib_path = PythonManager.createInstallBiolibLib(taskMonitor);
+		PythonManager.executePython(taskMonitor, installBiolib_path, null);
+
+		String fastaFile = "";
+		for (Protein protein : proteins) {
+
+			fastaFile = prepareFastaBasedOnOneProtein(protein);
+			fastaFile = PythonManager.createFastaFile(fastaFile, taskMonitor);
+			// [python script path, results folder path]
+			String[] run_python_py_path = PythonManager.createPythonCalling(fastaFile, taskMonitor);
+			String run_python_shell_path = PythonManager.createPythonShell(run_python_py_path[0], taskMonitor);
+			PythonManager.executePython(taskMonitor, run_python_shell_path, null);
+
+			String results_folder = System.getProperty("java.io.tmpdir") + "/cytoTmpScripts/" + run_python_py_path[1];
+			final_result.put(protein, readDeepTMHMM_results(results_folder));
+		}
+
+		return final_result;
+	}
+
+	private static String getCSVfromDeppTMHMM_results(final File folder) {
+		for (final File fileEntry : folder.listFiles()) {
+			if (fileEntry.isFile()) {
+				String fileName = fileEntry.getName();
+				if (fileName.endsWith("csv"))
+					return fileName;
+
+			}
+		}
+		return "";
+	}
+
+	/**
+	 * Method responsible for reading results generate by DeepTMHMM
+	 * 
+	 * @param folderPath results folder
+	 * @return list of predicted transmembrane regions
+	 * @throws IOException
+	 */
+	private static List<PredictedTransmem> readDeepTMHMM_results(String folderPath) throws IOException {
+
+		List<PredictedTransmem> final_list = new ArrayList<PredictedTransmem>();
+		String fileName = folderPath + "/" + getCSVfromDeppTMHMM_results(new File(folderPath));
+		ReaderWriterTextFile reader = new ReaderWriterTextFile(fileName);
+		while (reader.hasLine()) {
+			String line = reader.getLine();
+			if (!Character.isDigit(line.charAt(0)))
+				continue;
+
+			String[] cols = line.split(",");
+
+			String[] index_and_aa = cols[0].split(" ");
+			int index = Integer.parseInt(index_and_aa[0]);
+			PredictedTransmem pred_transm = new PredictedTransmem(index, index_and_aa[1], Double.parseDouble(cols[3]));
+			final_list.add(pred_transm);
+		}
+
+		return final_list;
+	}
+
+	/**
+	 * Method responsible for predicting transmembrane regions
+	 * 
+	 * @param proteins
+	 * @param taskMonitor
+	 * @return map Proteins and their predicted transmem
+	 */
+	public static Map<Protein, List<PredictedTransmem>> predictTransmemRegionsFromPhobius(List<Protein> proteins,
 			TaskMonitor taskMonitor) {
 
 		if (proteins.size() == 0)
@@ -4895,7 +4996,89 @@ public class Util {
 			taskMonitor.showMessage(TaskMonitor.Level.INFO,
 					"Connecting to the server to predict transmembrane regions...");
 
-		String jobID = callTMHMM_sequence_webservice(createFastaToTMHMM(proteins));
+		createFastaBasedOnProteins(proteins, true);
+		String first_response = callPhobius_sequence_webservice();
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Obtaining transmem regions...");
+
+		boolean errorToRetrieve = false;
+
+		// ProteinID, data_link
+		Map<String, String> data_link_url = getTransmemDataLinksFromPhobius(first_response);
+
+		while (data_link_url.size() == 0) {
+			data_link_url = getTransmemDataLinksFromPhobius(first_response);
+		}
+
+		if (data_link_url.containsKey("time out")) {
+			errorToRetrieve = true;
+		}
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_lines = data_link_url.size();
+		if (!errorToRetrieve) {
+
+			Map<Protein, List<PredictedTransmem>> final_result = new HashMap<Protein, List<PredictedTransmem>>();
+			// Map<ProteinID, data_link>
+			for (Map.Entry<String, String> entry : data_link_url.entrySet()) {
+
+				String response = connect_website(entry.getValue());
+				int processing_time = response.toLowerCase().indexOf("your job has run for ");
+				if (processing_time != -1) {
+					String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
+					procTimeStr = procTimeStr.replaceAll("[^0-9]", "").trim();
+					if (Integer.parseInt(procTimeStr) > 3000) {
+						errorToRetrieve = true;
+					}
+				}
+
+				if (!errorToRetrieve) {
+
+					Optional<Protein> isPtnPresent = proteins.stream()
+							.filter(value -> value.proteinID.equals(entry.getKey())).findFirst();
+					if (isPtnPresent.isPresent()) {
+						Protein ptn = isPtnPresent.get();
+						final_result.put(ptn, createPredictedTransmemListFromPhobius(response));
+					}
+				}
+
+				summary_processed++;
+				progressBar(summary_processed, old_progress, total_lines, "Obtaining transmem regions: ", taskMonitor,
+						null);
+
+			}
+
+			return final_result;
+
+		} else {
+			if (taskMonitor != null)
+				taskMonitor.showMessage(TaskMonitor.Level.ERROR,
+						"Error to retrieve transmembrane regions from Phobius website!");
+		}
+
+		return new HashMap<Protein, List<PredictedTransmem>>();
+	}
+
+	/**
+	 * Method responsible for predicting transmembrane regions
+	 * 
+	 * @param proteins
+	 * @param taskMonitor
+	 * @return map Proteins and their predicted transmem
+	 */
+	public static Map<Protein, List<PredictedTransmem>> predictTransmemRegionsFromTMHMM(List<Protein> proteins,
+			TaskMonitor taskMonitor) {
+
+		if (proteins.size() == 0)
+			return new HashMap<Protein, List<PredictedTransmem>>();
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO,
+					"Connecting to the server to predict transmembrane regions...");
+
+		String jobID = callTMHMM_sequence_webservice(createFastaBasedOnProteins(proteins, false));
 		boolean isValid = false;
 
 		if (!(jobID.isBlank() || jobID.isEmpty() || jobID.startsWith("Error to call TMHMM web service"))) {
@@ -4940,7 +5123,7 @@ public class Util {
 				// Map<ProteinID, data_link>
 				for (Map.Entry<String, String> entry : data_link_url.entrySet()) {
 
-					String response = connectTMHMM_website(entry.getValue());
+					String response = connect_website(entry.getValue());
 					int processing_time = response.toLowerCase().indexOf("your job has run for ");
 					if (processing_time != -1) {
 						String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
@@ -4956,7 +5139,7 @@ public class Util {
 								.filter(value -> value.proteinID.equals(entry.getKey())).findFirst();
 						if (isPtnPresent.isPresent()) {
 							Protein ptn = isPtnPresent.get();
-							final_result.put(ptn, createPredictedTransmemList(response));
+							final_result.put(ptn, createPredictedTransmemListFromTMHMM(response));
 						}
 					}
 
@@ -4979,7 +5162,7 @@ public class Util {
 	 * @param proteins
 	 * @return string with protein sequences
 	 */
-	private static String createFastaToTMHMM(List<Protein> proteins) {
+	private static String prepareFastaBasedOnProteins(List<Protein> proteins) {
 
 		List<String> fasta = new ArrayList<String>();
 		for (Protein protein : proteins) {
@@ -4988,83 +5171,89 @@ public class Util {
 		}
 
 		String result = fasta.stream().map(n -> String.valueOf(n)).collect(Collectors.joining(""));
+		return result;
+	}
+
+	/**
+	 * Method responsible for preparing protein sequence to TMHMM
+	 * 
+	 * @param proteins
+	 * @return string with protein sequences
+	 */
+	private static String prepareFastaBasedOnOneProtein(Protein protein) {
+
+		List<String> fasta = new ArrayList<String>();
+		fasta.add(">" + protein.proteinID + "\n");
+		fasta.add(protein.sequence + "\n");
+
+		String result = fasta.stream().map(n -> String.valueOf(n)).collect(Collectors.joining(""));
+		return result;
+	}
+
+	/**
+	 * Method responsible for preparing protein sequences to TMHMM
+	 * 
+	 * @param proteins
+	 * @return string with protein sequences
+	 */
+	private static String createFastaBasedOnProteins(List<Protein> proteins, boolean createFile) {
+
+		String result = prepareFastaBasedOnProteins(proteins);
+
+		if (createFile) {
+			try {
+
+				ReaderWriterTextFile file = new ReaderWriterTextFile();
+				file.appendLine(result);
+				file.closeFile();
+				return "createdFile";
+			} catch (Exception e) {
+				System.out.println("Error to create fasta file.");
+			}
+
+		}
 
 		return result;
 	}
 
 	/**
-	 * Method responsible for predicting transmem regions
+	 * Method responsible for creating transmembrane list from Phobius website
 	 * 
-	 * @param protein_sequence protein sequence
+	 * @param response response from TMHMM website
+	 * @return list of predicted transmembrane
 	 */
-	public static List<PredictedTransmem> predictTransmemRegions(Protein protein, TaskMonitor taskMonitor) {
+	private static List<PredictedTransmem> createPredictedTransmemListFromPhobius(String response) {
 
-		String protein_sequence = protein.sequence;
-		String jobID = callTMHMM_sequence_webservice(protein_sequence);
+		List<PredictedTransmem> final_list = new ArrayList<PredictedTransmem>();
 
-		boolean isValid = false;
+		if (response.isBlank() || response.isEmpty())
+			return final_list;
 
-		if (!(jobID.isBlank() || jobID.isEmpty() || jobID.startsWith("Error to call TMHMM web service"))) {
+		String[] cols_each_line = response.split("\r");
 
-			int isFinished = checkJobID_status(jobID);
-			while (isFinished == -1 || isFinished == 1) {
+		for (String col_line : cols_each_line) {
 
-				if (isFinished == 1)// Job has been expired
-				{
-					break;
-				}
-				isFinished = checkJobID_status(jobID);
-			}
+			if (!Character.isDigit(col_line.charAt(0)))
+				continue;
+			String[] cols = col_line.split("\t");
 
-			if (isFinished == 0)
-				isValid = true;
+			String[] id_aa = cols[0].split(" ");
+			int index = Integer.parseInt(id_aa[0]);
+
+			PredictedTransmem pred_transm = new PredictedTransmem(index, cols[1], Double.parseDouble(cols[4]));
+			final_list.add(pred_transm);
 		}
 
-		boolean errorToRetrieve = false;
-		if (isValid) {
-
-			String data_link_url = getTransmemDataLinkFromTMHMM(jobID);
-
-			while (data_link_url.isBlank() || data_link_url.isEmpty()) {
-				data_link_url = getTransmemDataLinkFromTMHMM(jobID);
-			}
-
-			if (data_link_url.equals("time out")) {
-				errorToRetrieve = true;
-			}
-
-			if (!errorToRetrieve) {
-				String response = connectTMHMM_website(data_link_url);
-				int processing_time = response.toLowerCase().indexOf("your job has run for ");
-				if (processing_time != -1) {
-					String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
-					procTimeStr = procTimeStr.replaceAll("[^0-9]", "").trim();
-					if (Integer.parseInt(procTimeStr) > 3000) {
-						errorToRetrieve = true;
-					}
-				}
-
-				if (!errorToRetrieve) {
-					while (response.isBlank() || response.isEmpty()) {
-						data_link_url = connectTMHMM_website(data_link_url);
-					}
-					return createPredictedTransmemList(response);
-				}
-			}
-		}
-		if (!isValid || errorToRetrieve) {
-
-			if (!(jobID.isBlank() || jobID.isEmpty()))
-				jobID = "ERROR: " + jobID;
-			taskMonitor.showMessage(TaskMonitor.Level.ERROR,
-					"Error retrieving protein " + protein.gene + " information from TMHMM server.\n" + jobID);
-			return new ArrayList<PredictedTransmem>();
-		}
-		return new ArrayList<PredictedTransmem>();
-
+		return final_list;
 	}
 
-	private static List<PredictedTransmem> createPredictedTransmemList(String response) {
+	/**
+	 * Method responsible for creating transmembrane list from TMHMM website
+	 * 
+	 * @param response response from TMHMM website
+	 * @return list of predicted transmembrane
+	 */
+	private static List<PredictedTransmem> createPredictedTransmemListFromTMHMM(String response) {
 
 		List<PredictedTransmem> final_list = new ArrayList<PredictedTransmem>();
 
@@ -5096,10 +5285,56 @@ public class Util {
 	 * @param jobID job id
 	 * @return url
 	 */
+	private static Map<String, String> getTransmemDataLinksFromPhobius(String response) {
+
+		// Map<Protein,data_link>
+		Map<String, String> result = new HashMap<String, String>();
+		int seq_index = response.indexOf("<pre>", 0);
+		while (seq_index != -1) {
+
+			String protein_preID = response.subSequence(seq_index, seq_index + 40).toString();
+			int proteinID_index = protein_preID.indexOf("ID   ");
+			if (proteinID_index == -1) {
+				// It means the results have not been retrieved.
+				result.put("time out", "time out");
+				break;
+			}
+			int proteinID_end_index = protein_preID.indexOf("\n", proteinID_index);
+			protein_preID = protein_preID.subSequence(proteinID_index, proteinID_end_index).toString().trim()
+					.replaceAll("ID   ", "").trim();
+
+			seq_index = response.indexOf("found <a href=", seq_index);
+			int data_end_index = response.indexOf("\">", seq_index);
+
+			String data_link = "";
+			if (seq_index != -1) {
+				data_link = response.subSequence(seq_index, data_end_index).toString().trim()
+						.replaceAll("found <a href=.../", data_link).trim();
+
+				data_link = "https://phobius.sbc.su.se/" + data_link;
+			}
+
+			result.put(protein_preID, data_link);
+
+			seq_index++;
+			seq_index = response.indexOf("<pre>", seq_index);
+
+		}
+
+		return result;
+
+	}
+
+	/**
+	 * Method responsible for getting transmem data link from TMHMM website
+	 * 
+	 * @param jobID job id
+	 * @return url
+	 */
 	private static Map<String, String> getTransmemDataLinksFromTMHMM(String jobID) {
 
 		String url = "https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi?jobid=" + jobID + "&wait=20";
-		String response = connectTMHMM_website(url);
+		String response = connect_website(url);
 		int processing_time = response.toLowerCase().indexOf("your job has run for ");
 		if (processing_time != -1) {
 			String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
@@ -5153,7 +5388,7 @@ public class Util {
 	private static String getTransmemDataLinkFromTMHMM(String jobID) {
 
 		String url = "https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi?jobid=" + jobID + "&wait=20";
-		String response = connectTMHMM_website(url);
+		String response = connect_website(url);
 		int processing_time = response.toLowerCase().indexOf("your job has run for ");
 		if (processing_time != -1) {
 			String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
@@ -5182,7 +5417,7 @@ public class Util {
 	 * @param jobID job id attribute
 	 * @return return the website as string
 	 */
-	private static String connectTMHMM_website(String _url) {
+	private static String connect_website(String _url) {
 
 		try {
 
@@ -5242,7 +5477,7 @@ public class Util {
 		int isFinished = -1;
 
 		String url = "https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi?jobid=" + jobID + "&wait=20";
-		String response = connectTMHMM_website(url);
+		String response = connect_website(url);
 		int processing_time = response.toLowerCase().indexOf("your job has run for ");
 		if (processing_time != -1) {
 			String procTimeStr = response.subSequence(processing_time, processing_time + 50).toString();
@@ -5264,6 +5499,38 @@ public class Util {
 
 	}
 
+	private static String callPhobius_sequence_webservice() {
+
+		String _return = "";
+
+		try {
+			// Set header
+			Map<String, String> headers = new HashMap<>();
+			headers.put("User-Agent",
+					"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36");
+
+			HttpPostMultipart multipart = new HttpPostMultipart("https://phobius.sbc.su.se/cgi-bin/predict.pl", "utf-8",
+					headers);
+			// Add form field
+
+			File uploadFastaFile = new File(ReaderWriterTextFile.outputFileName);
+			multipart.addFormField("format", "plp");
+			multipart.addFilePart("protfile", uploadFastaFile);
+//			multipart.addFormField("protseq", protein_sequence);
+			String response = multipart.finish();
+
+			ReaderWriterTextFile.destroyFile();
+
+			return response;
+
+		} catch (Exception e) {
+
+			_return = "Error to call Phobius web service: " + e.getMessage();
+		}
+
+		return _return;
+	}
+
 	/**
 	 * Method responsible for calling TMHMM web service
 	 * 
@@ -5278,6 +5545,7 @@ public class Util {
 			Map<String, String> headers = new HashMap<>();
 			headers.put("User-Agent",
 					"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36");
+
 			HttpPostMultipart multipart = new HttpPostMultipart(
 					"https://services.healthtech.dtu.dk/cgi-bin/webface2.cgi", "utf-8", headers);
 			// Add form field

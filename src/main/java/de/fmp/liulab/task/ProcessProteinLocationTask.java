@@ -1774,39 +1774,81 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		if (protein == null)
 			return;
 
-		if (protein.isConflictedDomain)
-			return;
-
 		if (protein.domains == null)
 			return;
 
-		if (containsConflictResidue(protein))
-			return;
+		if (!(protein.isConflictedDomain || containsConflictResidue(protein))) {
+			for (ProteinDomain domain : protein.domains) {
 
-		for (ProteinDomain domain : protein.domains) {
+				if (domain.eValue.isBlank() || domain.eValue.isEmpty() || domain.eValue.equals("predicted")
+						|| domain.name.isBlank() || domain.name.isEmpty())
+					continue;
 
-			if (domain.eValue.isBlank() || domain.eValue.isEmpty() || domain.eValue.equals("predicted")
-					|| domain.name.isBlank() || domain.name.isEmpty())
-				continue;
+				// Get all residues of a specific domain
+				List<Residue> residues = protein.reactionSites.stream()
+						.filter(value -> value.position >= domain.startId && value.position <= domain.endId)
+						.collect(Collectors.toList());
 
-			// Get all residues of a specific domain
-			List<Residue> residues = protein.reactionSites.stream()
-					.filter(value -> value.position >= domain.startId && value.position <= domain.endId)
-					.collect(Collectors.toList());
+				for (Residue residue : residues) {
 
-			for (Residue residue : residues) {
+					if (!domain.name.toLowerCase().equals(TRANSMEMBRANE))
+						residue.score = Double.parseDouble(domain.eValue);
+					else
+						residue.score = -1;
+					residue.location = domain.name;
+					residue.predictedLocation = domain.name;
+					if (residue.score != Util.initialResidueScore)
+						residue.predicted_epoch = epochs;
+				}
+			}
+		} else {
 
-				if (!domain.name.toLowerCase().equals(TRANSMEMBRANE))
-					residue.score = Double.parseDouble(domain.eValue);
+			// Group domains based on the range position
+			Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+					.filter(value -> !value.name.isBlank() && !value.name.isEmpty() && !value.eValue.isBlank()
+							&& !value.eValue.isEmpty() && !value.eValue.equals("predicted"))
+					.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+
+			for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
+
+				String[] split_index = proteinDomain.getKey().split("_");
+
+				int startId = Integer.parseInt(split_index[0]);
+				int endId = Integer.parseInt(split_index[1]);
+
+				// Get all residues of a specific domain
+				List<Residue> residues = protein.reactionSites.stream()
+						.filter(value -> value.position >= startId && value.position <= endId)
+						.collect(Collectors.toList());
+
+				List<ProteinDomain> current_domains = proteinDomain.getValue();
+				ProteinDomain domain = null;
+				boolean isConflict = false;
+				if (current_domains.size() > 1)
+					isConflict = true;
 				else
-					residue.score = -1;
-				residue.location = domain.name;
-				residue.predictedLocation = domain.name;
-				if (residue.score != Util.initialResidueScore)
-					residue.predicted_epoch = epochs;
+					domain = current_domains.get(0);
+
+				for (Residue residue : residues) {
+
+					if (isConflict) {
+						if (!residue.isConflicted) {
+							residue.isConflicted = true;
+							residue.conflicted_residue = new Residue('_', "", 0, null);
+						}
+					} else {
+						if (!domain.name.toLowerCase().equals(TRANSMEMBRANE))
+							residue.score = Double.parseDouble(domain.eValue);
+						else
+							residue.score = -1;
+						residue.location = domain.name;
+						residue.predictedLocation = domain.name;
+						if (residue.score != Util.initialResidueScore)
+							residue.predicted_epoch = epochs;
+					}
+				}
 			}
 		}
-
 	}
 
 	/**
@@ -1934,12 +1976,20 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					// Unified proteins -> e.g Matrix[11-30], Matrix [55-70] => Matrix [1-120]
 					// e.g. Matrix [11-30], IMS [55-70] => Matrix [1-120] and IMS [1-120]
-					if (!Util.dualLocalization_conflict)
-						protein.domains = ComputeDomainsScore(protein.reactionSites, 1, protein.sequence.length());
-					else if (protein.domains == null)
+					if (!Util.dualLocalization_conflict) {
+						newDomains = ComputeDomainsScore(protein.reactionSites, 1, protein.sequence.length());
+						newDomains.addAll(protein.domains.stream().filter(value -> !value.isPredicted)
+								.collect(Collectors.toList()));
+
+						protein.domains = newDomains.stream().distinct().collect(Collectors.toList());
+					} else if (protein.domains == null)
 						protein.domains = new ArrayList<ProteinDomain>();
 					if (protein.domains.size() == 0)
 						continue;
+
+					// remove domains created from null conflict residues
+					protein.domains.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty())
+							&& !value.eValue.isBlank() && !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
 
 					if (addDomainScore) {
 						for (ProteinDomain proteinDomain : protein.domains) {
@@ -2053,6 +2103,11 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									.collect(Collectors.toList()));
 							newDomains.add(transmem);
 							protein.domains = newDomains;
+
+							// remove domains created from null conflict residues
+							protein.domains.removeIf(
+									value -> ((value.name.isBlank() || value.name.isEmpty()) && !value.eValue.isBlank()
+											&& !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
 
 							Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
 								@Override
@@ -2255,6 +2310,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 						}
 						protein.domains = newDomains;
+
+						// remove domains created from null conflict residues
+						protein.domains.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty())
+								&& !value.eValue.isBlank() && !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
 
 						Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
 
@@ -2526,6 +2585,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						new_domain_list.addAll(current_domains);
 
 					}
+
+					// remove domains created from null conflict residues
+					new_domain_list.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty())
+							&& !value.eValue.isBlank() && !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
 
 					groupedDomains = new_domain_list.stream()
 							.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
@@ -4154,9 +4217,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				int start_domain = -1;
 				int end_domain = -1;
 				String domain = "";
-				
-				if(countProtein == 532)
-					System.out.println();
 
 				for (int i = 0; i < protein.reactionSites.size(); i++) {
 
@@ -4247,6 +4307,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 				if (protein.domains != null) {
 
+					// remove domains created from null conflict residues
+					protein.domains.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty())
+							&& !value.eValue.isBlank() && !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
+
 					// Sort protein domains list
 					Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
 						@Override
@@ -4330,10 +4394,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				&& value.position <= end_pos && value.isConflicted && value.conflicted_residue != null)
 				.collect(Collectors.toList())) {
 
-			//Transmem does not predict and conflict other residues
-			if(residue.conflicted_residue.predictedLocation.toLowerCase().equals(TRANSMEMBRANE))
+			// Transmem does not predict and conflict other residues
+			if (residue.conflicted_residue.predictedLocation.toLowerCase().equals(TRANSMEMBRANE))
 				continue;
-			
+
 			if (groupedResidues.containsKey(residue.conflicted_residue.predictedLocation)) {
 
 				List<Residue> current_residues = groupedResidues.get(residue.conflicted_residue.predictedLocation);
@@ -4355,7 +4419,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			double score = 0;
 
 			for (Residue residue : entry.getValue()) {
-				if (residue.isConflicted)
+				if (residue.isConflicted && residue.conflicted_score > 0)
 					score += Math.pow(residue.conflicted_score, 2);
 				else
 					score += Math.pow(residue.score, 2);

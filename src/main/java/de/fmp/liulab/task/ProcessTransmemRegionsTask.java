@@ -14,7 +14,6 @@ import org.cytoscape.application.CyApplicationManager;
 import org.cytoscape.model.CyNetwork;
 import org.cytoscape.view.model.VisualLexicon;
 import org.cytoscape.view.vizmap.VisualMappingManager;
-import org.cytoscape.view.vizmap.VisualStyle;
 import org.cytoscape.work.AbstractTask;
 import org.cytoscape.work.TaskMonitor;
 
@@ -25,10 +24,8 @@ import de.fmp.liulab.utils.Util;
 
 public class ProcessTransmemRegionsTask extends AbstractTask implements ActionListener {
 
-	private CyApplicationManager cyApplicationManager;
 	private static CyNetwork myNetwork;
 	public static VisualLexicon lexicon;
-	public static VisualStyle style;
 
 	private Map<Protein, List<PredictedTransmem>> proteinsWithPredTransmDict;
 	private final static String TRANSMEMBRANE = "transmem";
@@ -36,10 +33,7 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 	public ProcessTransmemRegionsTask(CyApplicationManager cyApplicationManager,
 			final VisualMappingManager vmmServiceRef) {
 
-		this.cyApplicationManager = cyApplicationManager;
-		this.style = vmmServiceRef.getCurrentVisualStyle();
-		this.myNetwork = cyApplicationManager.getCurrentNetwork();
-
+		myNetwork = cyApplicationManager.getCurrentNetwork();
 	}
 
 	@Override
@@ -62,9 +56,10 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 		int old_progress = 0;
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Predicting transmembrane regions: " + old_progress + "%");
 
+		List<Protein> ProteinsOfInterest = new ArrayList<Protein>();
+
 		if (this.proteinsWithPredTransmDict.size() == 0) {
 
-			List<Protein> ProteinsOfInterest = new ArrayList<Protein>();
 			for (Protein protein : allProteins) {
 
 				if (protein.sequence.isBlank() || protein.sequence.isEmpty())
@@ -81,17 +76,8 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 
 				ProteinsOfInterest.add(protein);
 			}
-
-			Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util
-					.predictTransmemRegions(ProteinsOfInterest, taskMonitor);
-			for (Map.Entry<Protein, List<PredictedTransmem>> entry : predictedTransmemList.entrySet()) {
-				this.proteinsWithPredTransmDict.put(entry.getKey(), entry.getValue());
-			}
-
 		} else {
 
-			List<Protein> ProteinsOfInterest = new ArrayList<Protein>();
-			
 			for (Protein protein : allProteins) {
 
 				if (protein.sequence.isBlank() || protein.sequence.isEmpty())
@@ -117,14 +103,19 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 				if (!isPresent.isPresent()) {
 					ProteinsOfInterest.add(protein);
 				}
+			}
+		}
 
-			}
-			
-			Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util
-					.predictTransmemRegions(ProteinsOfInterest, taskMonitor);
-			for (Map.Entry<Protein, List<PredictedTransmem>> entry : predictedTransmemList.entrySet()) {
-				this.proteinsWithPredTransmDict.put(entry.getKey(), entry.getValue());
-			}
+//		Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util.predictTransmemRegionsFromTMHMM(ProteinsOfInterest,
+//				taskMonitor);
+
+//		Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util
+//				.predictTransmemRegionsFromPhobius(ProteinsOfInterest, taskMonitor);
+		
+		Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util
+				.predictTransmemRegionsFromDeepTMHMM(ProteinsOfInterest, taskMonitor);
+		for (Map.Entry<Protein, List<PredictedTransmem>> entry : predictedTransmemList.entrySet()) {
+			this.proteinsWithPredTransmDict.put(entry.getKey(), entry.getValue());
 		}
 
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Applying cutoff filtering...");
@@ -132,6 +123,11 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 		applyFilterToTransmemDic(taskMonitor);
 	}
 
+	/**
+	 * Method responsible for filtering the predicted transmembrane regions
+	 * 
+	 * @param taskMonitor current task monitor
+	 */
 	private void applyFilterToTransmemDic(TaskMonitor taskMonitor) {
 
 		boolean isChanged = false;
@@ -209,6 +205,12 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 		Util.updateProteins(taskMonitor, myNetwork, null, false, false);
 	}
 
+	/**
+	 * Method responsible for converting Predicted Transmem to ProteinDomain
+	 * 
+	 * @param transmemList list of predicted transmem
+	 * @return list of protein domains
+	 */
 	private List<ProteinDomain> createTransmemDomains(List<PredictedTransmem> transmemList) {
 
 		List<ProteinDomain> new_transm_list = new ArrayList<ProteinDomain>();
