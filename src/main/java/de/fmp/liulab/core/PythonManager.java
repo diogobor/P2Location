@@ -1,8 +1,11 @@
 package de.fmp.liulab.core;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 
 import javax.swing.JLabel;
 
@@ -11,6 +14,19 @@ import org.cytoscape.work.TaskMonitor;
 import de.fmp.liulab.utils.Util;
 
 public class PythonManager {
+
+	public static void printErrorFromProcess(TaskMonitor taskMonitor, InputStream msgError, String cmdarray)
+			throws IOException {
+		BufferedReader stdError = new BufferedReader(new InputStreamReader(msgError));
+
+		String s = null;
+		while ((s = stdError.readLine()) != null) {
+			if (s.contains("ReadTimeout")) {
+				taskMonitor.showMessage(TaskMonitor.Level.ERROR, "TIME OUT: Error to call " + cmdarray);
+				break;
+			}
+		}
+	}
 
 	public static void execUnix(String cmdarray, TaskMonitor taskMonitor) throws IOException, InterruptedException {
 		// instead of calling command directly, we'll call the shell
@@ -23,6 +39,8 @@ public class PythonManager {
 		// waits for the process until you terminate.
 		p.waitFor();
 
+		printErrorFromProcess(taskMonitor, p.getErrorStream(), cmdarray);
+
 	}
 
 	public static void execWindows(String cmdarray, TaskMonitor taskMonitor) throws IOException, InterruptedException {
@@ -32,8 +50,11 @@ public class PythonManager {
 		pb.directory(rDir);
 
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Executing: '" + cmd + "' @ " + rDir.getAbsolutePath());
-		pb.start();
-		pb.wait();
+		Process p = pb.start();
+		// waits for the process until you terminate.
+		p.waitFor();
+
+		printErrorFromProcess(taskMonitor, p.getErrorStream(), cmdarray);
 	}
 
 	private static File getTmpFile(String prefix, String suffix, TaskMonitor taskMonitor) {

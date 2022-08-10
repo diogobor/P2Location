@@ -4908,7 +4908,7 @@ public class Util {
 	 * @throws IOException
 	 */
 	public static Map<Protein, List<PredictedTransmem>> predictTransmemRegionsFromDeepTMHMM(List<Protein> proteins,
-			TaskMonitor taskMonitor) throws IOException {
+			TaskMonitor taskMonitor) throws Exception {
 
 		if (proteins.size() == 0)
 			return new HashMap<Protein, List<PredictedTransmem>>();
@@ -4924,22 +4924,30 @@ public class Util {
 
 		String fastaFile = "";
 		for (Protein protein : proteins) {
+			try {
+				fastaFile = prepareFastaBasedOnOneProtein(protein);
+				fastaFile = PythonManager.createFastaFile(fastaFile, taskMonitor);
+				// [python script path, results folder path]
+				String[] run_python_py_path = PythonManager.createPythonCalling(fastaFile, taskMonitor);
+				String run_python_shell_path = PythonManager.createPythonShell(run_python_py_path[0], taskMonitor);
+				PythonManager.executePython(taskMonitor, run_python_shell_path, null);
 
-			fastaFile = prepareFastaBasedOnOneProtein(protein);
-			fastaFile = PythonManager.createFastaFile(fastaFile, taskMonitor);
-			// [python script path, results folder path]
-			String[] run_python_py_path = PythonManager.createPythonCalling(fastaFile, taskMonitor);
-			String run_python_shell_path = PythonManager.createPythonShell(run_python_py_path[0], taskMonitor);
-			PythonManager.executePython(taskMonitor, run_python_shell_path, null);
-
-			String results_folder = System.getProperty("java.io.tmpdir") + "/cytoTmpScripts/" + run_python_py_path[1];
-			final_result.put(protein, readDeepTMHMM_results(results_folder));
+				String results_folder = System.getProperty("java.io.tmpdir") + "/cytoTmpScripts/"
+						+ run_python_py_path[1];
+				final_result.put(protein, readDeepTMHMM_results(results_folder));
+			} catch (Exception e) {
+				taskMonitor.showMessage(TaskMonitor.Level.ERROR,
+						"Error to predict transmembrane regions for the protein: " + protein.gene
+								+ " using DeepTMHMM.");
+			}
 		}
 
 		return final_result;
 	}
 
 	private static String getCSVfromDeppTMHMM_results(final File folder) {
+		if (folder == null || folder.listFiles() == null)
+			return "";
 		for (final File fileEntry : folder.listFiles()) {
 			if (fileEntry.isFile()) {
 				String fileName = fileEntry.getName();
