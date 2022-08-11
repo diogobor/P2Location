@@ -24,6 +24,9 @@ public class PythonManager {
 			if (s.contains("ReadTimeout")) {
 				taskMonitor.showMessage(TaskMonitor.Level.ERROR, "TIME OUT: Error to call " + cmdarray);
 				break;
+			} else if (s.contains("under high load")) {
+				taskMonitor.showMessage(TaskMonitor.Level.ERROR, "TIME OUT: Error to call " + cmdarray);
+				break;
 			}
 		}
 	}

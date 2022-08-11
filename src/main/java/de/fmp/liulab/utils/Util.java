@@ -4937,8 +4937,8 @@ public class Util {
 				final_result.put(protein, readDeepTMHMM_results(results_folder));
 			} catch (Exception e) {
 				taskMonitor.showMessage(TaskMonitor.Level.ERROR,
-						"Error to predict transmembrane regions for the protein: " + protein.gene
-								+ " using DeepTMHMM.");
+						"ERROR: It is not possible to proceed the transmembrane prediction for the protein "
+								+ protein.gene + " using DeepTMHMM.\n" + e.getMessage());
 			}
 		}
 
