@@ -56,7 +56,7 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 		int old_progress = 0;
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Predicting transmembrane regions: " + old_progress + "%");
 
-		List<Protein> ProteinsOfInterest = new ArrayList<Protein>();
+		List<Protein> proteinsOfInterest = new ArrayList<Protein>();
 
 		if (this.proteinsWithPredTransmDict.size() == 0) {
 
@@ -74,7 +74,7 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 						continue;
 				}
 
-				ProteinsOfInterest.add(protein);
+				proteinsOfInterest.add(protein);
 			}
 		} else {
 
@@ -101,26 +101,32 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 						.findFirst();
 
 				if (!isPresent.isPresent()) {
-					ProteinsOfInterest.add(protein);
+					proteinsOfInterest.add(protein);
 				}
 			}
 		}
 
-//		Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util.predictTransmemRegionsFromTMHMM(ProteinsOfInterest,
-//				taskMonitor);
+		Map<Protein, List<PredictedTransmem>> predictedTransmemList = null;
+
+//		if (Util.transmembraneTool == 1)
+//			predictedTransmemList = Util.predictTransmemRegionsFromDeepTMHMM(ProteinsOfInterest, taskMonitor);
+//		else if (Util.transmembraneTool == 2)
+
+		predictedTransmemList = Util.predictTransmemRegionsFromTMHMM(proteinsOfInterest, taskMonitor);
 
 //		Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util
 //				.predictTransmemRegionsFromPhobius(ProteinsOfInterest, taskMonitor);
-		
-		Map<Protein, List<PredictedTransmem>> predictedTransmemList = Util
-				.predictTransmemRegionsFromDeepTMHMM(ProteinsOfInterest, taskMonitor);
+
+		// Update proteinsWithPredTransmDic
 		for (Map.Entry<Protein, List<PredictedTransmem>> entry : predictedTransmemList.entrySet()) {
 			this.proteinsWithPredTransmDict.put(entry.getKey(), entry.getValue());
 		}
 
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Applying cutoff filtering...");
-
 		applyFilterToTransmemDic(taskMonitor);
+
+		retrieveTransmemInfoFromUniprot(proteinsOfInterest, taskMonitor);
+		updateProteinsMap(taskMonitor);
 	}
 
 	/**
@@ -130,7 +136,6 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 	 */
 	private void applyFilterToTransmemDic(TaskMonitor taskMonitor) {
 
-		boolean isChanged = false;
 		for (Map.Entry<Protein, List<PredictedTransmem>> entry : this.proteinsWithPredTransmDict.entrySet()) {
 
 			try {
@@ -147,8 +152,6 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 									|| (value.isPredicted && !value.name.toLowerCase().contains(TRANSMEMBRANE)))
 							.collect(Collectors.toList());
 				}
-
-				isChanged = true;
 
 				if (domains_without_predicted_transm != null)
 					domains_without_predicted_transm.addAll(transmemDomains);
@@ -170,10 +173,6 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 			}
 
 		}
-
-		if (isChanged)
-			updateProteinsMap(taskMonitor);
-
 	}
 
 	/**
@@ -245,5 +244,137 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 		}
 
 		return new_transm_list;
+	}
+
+	/**
+	 * Method responsible for merging similar protein domains with different ranges
+	 * 
+	 * @param protein  current protein
+	 * @param delta_aa delta number of amino acids
+	 */
+	private List<ProteinDomain> unifyResiduesDomains(List<ProteinDomain> current_ptn_domain_list, int delta_aa) {
+
+		for (ProteinDomain domain : current_ptn_domain_list) {
+
+			// e.g. Domain[716-722] and Domain[717-723] => Domain[716-723] -> delta == 0
+			// e.g. Domain[136-142] and Domain[144-150] => Domain[136-150] -> delta == 2
+			List<ProteinDomain> candidates_domains = current_ptn_domain_list.stream()
+					.filter(value -> value.startId >= domain.startId - delta_aa
+							&& value.startId <= domain.endId + delta_aa && value.endId >= domain.endId
+							&& value.name.equals(domain.name))
+					.collect(Collectors.toList());
+
+			if (candidates_domains.size() > 0) {
+				double highest_score = candidates_domains.stream().map(value -> Double.parseDouble(value.eValue))
+						.max(Comparator.naturalOrder()).get();
+				int min_value = candidates_domains.stream().map(value -> value.startId).min(Comparator.naturalOrder())
+						.get();
+				int max_value = candidates_domains.stream().map(value -> value.endId).max(Comparator.naturalOrder())
+						.get();
+				for (ProteinDomain expandDomain : candidates_domains) {
+
+					domain.endId = max_value;
+					expandDomain.startId = min_value;
+					expandDomain.eValue = Double.toString(highest_score);
+				}
+			}
+		}
+
+		current_ptn_domain_list = current_ptn_domain_list.stream().distinct().collect(Collectors.toList());
+
+		// E.g. IMS [50-250], IMS [50-255], IMS [50-300]
+//		checkSubsetProteinDomains(protein);
+
+//		protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
+
+		return current_ptn_domain_list;
+	}
+
+	/**
+	 * Method responsible for merging transmembrane regions
+	 * 
+	 * @param protein               current protein
+	 * @param transmembrane_domains list of transmembrane regions
+	 */
+	private void mergeTransmemDomains(Protein protein, List<ProteinDomain> transmembrane_domains) {
+
+		if (protein.domains == null) {
+			protein.domains = transmembrane_domains;
+			return;
+		}
+		List<ProteinDomain> current_transmem_list = protein.domains.stream()
+				.filter(value -> value.name.toLowerCase().equals(TRANSMEMBRANE)).collect(Collectors.toList());
+
+		current_transmem_list.addAll(transmembrane_domains);
+		Collections.sort(current_transmem_list, new Comparator<ProteinDomain>() {
+			@Override
+			public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+				return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+			}
+		});
+
+		List<ProteinDomain> candidates_transmem_list = new ArrayList<ProteinDomain>();
+
+		int offset = 0;
+		for (int i = 0; i < current_transmem_list.size(); i++) {
+			ProteinDomain current_transm = current_transmem_list.get(i);
+
+			int j = i + 1;
+			for (; j < current_transmem_list.size(); j++) {
+				ProteinDomain next_transm = current_transmem_list.get(j);
+				if ((next_transm.startId >= current_transm.startId && next_transm.endId <= current_transm.endId)
+						|| (next_transm.startId >= current_transm.startId && next_transm.endId > current_transm.endId
+								&& next_transm.startId <= current_transm.endId)) {
+					// get index
+					offset = j;
+				} else
+					break;
+			}
+
+			int offset_start = current_transmem_list.get(j - 1).startId - current_transmem_list.get(i).startId;
+			int offset_end = current_transmem_list.get(i).endId - current_transmem_list.get(j - 1).endId;
+			offset = offset_start > offset_end ? offset_start : offset_end;
+			candidates_transmem_list.addAll(unifyResiduesDomains(current_transmem_list.subList(i, j), offset));
+
+			i = j - 1;
+		}
+
+		protein.domains.removeIf(value -> value.name.toLowerCase().equals(TRANSMEMBRANE));
+		protein.domains.addAll(candidates_transmem_list);
+	}
+
+	/**
+	 * Method responsible for retrieving transmembrane regions from Uniprot
+	 * 
+	 * @param proteins    list of proteins
+	 * @param taskMonitor current task monitor
+	 */
+	private void retrieveTransmemInfoFromUniprot(List<Protein> proteins, TaskMonitor taskMonitor) {
+
+		if (proteins == null || proteins.size() == 0)
+			return;
+
+		int total_lines = proteins.size();
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		for (Protein protein : proteins) {
+
+			List<ProteinDomain> transmem_domains = Util.getTransmembraneInfoFromUniprot(myNetwork, protein.proteinID,
+					taskMonitor);
+
+			if (transmem_domains != null && transmem_domains.size() > 0) {
+				if (protein.domains == null)
+					protein.domains = transmem_domains;
+				else {
+					mergeTransmemDomains(protein, transmem_domains);
+					protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
+				}
+			}
+
+			summary_processed++;
+			Util.progressBar(summary_processed, old_progress, total_lines,
+					"Retrieving transmembrane regions from Uniprot: ", taskMonitor, null);
+		}
 	}
 }

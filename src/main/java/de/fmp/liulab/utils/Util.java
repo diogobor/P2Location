@@ -173,6 +173,9 @@ public class Util {
 	public static double initialResidueScore = 150.0;
 	public static double initialTransmembraneScore = 1.0;
 
+	// 1 = DeepTMHMM , 2 = TMHMM
+	public static int transmembraneTool = 1;
+
 	// Map<Network name,List<Protein>
 	public static Map<String, List<Protein>> proteinsMap = new HashMap<String, List<Protein>>();
 	public static Map<String, Color> proteinDomainsColorMap = new HashMap<String, Color>();
@@ -6273,6 +6276,118 @@ public class Util {
 	}
 
 	/**
+	 * Method responsible for retrieving transmembrane information from Uniprot
+	 * 
+	 * @param currentNetwork current network
+	 * @param proteinID      current protein ID
+	 * @param taskMonitor    current task monitor
+	 * @return list of transmembrane regions
+	 */
+	public static List<ProteinDomain> getTransmembraneInfoFromUniprot(CyNetwork currentNetwork, String proteinID,
+			TaskMonitor taskMonitor) {
+
+		if (currentNetwork == null)
+			return new ArrayList<ProteinDomain>();
+
+		CyNode ptn_node = getNode(currentNetwork, proteinID);
+		if (ptn_node == null)
+			return new ArrayList<ProteinDomain>();
+
+		CyRow myCurrentRow = currentNetwork.getRow(ptn_node);
+		if (myCurrentRow == null)
+			return new ArrayList<ProteinDomain>();
+
+		proteinID = getProteinID(myCurrentRow);
+		if (proteinID.isBlank() || proteinID.isEmpty())
+			return new ArrayList<ProteinDomain>();
+
+		try {
+			String _url = "https://www.uniprot.org/uniprot/" + proteinID + ".xml";
+			final URL url = new URL(_url);
+			final HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("POST");
+			connection.setDoOutput(true);
+			connection.setReadTimeout(5000);
+			connection.setConnectTimeout(5000);
+			connection.connect();
+
+			if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+
+				// Get Response
+				InputStream inputStream = connection.getErrorStream(); // first check for error.
+				if (inputStream == null) {
+					inputStream = connection.getInputStream();
+				}
+				BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
+				String line;
+				StringBuilder response = new StringBuilder();
+				int total_lines = connection.getContentLength();
+
+				int old_progress = 0;
+				int summary_processed = 0;
+				while ((line = rd.readLine()) != null) {
+					response.append(line);
+					response.append('\r');
+
+					summary_processed += line.toCharArray().length + 1;
+					progressBar(summary_processed, old_progress, total_lines,
+							"Download protein information from Uniprot: ", taskMonitor, null);
+
+				}
+				rd.close();
+				String responseString = response.toString();
+
+				if (responseString.startsWith("<!DOCTYPE html PUBLIC"))
+					return new ArrayList<ProteinDomain>();
+
+				// Use method to convert XML string content to XML Document object
+				Document doc = convertStringToXMLDocument(responseString);
+
+				if (doc == null)
+					return new ArrayList<ProteinDomain>();
+
+				// check if exists error
+				NodeList xmlnodes = doc.getElementsByTagName("error");
+				if (xmlnodes.getLength() > 0) {
+					throw new Exception("P2Location ERROR: " + xmlnodes.item(0).getNodeValue());
+				}
+
+				taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting transmembrane regions...");
+				xmlnodes = doc.getElementsByTagName("feature");
+				if (xmlnodes.getLength() == 0) {
+					throw new Exception("P2Location ERROR: There is no feature tag");
+				}
+
+				List<ProteinDomain> transmem_regions = new ArrayList<ProteinDomain>();
+
+				for (int i = 0; i < xmlnodes.getLength(); i++) {
+					Node node = xmlnodes.item(i);
+					if (node.getAttributes().getLength() < 3)
+						continue;
+					String featureType = node.getAttributes().item(2).getNodeValue();
+					if (featureType.equals("transmembrane region")) {
+						Node child_start = node.getChildNodes().item(1).getChildNodes().item(1);
+						Node child_end = node.getChildNodes().item(1).getChildNodes().item(3);
+						int startID = Integer.parseInt(child_start.getAttributes().item(0).getNodeValue());
+						int endID = Integer.parseInt(child_end.getAttributes().item(0).getNodeValue());
+
+						ProteinDomain new_transm_domain = new ProteinDomain("TRANSMEM", startID, endID, false, "1.0");
+						transmem_regions.add(new_transm_domain);
+					}
+				}
+				return transmem_regions;
+
+			} else {
+				return new ArrayList<ProteinDomain>();
+			}
+
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+			return new ArrayList<ProteinDomain>();
+		}
+	}
+
+	/**
 	 * Method responsible for getting protein description from Uniprot
 	 * 
 	 * @param myCurrentRow current row
@@ -6679,5 +6794,32 @@ public class Util {
 		}
 
 		return isKeyPresent;
+	}
+
+	/**
+	 * Method responsible for computing domain score
+	 * 
+	 * @param protein      current protein
+	 * @param start_domain starts domain
+	 * @param end_domain   ends domain
+	 * @return score
+	 */
+	public static double ComputeDomainScore(Protein protein, int start_domain, int end_domain) {
+
+		List<Residue> current_residues = protein.reactionSites.stream()
+				.filter(value -> value.position >= start_domain && value.position <= end_domain)
+				.collect(Collectors.toList());
+
+		if (current_residues.size() == 0)
+			return 0;
+
+		double score = 0;
+
+		for (Residue residue : current_residues) {
+			score += Math.pow(residue.score, 2);
+		}
+
+		return Math.sqrt(score / current_residues.size());
+
 	}
 }

@@ -4341,32 +4341,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 //		Util.updateProteins(taskMonitor, myNetwork, null, false, true);
 	}
 
-	/**
-	 * Method responsible for computing domain score
-	 * 
-	 * @param protein      current protein
-	 * @param start_domain starts domain
-	 * @param end_domain   ends domain
-	 * @return score
-	 */
-	private double ComputeDomainScore(Protein protein, int start_domain, int end_domain) {
-
-		List<Residue> current_residues = protein.reactionSites.stream()
-				.filter(value -> value.position >= start_domain && value.position <= end_domain)
-				.collect(Collectors.toList());
-
-		if (current_residues.size() == 0)
-			return 0;
-
-		double score = 0;
-
-		for (Residue residue : current_residues) {
-			score += Math.pow(residue.score, 2);
-		}
-
-		return Math.sqrt(score / current_residues.size());
-
-	}
+	
 
 	/**
 	 * Method responsible for computing domain score based on residues scores
@@ -4480,7 +4455,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					new_end = protein.sequence.length();
 				domain.startId = new_start;
 				domain.endId = new_end;
-				domain.eValue = Util.RoundScore(ComputeDomainScore(protein, domain.startId, domain.endId));
+				domain.eValue = Util.RoundScore(Util.ComputeDomainScore(protein, domain.startId, domain.endId));
 
 			}
 		}
@@ -4525,7 +4500,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					expandDomain.startId = domain.startId;
 					expandDomain.isPredicted = true;
 					expandDomain.eValue = Util
-							.RoundScore(ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
+							.RoundScore(Util.ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
 				}
 			}
 		}
@@ -4624,7 +4599,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						ProteinDomain final_domain = current_ptn_domain_list.get(current_ptn_domain_list.size() - 1);
 						initial_domain.endId = final_domain.endId;
 						initial_domain.eValue = Util
-								.RoundScore(ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
+								.RoundScore(Util.ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
 
 						if (initial_domain.eValue.equals("0E0"))
 							initial_domain.eValue = "predicted";
@@ -4654,7 +4629,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					ProteinDomain final_domain = current_ptn_domain_list.get(current_ptn_domain_list.size() - 1);
 					initial_domain.endId = final_domain.endId;
 					initial_domain.eValue = Util
-							.RoundScore(ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
+							.RoundScore(Util.ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
 
 					if (initial_domain.eValue.equals("0E0"))
 						initial_domain.eValue = "predicted";
@@ -4736,7 +4711,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						expandDomain.startId = domain.startId;
 						expandDomain.isPredicted = true;
 						expandDomain.eValue = Util
-								.RoundScore(ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
+								.RoundScore(Util.ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
 					}
 				}
 			}
@@ -4780,7 +4755,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						expandDomain.endId = max_value;
 						expandDomain.isPredicted = true;
 						expandDomain.eValue = Util
-								.RoundScore(ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
+								.RoundScore(Util.ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
 					}
 				}
 			}
@@ -4802,7 +4777,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						expandDomain.endId = domain.endId;
 						expandDomain.isPredicted = true;
 						expandDomain.eValue = Util
-								.RoundScore(ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
+								.RoundScore(Util.ComputeDomainScore(protein, expandDomain.startId, expandDomain.endId));
 					}
 				}
 			}

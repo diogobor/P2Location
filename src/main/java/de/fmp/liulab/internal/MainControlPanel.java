@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Properties;
 
 import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -31,6 +32,7 @@ import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import javax.swing.JSpinner;
 import javax.swing.SpinnerModel;
 import javax.swing.SpinnerNumberModel;
@@ -700,6 +702,38 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		transmem_regions_prediction_panel.setBounds(10, offset_y, WIDTH_PANEL - 20, 55);
 		transmem_regions_prediction_panel.setLayout(null);
 		prediction_panel.add(transmem_regions_prediction_panel);
+
+//		JRadioButton deep_tmhmm_radioButton = new JRadioButton("DeepTMHMM");
+//		deep_tmhmm_radioButton.addChangeListener(new ChangeListener() {
+//
+//			@Override
+//			public void stateChanged(ChangeEvent e) {
+//				Util.transmembraneTool = 1;
+//				P2LocationProps.setProperty("p2location.transmembraneTool", "1");
+//
+//			}
+//		});
+//		JRadioButton tmhmm_radioButton = new JRadioButton("TMHMM");
+//		tmhmm_radioButton.addChangeListener(new ChangeListener() {
+//
+//			@Override
+//			public void stateChanged(ChangeEvent e) {
+//				Util.transmembraneTool = 2;
+//				P2LocationProps.setProperty("p2location.transmembraneTool", "2");
+//
+//			}
+//		});
+//
+//		deep_tmhmm_radioButton.setBounds(5, offset_y - 8, 120, 30);
+//		deep_tmhmm_radioButton.setSelected(true);
+//		tmhmm_radioButton.setBounds(115, offset_y - 8, 100, 30);
+//		tmhmm_radioButton.setSelected(false);
+//		
+//		ButtonGroup transmem_buttonGroup = new ButtonGroup();
+//		transmem_buttonGroup.add(deep_tmhmm_radioButton);
+//		transmem_buttonGroup.add(tmhmm_radioButton);
+//		transmem_regions_prediction_panel.add(deep_tmhmm_radioButton);
+//		transmem_regions_prediction_panel.add(tmhmm_radioButton);
 
 //		offset_y -= 10;
 //		JLabel upperScoreLabel = new JLabel("Cutoff Score:");
