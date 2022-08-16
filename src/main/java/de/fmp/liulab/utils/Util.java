@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.swing.AbstractListModel;
 import javax.swing.JLabel;
@@ -102,6 +103,7 @@ public class Util {
 	public static String PREDICTED_PROTEIN_DOMAIN_COLUMN = PROJECT_NAME + "predicted_domains";
 	public static String CONFLICTED_PREDICTED_RESIDUES_COLUMN = PROJECT_NAME + "conflicted_residues";
 	public static String CONFLICTED_PROTEIN_DOMAINS_COLUMN = PROJECT_NAME + "conflicted_protein_domains";
+	public static String VALID_PROTEINS_COLUMN = PROJECT_NAME + "valid_proteins";
 	public static String PROTEIN_SEQUENCE_COLUMN = PROJECT_NAME + "sequence";
 	public static String PROTEIN_NAME_COLUMN = PROJECT_NAME + "protein_name";
 	public static String SUBCELLULAR_LOCATION_COLUMN = PROJECT_NAME + "subcellular_location";
@@ -918,6 +920,29 @@ public class Util {
 	}
 
 	/**
+	 * Method responsible for updating protein information (valid parameter)
+	 * 
+	 * @param myNetwork    current network
+	 * @param selectedNode protein node
+	 * @param proteinSUID  protein SUID
+	 * @param value        true if the protein is valid
+	 */
+	public static void updateValidProteinInfo(CyNetwork myNetwork, CyNode node, boolean value) {
+
+		// Update protein information
+		CyRow myCurrentRow = myNetwork.getRow(node);
+		if (myCurrentRow == null)
+			return;
+
+		String node_name = myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME).toString();
+		Protein protein = Util.getProtein(myNetwork, node_name);
+		if (protein == null)
+			return;
+
+		protein.isValid = value;
+	}
+
+	/**
 	 * Method responsible for getting edge from a name
 	 * 
 	 * @param myNetwork current network
@@ -1048,7 +1073,7 @@ public class Util {
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return;
 
-		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		List<Protein> proteinList = Util.getProteins(myNetwork, true);
 		if (proteinList == null || proteinList.size() == 0)
 			return;
 
@@ -1072,6 +1097,159 @@ public class Util {
 					textLabel_status_result);
 
 		}
+	}
+
+	/**
+	 * Method responsible for restoring the layout of the selected node.
+	 * 
+	 * @param taskMonitor
+	 */
+	public static void restoreDefaultStyle(final TaskMonitor taskMonitor, VisualStyle style, CyNetworkView netView,
+			CyApplicationManager cyApplicationManager, View<CyNode> nodeView, HandleFactory handleFactory,
+			BendFactory bendFactory, CyNode node, CyNetwork myNetwork, CyRow myCurrentRow, VisualLexicon lexicon) {
+
+		MainSingleNodeTask.isPlotDone = false;
+
+		if (style == null) {
+			return;
+		}
+		if (netView == null) {
+			netView = cyApplicationManager.getCurrentNetworkView();
+		}
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting protein...");
+		nodeView = netView.getNodeView(node);
+
+		clearNodeStyle(taskMonitor, nodeView, lexicon, netView, myNetwork, myCurrentRow);
+		UpdateViewListener.isNodeModified = false;
+		Util.restoreEdgesStyle(taskMonitor, myNetwork, cyApplicationManager, netView, handleFactory, bendFactory, node);
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Removing monolinks...");
+		hideMonolinks(netView, myNetwork, myCurrentRow);
+
+		// Apply the change to the view
+		style.apply(netView);
+		netView.updateView();
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Done!");
+
+		MainSingleNodeTask.isPlotDone = true;
+	}
+
+	/**
+	 * Method responsible for hiding monolink nodes
+	 */
+	private static void hideMonolinks(CyNetworkView netView, CyNetwork myNetwork, CyRow myCurrentRow) {
+
+		if (myNetwork == null)
+			return;
+
+		String nodeName = (String) myCurrentRow.getRaw(CyNetwork.NAME);
+
+		// Check if the node exists in the network
+		Stream<CyRow> monolinksRows = myNetwork.getDefaultNodeTable().getAllRows().stream()
+				.filter(new Predicate<CyRow>() {
+					public boolean test(CyRow o) {
+						return o.get(CyNetwork.NAME, String.class).contains("MONOLINK")
+								&& o.get(CyNetwork.NAME, String.class).contains(nodeName);
+					}
+				});
+
+		for (Iterator<CyRow> i = monolinksRows.iterator(); i.hasNext();) {
+
+			CyRow _node_row = i.next();
+
+			CyNode _node = myNetwork.getNode(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
+
+			View<CyNode> monolinkNodeView = netView.getNodeView(_node);
+			monolinkNodeView.setLockedValue(BasicVisualLexicon.NODE_VISIBLE, false);
+		}
+
+	}
+
+	/**
+	 * Method responsible for restoring basic node styles
+	 * 
+	 * @param taskMonitor
+	 */
+	private static void clearNodeStyle(final TaskMonitor taskMonitor, View<CyNode> nodeView, VisualLexicon lexicon,
+			CyNetworkView netView, CyNetwork myNetwork, CyRow myCurrentRow) {
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Restoring node layout...");
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_WIDTH);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_TRANSPARENCY);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_PAINT);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_FILL_COLOR);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_LABEL_COLOR);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_SELECTED_PAINT);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_BORDER_WIDTH);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_BORDER_PAINT);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_HEIGHT);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_SHAPE);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_TOOLTIP);
+		nodeView.clearValueLock(BasicVisualLexicon.NODE_LABEL_FONT_SIZE);
+
+		// ######################### NODE_LABEL_POSITION ######################
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Restoring node label position...");
+
+		// Try to get the label visual property by its ID
+		VisualProperty<?> vp_label_position = lexicon.lookup(CyNode.class, Util.NODE_LABEL_POSITION);
+		if (vp_label_position != null) {
+			nodeView.clearValueLock(vp_label_position);
+		}
+		// ######################### NODE_LABEL_POSITION ######################
+
+		// ######################### NODE_COLOR_LINEAR_GRADIENT ######################
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Clearing all colors of node domains...");
+
+		VisualProperty<CyCustomGraphics2> vp_node_linear_gradient = (VisualProperty<CyCustomGraphics2>) lexicon
+				.lookup(CyNode.class, "NODE_CUSTOMGRAPHICS_1");
+		if (vp_node_linear_gradient != null) {
+			nodeView.clearValueLock(vp_node_linear_gradient);
+		}
+
+		// ############################################################################
+
+		hideNodeResidues(myNetwork, myCurrentRow, netView);
+
+	}
+
+	/**
+	 * Method responsible for hiding nodes residues
+	 */
+	private static void hideNodeResidues(CyNetwork myNetwork, CyRow myCurrentRow, CyNetworkView netView) {
+
+		if (myNetwork == null)
+			return;
+
+		String nodeName = (String) myCurrentRow.getRaw(CyNetwork.NAME);
+
+		// Check if the node exists in the network
+		Stream<CyRow> residuesRows = myNetwork.getDefaultNodeTable().getAllRows().stream()
+				.filter(new Predicate<CyRow>() {
+					public boolean test(CyRow o) {
+						return o.get(CyNetwork.NAME, String.class).contains("RESIDUE")
+								&& o.get(CyNetwork.NAME, String.class).contains(nodeName);
+					}
+				});
+
+		for (Iterator<CyRow> i = residuesRows.iterator(); i.hasNext();) {
+
+			CyRow _node_row = i.next();
+
+			CyNode _node = myNetwork.getNode(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
+
+			View<CyNode> residueNodeView = netView.getNodeView(_node);
+			residueNodeView.setLockedValue(BasicVisualLexicon.NODE_VISIBLE, false);
+		}
+
 	}
 
 	/**
@@ -1106,8 +1284,7 @@ public class Util {
 
 			// Check if transmembrane regions have been predicted
 
-			List<Protein> allProteins = Util.proteinsMap.get(myNetwork.toString());
-
+			List<Protein> allProteins = Util.getProteins(myNetwork, false);
 			if (allProteins == null || allProteins.size() == 0)
 				return false;
 
@@ -4226,7 +4403,8 @@ public class Util {
 			CyApplicationManager cyApplicationManager, CyNetworkView netView, HandleFactory handleFactory,
 			BendFactory bendFactory, CyNode current_node) {
 
-		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Restoring edges...");
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Restoring edges...");
 
 		boolean IsModified_source_node = false;
 		boolean IsModified_target_node = false;
@@ -5165,6 +5343,25 @@ public class Util {
 			}
 		}
 		return new HashMap<Protein, List<PredictedTransmem>>();
+	}
+
+	/**
+	 * Method responsible for retrieving all proteins
+	 * 
+	 * @param currentNetwork current network
+	 * @param isValid        retrieve only valid proteins for a specific epoch
+	 * @return list of proteins
+	 */
+	public static List<Protein> getProteins(CyNetwork currentNetwork, boolean isValid) {
+
+		List<Protein> allProteins = null;
+		if (isValid)// Valid means candidate proteins for a specific epoch
+			allProteins = proteinsMap.get(currentNetwork.toString()).stream().filter(value -> value.isValid)
+					.collect(Collectors.toList());
+		else
+			allProteins = proteinsMap.get(currentNetwork.toString());
+
+		return allProteins;
 	}
 
 	/**

@@ -290,7 +290,8 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 
 			if (isCurrentNode_modified) {
 				if (isPlotDone)
-					this.restoreDefaultStyle(taskMonitor);
+					Util.restoreDefaultStyle(taskMonitor, style, netView, cyApplicationManager, nodeView, handleFactory,
+							bendFactory, node, myNetwork, myCurrentRow, lexicon);
 
 			} else {
 
@@ -1319,7 +1320,8 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		restoreStyleButton.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
 				taskMonitor.setProgress(0.6);
-				restoreDefaultStyle(taskMonitor);
+				Util.restoreDefaultStyle(taskMonitor, style, netView, cyApplicationManager, nodeView, handleFactory,
+						bendFactory, node, myNetwork, myCurrentRow, lexicon);
 				taskMonitor.setProgress(1.0);
 				mainFrame.dispose();
 			}
@@ -1812,149 +1814,6 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 		} else {
 			return false;
 		}
-	}
-
-	/**
-	 * Method responsible for restoring basic node styles
-	 * 
-	 * @param taskMonitor
-	 */
-	private void clearNodeStyle(final TaskMonitor taskMonitor) {
-
-		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Restoring node layout...");
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_WIDTH);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_TRANSPARENCY);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_PAINT);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_FILL_COLOR);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_LABEL_COLOR);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_SELECTED_PAINT);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_BORDER_WIDTH);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_BORDER_PAINT);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_HEIGHT);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_SHAPE);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_TOOLTIP);
-		nodeView.clearValueLock(BasicVisualLexicon.NODE_LABEL_FONT_SIZE);
-
-		// ######################### NODE_LABEL_POSITION ######################
-
-		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Restoring node label position...");
-
-		// Try to get the label visual property by its ID
-		VisualProperty<?> vp_label_position = lexicon.lookup(CyNode.class, Util.NODE_LABEL_POSITION);
-		if (vp_label_position != null) {
-			nodeView.clearValueLock(vp_label_position);
-		}
-		// ######################### NODE_LABEL_POSITION ######################
-
-		// ######################### NODE_COLOR_LINEAR_GRADIENT ######################
-		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Clearing all colors of node domains...");
-
-		VisualProperty<CyCustomGraphics2> vp_node_linear_gradient = (VisualProperty<CyCustomGraphics2>) lexicon
-				.lookup(CyNode.class, "NODE_CUSTOMGRAPHICS_1");
-		if (vp_node_linear_gradient != null) {
-			nodeView.clearValueLock(vp_node_linear_gradient);
-		}
-
-		// ############################################################################
-
-		this.hideNodeResidues();
-	}
-
-	/**
-	 * Method responsible for restoring the layout of the selected node.
-	 * 
-	 * @param taskMonitor
-	 */
-	private void restoreDefaultStyle(final TaskMonitor taskMonitor) {
-
-		isPlotDone = false;
-
-		if (style == null) {
-			return;
-		}
-		if (netView == null) {
-			netView = cyApplicationManager.getCurrentNetworkView();
-		}
-
-		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Getting protein...");
-		nodeView = netView.getNodeView(node);
-
-		this.clearNodeStyle(taskMonitor);
-		UpdateViewListener.isNodeModified = false;
-		Util.restoreEdgesStyle(taskMonitor, myNetwork, cyApplicationManager, netView, handleFactory, bendFactory, node);
-
-		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Removing monolinks...");
-		this.hideMonolinks();
-
-		// Apply the change to the view
-		style.apply(netView);
-		netView.updateView();
-
-		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Done!");
-
-		isPlotDone = true;
-	}
-
-	/**
-	 * Method responsible for hiding monolink nodes
-	 */
-	private void hideMonolinks() {
-
-		if (myNetwork == null)
-			return;
-
-		String nodeName = (String) myCurrentRow.getRaw(CyNetwork.NAME);
-
-		// Check if the node exists in the network
-		Stream<CyRow> monolinksRows = myNetwork.getDefaultNodeTable().getAllRows().stream()
-				.filter(new Predicate<CyRow>() {
-					public boolean test(CyRow o) {
-						return o.get(CyNetwork.NAME, String.class).contains("MONOLINK")
-								&& o.get(CyNetwork.NAME, String.class).contains(nodeName);
-					}
-				});
-
-		for (Iterator<CyRow> i = monolinksRows.iterator(); i.hasNext();) {
-
-			CyRow _node_row = i.next();
-
-			CyNode _node = myNetwork.getNode(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
-
-			View<CyNode> monolinkNodeView = netView.getNodeView(_node);
-			monolinkNodeView.setLockedValue(BasicVisualLexicon.NODE_VISIBLE, false);
-		}
-
-	}
-
-	/**
-	 * Method responsible for hiding nodes residues
-	 */
-	private void hideNodeResidues() {
-
-		if (myNetwork == null)
-			return;
-
-		String nodeName = (String) myCurrentRow.getRaw(CyNetwork.NAME);
-
-		// Check if the node exists in the network
-		Stream<CyRow> residuesRows = myNetwork.getDefaultNodeTable().getAllRows().stream()
-				.filter(new Predicate<CyRow>() {
-					public boolean test(CyRow o) {
-						return o.get(CyNetwork.NAME, String.class).contains("RESIDUE")
-								&& o.get(CyNetwork.NAME, String.class).contains(nodeName);
-					}
-				});
-
-		for (Iterator<CyRow> i = residuesRows.iterator(); i.hasNext();) {
-
-			CyRow _node_row = i.next();
-
-			CyNode _node = myNetwork.getNode(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
-
-			View<CyNode> residueNodeView = netView.getNodeView(_node);
-			residueNodeView.setLockedValue(BasicVisualLexicon.NODE_VISIBLE, false);
-		}
-
 	}
 
 	/**

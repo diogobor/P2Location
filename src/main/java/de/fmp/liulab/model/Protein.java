@@ -26,6 +26,7 @@ public class Protein {
 	public List<Residue> reactionSites;
 	public boolean isConflictedDomain;
 	public boolean isPredictedBasedOnTransmemInfo;
+	public boolean isValid = true;
 
 	/**
 	 * Constructor

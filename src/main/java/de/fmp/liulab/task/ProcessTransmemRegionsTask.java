@@ -282,11 +282,6 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 
 		current_ptn_domain_list = current_ptn_domain_list.stream().distinct().collect(Collectors.toList());
 
-		// E.g. IMS [50-250], IMS [50-255], IMS [50-300]
-//		checkSubsetProteinDomains(protein);
-
-//		protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
-
 		return current_ptn_domain_list;
 	}
 

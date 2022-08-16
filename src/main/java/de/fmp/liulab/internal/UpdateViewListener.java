@@ -12,8 +12,6 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import javax.swing.DefaultComboBoxModel;
-
 import org.cytoscape.application.CyApplicationManager;
 import org.cytoscape.application.events.SetCurrentNetworkEvent;
 import org.cytoscape.application.events.SetCurrentNetworkListener;
@@ -36,6 +34,7 @@ import org.cytoscape.model.events.RowsSetListener;
 import org.cytoscape.view.model.CyNetworkView;
 import org.cytoscape.view.model.CyNetworkViewManager;
 import org.cytoscape.view.model.View;
+import org.cytoscape.view.model.VisualLexicon;
 import org.cytoscape.view.model.events.ViewChangeRecord;
 import org.cytoscape.view.model.events.ViewChangedEvent;
 import org.cytoscape.view.model.events.ViewChangedListener;
@@ -53,6 +52,7 @@ import org.cytoscape.work.swing.DialogTaskManager;
 import de.fmp.liulab.model.CrossLink;
 import de.fmp.liulab.model.PredictedTransmem;
 import de.fmp.liulab.model.Protein;
+import de.fmp.liulab.model.ProteinDomain;
 import de.fmp.liulab.model.Residue;
 import de.fmp.liulab.task.MainSingleNodeTask;
 import de.fmp.liulab.task.ProcessProteinLocationTask;
@@ -123,6 +123,36 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 	}
 
 	/**
+	 * Method responsible for displaying or not valid proteins
+	 * 
+	 * @param e event
+	 */
+	private void hiddenNotValidProteins(RowsSetEvent e) {
+
+		if (myNetwork == null || netView == null)
+			return;
+
+		if (e.getColumnRecords(Util.VALID_PROTEINS_COLUMN).size() == 1) {
+			for (RowSetRecord record : e.getColumnRecords(Util.VALID_PROTEINS_COLUMN)) {
+				Long suid = record.getRow().get(CyIdentifiable.SUID, Long.class);
+				Boolean value = (Boolean) record.getValue();
+				CyNode selectedNode = myNetwork.getNode(suid);
+				View<CyNode> new_node_source_view = netView.getNodeView(selectedNode);
+				if (value.equals(Boolean.TRUE))
+					new_node_source_view.setLockedValue(BasicVisualLexicon.NODE_VISIBLE, true);
+				else
+					new_node_source_view.setLockedValue(BasicVisualLexicon.NODE_VISIBLE, false);
+
+				CyRow myCurrentRow = myNetwork.getRow(selectedNode);
+				VisualLexicon lexicon = cyApplicationManager.getCurrentRenderingEngine().getVisualLexicon();
+				Util.restoreDefaultStyle(null, style, netView, cyApplicationManager, new_node_source_view,
+						handleFactory, bendFactory, selectedNode, myNetwork, myCurrentRow, lexicon);
+				Util.updateValidProteinInfo(myNetwork, selectedNode, value);
+			}
+		}
+	}
+
+	/**
 	 * Method responsible for capturing the selected node.
 	 */
 	@Override
@@ -137,7 +167,12 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 		nodes_suids.clear();
 
 		try {
-			// First see if this event has anything to do with selections
+			// First check whether 'valid_proteins' column has been changed
+			if (e.containsColumn(Util.VALID_PROTEINS_COLUMN)) {
+				hiddenNotValidProteins(e);
+			}
+
+			// Check whether this event has anything to do with selections
 			if (!e.containsColumn(CyNetwork.SELECTED)) {
 				// Nope, we're done
 				return;
@@ -335,7 +370,7 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 				return;
 
 			current_network_name = myNetwork.toString();
-			
+
 			int network_index = Util.myCyNetworkList.indexOf(myNetwork);
 
 			if (network_index == 0 && ProcessProteinLocationTask.number_unknown_residues != null

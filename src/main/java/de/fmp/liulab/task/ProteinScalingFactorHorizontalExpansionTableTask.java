@@ -493,6 +493,48 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			}
 		}
 
+		// ######## VALID PROTEINS ########
+		if (nodeTable.getColumn(Util.VALID_PROTEINS_COLUMN) == null) {
+			try {
+				nodeTable.createColumn(Util.VALID_PROTEINS_COLUMN, Boolean.class, false);
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					row.set(Util.VALID_PROTEINS_COLUMN, true);
+				}
+
+			} catch (IllegalArgumentException e) {
+			} catch (Exception e) {
+			}
+
+		} else { // The column exists, but it's necessary to check the cells
+			try {
+
+				// Check if proteinDomainsMap has been initialized
+				boolean proteinDomainsMapOK = true;
+				if (Util.proteinsMap == null)
+					proteinDomainsMapOK = false;
+
+				// Initialize protein domain colors map if LoadProteinDomainTask has not been
+				// initialized
+				Util.init_availableProteinDomainColorsMap();
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					if (row.get(Util.VALID_PROTEINS_COLUMN, Boolean.class) == null)
+						row.set(Util.VALID_PROTEINS_COLUMN, true);
+					else {
+
+						Boolean validDomain = row.get(Util.VALID_PROTEINS_COLUMN, Boolean.class);
+						if (validDomain && proteinDomainsMapOK) {
+
+							String nodeName = row.get(CyNetwork.NAME, String.class);
+							updateValidProtein(taskMonitor, nodeName, validDomain);
+						}
+					}
+				}
+			} catch (Exception e) {
+			}
+		}
+
 		// ######## CONFLICTED PREDICTED RESIDUES ########
 		if (nodeTable.getColumn(Util.CONFLICTED_PREDICTED_RESIDUES_COLUMN) == null) {
 			try {
@@ -752,6 +794,37 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			if (isPtnPresent.isPresent()) {
 				Protein _myProtein = isPtnPresent.get();
 				_myProtein.isConflictedDomain = conflictedDomain;
+
+			}
+
+			else {
+				taskMonitor.showMessage(TaskMonitor.Level.WARN, "WARNING: Node " + nodeName + " has not been found.\n");
+			}
+		}
+
+	}
+
+	/**
+	 * Method responsible for updating valid proteins based on table information
+	 * 
+	 * @param taskMonitor task monitor
+	 * @param nodeName    current node name
+	 * @param validDomain it is a valid protein or not
+	 */
+	private void updateValidProtein(TaskMonitor taskMonitor, String nodeName, Boolean validDomain) {
+
+		if (myNetwork == null || Util.proteinsMap == null)
+			return;
+
+		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+
+		if (proteinList != null) {
+			Optional<Protein> isPtnPresent = proteinList.stream().filter(value -> value.gene.equals(nodeName))
+					.findFirst();
+
+			if (isPtnPresent.isPresent()) {
+				Protein _myProtein = isPtnPresent.get();
+				_myProtein.isValid = validDomain;
 
 			}
 
