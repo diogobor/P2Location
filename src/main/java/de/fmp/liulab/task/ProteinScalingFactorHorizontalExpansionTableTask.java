@@ -968,10 +968,16 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 
 				if (isPtnPresent.isPresent()) {
 					Protein _myProtein = isPtnPresent.get();
+					_myProtein.predicted_domain_epoch = 0;
 					if (isPredicted) {
 						if (_myProtein.domains != null && _myProtein.domains.size() > 0) {
 							_myProtein.domains.addAll(proteinDomains);
 							_myProtein.domains = _myProtein.domains.stream().distinct().collect(Collectors.toList());
+							
+							// Check whether exists only transmem regions
+							if (_myProtein.domains.stream().filter(value -> value.name.toLowerCase().equals("transmem"))
+									.collect(Collectors.toList()).size() == _myProtein.domains.size())
+								_myProtein.predicted_domain_epoch = -1;
 						} else {
 							noDomains = true;
 						}
@@ -981,6 +987,11 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 
 					if (noDomains) {
 						_myProtein.domains = proteinDomains;
+
+						// Check whether exists only transmem regions
+						if (_myProtein.domains.stream().filter(value -> value.name.toLowerCase().equals("transmem"))
+								.collect(Collectors.toList()).size() == _myProtein.domains.size())
+							_myProtein.predicted_domain_epoch = -1;
 						ProcessProteinLocationTask.addReactionSites(_myProtein);
 					} else {
 						Util.updateResiduesBasedOnProteinDomains(_myProtein, false);
@@ -1148,8 +1159,8 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			currentNode = myNetwork.getNode(Long.parseLong(_node_row.getRaw(CyIdentifiable.SUID).toString()));
 
 			if (monolinksList.size() > 0) {
-				String node_name = myNetwork.getDefaultNodeTable().getRow(currentNode.getSUID()).get(CyNetwork.NAME,
-						String.class);
+//				String node_name = myNetwork.getDefaultNodeTable().getRow(currentNode.getSUID()).get(CyNetwork.NAME,
+//						String.class);
 
 //				Protein ptn = new Protein(node_name, "", monolinksList);
 //				LoadProteinLocationTask.updateMonolinksMap(myNetwork, currentNode, ptn);

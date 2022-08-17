@@ -161,6 +161,15 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	}
 
 	/**
+	 * Method responsible for setting process button text
+	 * 
+	 * @param text
+	 */
+	public static void setProcessButtonLabel(String text) {
+		processButton.setText(text);
+	}
+
+	/**
 	 * Load default parameters to main panel
 	 * 
 	 * @param bc main context
@@ -663,11 +672,11 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private void init_prediction(int offset_x) {
 
 		int offset_y = 20;
-		int button_width = 38;
+		int button_width = 45;
 		int button_height = 15;
 
 		if (Util.isWindows()) {
-			button_width = 65;
+			button_width = 72;
 			button_height = 20;
 		}
 
@@ -966,7 +975,11 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 						}
 
 						if (valid) {
-							TaskIterator ti = processProteinLocationTaskFactory.createTaskIterator(true, false);
+							TaskIterator ti = null;
+							if (processButton.getText().equals("Run"))
+								ti = processProteinLocationTaskFactory.createTaskIterator(true, false, true);
+							else
+								ti = processProteinLocationTaskFactory.createTaskIterator(true, false, false);
 
 							TaskObserver observer = new TaskObserver() {
 
@@ -989,11 +1002,20 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 											real_epochs))
 										uk_residue_location = ProcessProteinLocationTask.number_unknown_residues
 												.get(real_epochs);
-									JOptionPane.showMessageDialog(null,
-											"Prediction has been done successfully!\nEpoch(s): " + real_epochs
-													+ "\n# Unknown Residue location: " + uk_residue_location,
-											"P2Location - Information", JOptionPane.INFORMATION_MESSAGE,
-											new ImageIcon(getClass().getResource("/images/logo.png")));
+
+									if (ProcessProteinLocationTask.hasMoreResidueToBePredicted)
+										JOptionPane.showMessageDialog(null,
+												"Prediction has been done successfully!\nEpoch(s): " + real_epochs
+														+ "\n# Unknown Residue location: " + uk_residue_location
+														+ "\nThere are more residues to be predicted. Press 'Continue' to perform more predictions!",
+												"P2Location - Information", JOptionPane.INFORMATION_MESSAGE,
+												new ImageIcon(getClass().getResource("/images/logo.png")));
+									else
+										JOptionPane.showMessageDialog(null,
+												"Prediction has been done successfully!\nEpoch(s): " + real_epochs
+														+ "\n# Unknown Residue location: " + uk_residue_location,
+												"P2Location - Information", JOptionPane.INFORMATION_MESSAGE,
+												new ImageIcon(getClass().getResource("/images/logo.png")));
 
 									if (ProcessProteinLocationTask.epochs > 1) {
 										List<String> epochsList = new ArrayList<String>();
@@ -1013,6 +1035,11 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 									enable_disable_transmemBox(true);
 									enable_disable_spinners(true);
 									processButton.setEnabled(true);
+
+									if (ProcessProteinLocationTask.hasMoreResidueToBePredicted)
+										setProcessButtonLabel("Continue");
+									else
+										setProcessButtonLabel("Run");
 								}
 							};
 
@@ -1178,7 +1205,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 
 						// Update protein domains according to the epochs
 						TaskIterator updateProteinDomainsTaskIterator = processProteinLocationTaskFactory
-								.createTaskIterator(true, true);
+								.createTaskIterator(true, true, false);
 
 						TaskObserver updateProteinDomainsObserver = new TaskObserver() {
 

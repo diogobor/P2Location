@@ -47,7 +47,7 @@ public class LoadProteinLocationAction extends AbstractCyAction {
 	@Override
 	public void actionPerformed(ActionEvent e) {
 		// Get the task iterator
-		TaskIterator ti = myFactory.createTaskIterator(false, false);
+		TaskIterator ti = myFactory.createTaskIterator(false, false, true);
 
 		// Execute the task through the TaskManager
 		dialogTaskManager.execute(ti);

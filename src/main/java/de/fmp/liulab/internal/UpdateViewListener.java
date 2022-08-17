@@ -52,7 +52,6 @@ import org.cytoscape.work.swing.DialogTaskManager;
 import de.fmp.liulab.model.CrossLink;
 import de.fmp.liulab.model.PredictedTransmem;
 import de.fmp.liulab.model.Protein;
-import de.fmp.liulab.model.ProteinDomain;
 import de.fmp.liulab.model.Residue;
 import de.fmp.liulab.task.MainSingleNodeTask;
 import de.fmp.liulab.task.ProcessProteinLocationTask;
@@ -518,6 +517,7 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 		MainControlPanel.enable_disable_spinners(false);
 		MainControlPanel.unselectCheckboxes();
 		MainControlPanel.myNetwork = null;
+		MainControlPanel.setProcessButtonLabel("Run");
 	}
 
 	@Override

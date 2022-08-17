@@ -1265,36 +1265,16 @@ public class Util {
 			JLabel textLabel_status_result) {
 
 		if (taskMonitor != null)
-			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Checking whether there are some conflict residues");
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Checking whether there are localization markers...");
 
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return false;
 
-		// Localization markers have been loaded
-		if (ProcessProteinLocationTask.compartments != null && ProcessProteinLocationTask.compartments.size() > 0) {
-			if (ProcessProteinLocationTask.compartments.size() == 1) {
-				if (ProcessProteinLocationTask.compartments.containsKey(ProcessProteinLocationTask.UNKNOWN_RESIDUE))
-					return false;
-				else
-					return true;
-			} else
-				return true;
-
-		} else {
-
-			// Check if transmembrane regions have been predicted
-
-			List<Protein> allProteins = Util.getProteins(myNetwork, false);
-			if (allProteins == null || allProteins.size() == 0)
-				return false;
-
-			for (Protein protein : allProteins) {
-				if (protein.domains != null && protein.domains.size() > 0)
-					return true;
-			}
-
+		if (Util.proteinsMap.get(myNetwork.toString()).stream().filter(value -> value.predicted_domain_epoch == 0)
+				.collect(Collectors.toList()).size() == 0)
 			return false;
-		}
+		else
+			return true;
 
 	}
 

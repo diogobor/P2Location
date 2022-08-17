@@ -37,9 +37,10 @@ public class ProcessProteinLocationTaskFactory extends AbstractTaskFactory {
 	/**
 	 * Method responsible for initializing task
 	 */
-	public TaskIterator createTaskIterator(boolean isPredictLocation, boolean updateAnnotationDomain) {
-		return new TaskIterator(new ProcessProteinLocationTask(cyApplicationManager, vmmServiceRef,
-				isPredictLocation, updateAnnotationDomain));
+	public TaskIterator createTaskIterator(boolean isPredictLocation, boolean updateAnnotationDomain,
+			boolean isNewPrediction) {
+		return new TaskIterator(new ProcessProteinLocationTask(cyApplicationManager, vmmServiceRef, isPredictLocation,
+				updateAnnotationDomain, isNewPrediction));
 	}
 
 	@Override

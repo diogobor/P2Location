@@ -27,6 +27,7 @@ public class Protein {
 	public boolean isConflictedDomain;
 	public boolean isPredictedBasedOnTransmemInfo;
 	public boolean isValid = true;
+	public int predicted_domain_epoch = -1;
 
 	/**
 	 * Constructor
