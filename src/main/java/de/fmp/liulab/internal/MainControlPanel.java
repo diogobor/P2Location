@@ -961,13 +961,23 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 								valid = false;
 						}
 
+						// Check if there are some conflict domains before
+						// proceeding the prediction
+						if (valid && Util.isThereConflictDomain(null, myNetwork, null)) {
+
+							valid = false;
+
+							JOptionPane.showMessageDialog(null,
+									"There are unresolved conflict domains.\nPlease correct them before proceeding!",
+									"P2Location - Warning", JOptionPane.WARNING_MESSAGE,
+									new ImageIcon(getClass().getResource("/images/logo.png")));
+						}
 						// Check if there are some conflict residues (from localization markers) before
 						// proceeding the prediction
-
-						if (valid && Util.isThereConflictResidue(null, myNetwork, null)) {
+						else if (valid && Util.isThereConflictResidue(null, myNetwork, null)) {
 
 							int input = JOptionPane.showConfirmDialog(null,
-									"There are some conflict residues in the network. \nDo you want to continue with the prediction?",
+									"There are some conflict residues in the network.\nDo you want to continue with the prediction?",
 									"P2Location - Information", JOptionPane.YES_NO_OPTION);
 
 							if (input == 1)
@@ -1052,7 +1062,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 						}
 
 					} else {
-						JOptionPane.showMessageDialog(null, "No network has been loaded!", "P2Location - Alert",
+						JOptionPane.showMessageDialog(null, "No network has been loaded!", "P2Location - Warning",
 								JOptionPane.WARNING_MESSAGE, new ImageIcon(getClass().getResource("/images/logo.png")));
 					}
 				}

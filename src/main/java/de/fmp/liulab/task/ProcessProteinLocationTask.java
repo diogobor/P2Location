@@ -977,7 +977,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								all_knownResidues = getAllKnownResidues();
 								computeResiduesScore(taskMonitor);
 								computeNewResidues(taskMonitor, all_knownResidues, true);
-
+								epochs = 1;
 								// TODO: TEMP
 //								printResidueScore();
 								// TODO: TEMP
@@ -1789,7 +1789,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 */
 	private void updateResiduesLocationAndScore(Protein protein) {
 
-		if (protein == null)
+		if (protein == null || !protein.isValid)
 			return;
 
 		if (protein.domains == null)
@@ -2063,7 +2063,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											&& !value.eValue.equals("predicted"))
 									.collect(Collectors.toList());
 
-							if (protein.domains.size() > 0)
+							if (protein.domains.size() > 0 && !Util.dualLocalization_conflict)
 								protein.isConflictedDomain = true;
 							else
 								protein.isConflictedDomain = false;
@@ -3007,8 +3007,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private ProteinDomain getProteinDomain(Protein protein, final int start_domain, final int end_domain) {
 
 		if (protein.domains != null && protein.domains.size() > 0) {
+
+			// eg: Matrix[10,20] => start_d = 12, end_d = 18
 			Optional<ProteinDomain> isProteinDomainPresent = protein.domains.stream()
-					.filter(value -> value.startId == start_domain && value.endId <= end_domain).findFirst();
+					.filter(value -> value.startId <= start_domain && value.endId >= end_domain).findFirst();
 
 			if (isProteinDomainPresent.isPresent())
 				return isProteinDomainPresent.get();
@@ -4422,9 +4424,15 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 		// Algorithm cannot backward.
 		Protein current_protein = residues.get(0).protein;
-		if (current_protein.predicted_domain_epoch != -1 && current_protein.domains != null // Check whether domains
-																							// contain only transmem
-				&& current_protein.domains.stream().filter(value -> value.name.toLowerCase().equals(TRANSMEMBRANE))
+		if (current_protein.predicted_domain_epoch != -1 && current_protein.domains != null
+				&& getProteinDomain(residues.get(0).protein, start_pos, end_pos) != null &&
+
+				// Check whether domains
+				// contain only valid
+				// transmem
+				current_protein.domains.stream()
+						.filter(value -> Double.parseDouble(value.eValue) > Util.transmemPredictionRegionsUpperScore
+								&& value.name.toLowerCase().equals(TRANSMEMBRANE))
 						.collect(Collectors.toList()).size() != current_protein.domains.size())
 			return current_protein.domains;
 

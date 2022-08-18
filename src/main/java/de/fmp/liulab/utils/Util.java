@@ -1279,6 +1279,34 @@ public class Util {
 	}
 
 	/**
+	 * Method responsible for checking whether there are some conflict domains
+	 * 
+	 * @param taskMonitor             current task monitor
+	 * @param myNetwork               current network
+	 * @param textLabel_status_result current text label status
+	 * @return true if contains conflict domain
+	 */
+	public static boolean isThereConflictDomain(TaskMonitor taskMonitor, CyNetwork myNetwork,
+			JLabel textLabel_status_result) {
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Checking whether there are some conflict domains...");
+
+		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
+			return false;
+
+		List<Protein> proteinList = Util.getProteins(myNetwork, true);
+		if (proteinList == null || proteinList.size() == 0)
+			return false;
+
+		if (proteinList.stream().filter(value -> value.isConflictedDomain).collect(Collectors.toList()).size() > 0)
+			return true;
+
+		return false;
+
+	}
+
+	/**
 	 * Method responsible for checking whether there are some conflict residues
 	 * 
 	 * @param taskMonitor             current task monitor
@@ -1290,12 +1318,12 @@ public class Util {
 			JLabel textLabel_status_result) {
 
 		if (taskMonitor != null)
-			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Checking whether there are some conflict residues");
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Checking whether there are some conflict residues...");
 
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return false;
 
-		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		List<Protein> proteinList = Util.getProteins(myNetwork, true);
 		if (proteinList == null || proteinList.size() == 0)
 			return false;
 
