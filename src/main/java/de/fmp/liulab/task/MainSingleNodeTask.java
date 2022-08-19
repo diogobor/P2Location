@@ -17,12 +17,9 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -52,7 +49,6 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.text.DefaultFormatter;
 
 import org.cytoscape.application.CyApplicationManager;
-import org.cytoscape.model.CyIdentifiable;
 import org.cytoscape.model.CyNetwork;
 import org.cytoscape.model.CyNode;
 import org.cytoscape.model.CyRow;
@@ -60,8 +56,6 @@ import org.cytoscape.model.CyTableUtil;
 import org.cytoscape.view.model.CyNetworkView;
 import org.cytoscape.view.model.View;
 import org.cytoscape.view.model.VisualLexicon;
-import org.cytoscape.view.model.VisualProperty;
-import org.cytoscape.view.presentation.customgraphics.CyCustomGraphics2;
 import org.cytoscape.view.presentation.customgraphics.CyCustomGraphics2Factory;
 import org.cytoscape.view.presentation.property.BasicVisualLexicon;
 import org.cytoscape.view.presentation.property.values.BendFactory;
@@ -73,7 +67,6 @@ import org.cytoscape.work.TaskMonitor;
 import org.cytoscape.work.TaskMonitor.Level;
 
 import de.fmp.liulab.core.ProteinStructureManager;
-import de.fmp.liulab.internal.UpdateViewListener;
 import de.fmp.liulab.internal.view.JFrameWithoutMaxAndMinButton;
 import de.fmp.liulab.model.CrossLink;
 import de.fmp.liulab.model.PDB;
@@ -95,6 +88,7 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 	private CyApplicationManager cyApplicationManager;
 	private CyNetwork myNetwork;
 	private CyNetworkView netView;
+	@SuppressWarnings("rawtypes")
 	private CyCustomGraphics2Factory vgFactory;
 	private HandleFactory handleFactory;
 	private BendFactory bendFactory;
@@ -120,23 +114,29 @@ public class MainSingleNodeTask extends AbstractTask implements ActionListener {
 //	private JPanel ptm_panel;
 	private JLabel textLabel_status_result;
 	private String[] columnNamesDomainTable = { "Domain(*)", "Start Residue(*)", "End Residue(*)", "e-value", "Color" };
+	@SuppressWarnings("rawtypes")
 	private final Class[] columnClassDomainTable = new Class[] { String.class, Integer.class, Integer.class,
 			String.class, String.class };
 	private DefaultTableModel domainTableDataModel;
 	private static JTable mainProteinDomainTable;
+	@SuppressWarnings("rawtypes")
 	private static JList rowHeaderDomainTable;
 	private static JScrollPane proteinDomainTableScrollPanel;
 
+	@SuppressWarnings("unused")
 	private String[] columnNamesPTMTable = { "PTM", "Residue", "Position" };
+	@SuppressWarnings({ "rawtypes", "unused" })
 	private final Class[] columnClassPTMTable = new Class[] { String.class, String.class, Integer.class };
 //	private DefaultTableModel ptmTableDataModel;
 	private static JTable mainProteinPTMTable;
+	@SuppressWarnings("rawtypes")
 	private static JList rowHeaderPTMTable;
 	private static JScrollPane proteinPTMTableScrollPanel;
 
 	public static CyNode node;
 
 	private Thread pfamThread;
+	@SuppressWarnings("unused")
 	private Thread pyMOLThread;
 //	private Thread uniprotThread;
 	private JButton proteinDomainServerButton;

@@ -42,25 +42,20 @@ import org.osgi.framework.BundleContext;
 
 import de.fmp.liulab.core.ConfigurationManager;
 import de.fmp.liulab.internal.action.ControlURLAction;
-import de.fmp.liulab.internal.action.ExportMonolinksAction;
-import de.fmp.liulab.internal.action.ExportPTMsAction;
 import de.fmp.liulab.internal.action.ExportProteinDomainsAction;
-import de.fmp.liulab.internal.action.LoadPTMsAction;
-import de.fmp.liulab.internal.action.LoadProteinDomainsAction;
 import de.fmp.liulab.internal.action.LoadProteinLocationAction;
 import de.fmp.liulab.internal.action.MainPanelAction;
 import de.fmp.liulab.internal.action.ReadMeAction;
 import de.fmp.liulab.internal.action.ResiduesTreeNodeExecuteAction;
-import de.fmp.liulab.internal.action.SetDomainColorAction;
+import de.fmp.liulab.internal.action.ShortcutValidateProteinAction;
 import de.fmp.liulab.internal.action.ShortcutWindowSingleNodeLayout;
-import de.fmp.liulab.task.LoadPTMsTaskFactory;
 import de.fmp.liulab.task.MainSingleEdgeTaskFactory;
 import de.fmp.liulab.task.MainSingleNodeTaskFactory;
 import de.fmp.liulab.task.ProcessProteinLocationTaskFactory;
 import de.fmp.liulab.task.ProcessTransmemRegionsTaskFactory;
 import de.fmp.liulab.task.ProteinScalingFactorHorizontalExpansionTableTaskFactory;
 import de.fmp.liulab.task.ResiduesTreeTaskFactory;
-import de.fmp.liulab.task.SetDomainColorTaskFactory;
+import de.fmp.liulab.task.UpdateProteinInformationTaskFactory;
 import de.fmp.liulab.task.UpdateViewerTaskFactory;
 import de.fmp.liulab.task.command_lines.ApplyRestoreStyleCommandTask;
 import de.fmp.liulab.task.command_lines.ApplyRestoreStyleCommandTaskFactory;
@@ -122,7 +117,7 @@ public class CyActivator extends AbstractCyActivator {
 		// ### 3 - MONOLINKED PEPTIDES ####
 
 		// ### 3.1 - EXPORT ###
-		ExportMonolinksAction myExportMonolinksAction = new ExportMonolinksAction(cyApplicationManager);
+//		ExportMonolinksAction myExportMonolinksAction = new ExportMonolinksAction(cyApplicationManager);
 
 		// ### 3.2 - LOAD ####
 
@@ -140,14 +135,14 @@ public class CyActivator extends AbstractCyActivator {
 		// ### 4 - POST-TRANSLATIONAL MODIFICATIONS ###
 
 		// ### 4.1 - EXPORT ###
-		ExportPTMsAction myExportPTMsAction = new ExportPTMsAction(cyApplicationManager);
+//		ExportPTMsAction myExportPTMsAction = new ExportPTMsAction(cyApplicationManager);
 
 		// ### 4.2 - LOAD ####
 
-		TaskFactory myLoadPTMsFactory = new LoadPTMsTaskFactory(cyApplicationManager, vmmServiceRef,
-				customChartListener);
+//		TaskFactory myLoadPTMsFactory = new LoadPTMsTaskFactory(cyApplicationManager, vmmServiceRef,
+//				customChartListener);
 
-		LoadPTMsAction myLoadPTMsAction = new LoadPTMsAction(dialogTaskManager, myLoadPTMsFactory);
+//		LoadPTMsAction myLoadPTMsAction = new LoadPTMsAction(dialogTaskManager, myLoadPTMsFactory);
 
 		// ############################################
 
@@ -159,20 +154,20 @@ public class CyActivator extends AbstractCyActivator {
 		// ####################
 
 		// ### 5.2 - LOAD ####
-		TaskFactory myLoadProteinDomainsFactory = new ProcessProteinLocationTaskFactory(cyApplicationManager,
-				vmmServiceRef);
+//		TaskFactory myLoadProteinDomainsFactory = new ProcessProteinLocationTaskFactory(cyApplicationManager,
+//				vmmServiceRef);
 
-		LoadProteinDomainsAction myLoadProteinDomainsAction = new LoadProteinDomainsAction(dialogTaskManager,
-				myLoadProteinDomainsFactory);
+//		LoadProteinDomainsAction myLoadProteinDomainsAction = new LoadProteinDomainsAction(dialogTaskManager,
+//				myLoadProteinDomainsFactory);
 
 		// ###################
 
 		// ### 5.3 - SET ####
-		TaskFactory mySetProteinDomainsColorFactory = new SetDomainColorTaskFactory(cyApplicationManager, vmmServiceRef,
-				customChartListener);
+//		TaskFactory mySetProteinDomainsColorFactory = new SetDomainColorTaskFactory(cyApplicationManager, vmmServiceRef,
+//				customChartListener);
 
-		SetDomainColorAction mySetProteinDomainsAction = new SetDomainColorAction(dialogTaskManager,
-				mySetProteinDomainsColorFactory);
+//		SetDomainColorAction mySetProteinDomainsAction = new SetDomainColorAction(dialogTaskManager,
+//				mySetProteinDomainsColorFactory);
 
 		// ###################
 
@@ -221,6 +216,11 @@ public class CyActivator extends AbstractCyActivator {
 		ShortcutWindowSingleNodeLayout myShortcutWindowSingleNodeAction = new ShortcutWindowSingleNodeLayout(
 				dialogTaskManager, mySingleNodeContextMenuFactory);
 
+		UpdateProteinInformationTaskFactory updateProteinInformation = new UpdateProteinInformationTaskFactory(
+				cyApplicationManager, vmmServiceRef, customChartListener, bendFactory, handleFactory);
+
+		ShortcutValidateProteinAction myShortcutValidateProteinAction = new ShortcutValidateProteinAction(
+				dialogTaskManager, updateProteinInformation);
 		// ##############################
 
 		// ##### PROTEIN SCALING FACTOR TABLE #####
@@ -267,6 +267,7 @@ public class CyActivator extends AbstractCyActivator {
 		registerService(bc, myResiduesTreeNodeAction, CyAction.class, new Properties());
 		registerService(bc, myExportProteinDomainsAction, CyAction.class, new Properties());
 //		registerService(bc, mySetProteinDomainsAction, CyAction.class, new Properties());
+		registerService(bc, myShortcutValidateProteinAction, CyAction.class, new Properties());
 
 		registerService(bc, mainControlPanel, CytoPanelComponent.class, new Properties());
 		registerService(bc, panelAction, CyAction.class, new Properties());

@@ -916,47 +916,12 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 		if (domains == null || domains.size() == 0 || domains.get(0).isBlank() || domains.get(0).isEmpty())
 			return;
 
-		List<ProteinDomain> proteinDomains = new ArrayList<ProteinDomain>();
-		try {
-
-			for (String domain : domains) {
-
-				String domainName = "";
-				String score = "";
-				ProteinDomain pd;
-				if (domain.contains("#Score:")) {
-					// e.g. TRANSMEM#Score:0.9992[30-40]
-					String[] domainScore = domain.split("#Score:");
-					domainName = domainScore[0].trim();
-
-					// e.g. 0.9992[30-40]
-					String[] domainsArray = domainScore[1].split("\\[|\\]");
-					score = domainsArray[0];
-					String[] colRange = domainsArray[1].split("-");
-					int startId = Integer.parseInt(colRange[0]);
-					int endId = Integer.parseInt(colRange[1]);
-					pd = new ProteinDomain(domainName, startId, endId, isPredicted, score);
-				} else {
-					// e.g. TRANSMEM[30-40]
-					String[] domainsArray = domain.split("\\[|\\]");
-					domainName = domainsArray[0].trim();
-					String[] colRange = domainsArray[1].split("-");
-					int startId = Integer.parseInt(colRange[0]);
-					int endId = Integer.parseInt(colRange[1]);
-					pd = new ProteinDomain(domainName, startId, endId, isPredicted, "");
-				}
-				proteinDomains.add(pd);
-
-			}
-		} catch (Exception e) {
-			taskMonitor.showMessage(TaskMonitor.Level.WARN, "ERROR: Node: " + nodeName
-					+ " - Protein domains don't match with the pattern 'name[start_index-end_index]'\n");
-			return;
-		}
+		List<ProteinDomain> proteinDomains = Util.parserProteinDomainColumnFromNodeCytoTable(domains, taskMonitor,
+				isPredicted, nodeName);
 
 		// Check if the node exists in the network
 
-		if (proteinDomains.size() > 0) {
+		if (proteinDomains != null && proteinDomains.size() > 0) {
 
 			// Update proteinsMap
 			List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
@@ -973,7 +938,7 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 						if (_myProtein.domains != null && _myProtein.domains.size() > 0) {
 							_myProtein.domains.addAll(proteinDomains);
 							_myProtein.domains = _myProtein.domains.stream().distinct().collect(Collectors.toList());
-							
+
 							// Check whether exists only transmem regions
 							if (_myProtein.domains.stream().filter(value -> value.name.toLowerCase().equals("transmem"))
 									.collect(Collectors.toList()).size() == _myProtein.domains.size())

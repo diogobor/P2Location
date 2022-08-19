@@ -251,7 +251,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			processLocation(taskMonitor);
 		} else {
 			taskMonitor.setTitle("P2Location - Update epoch");
-			restoreParamsOriginalResidues(taskMonitor);
+			restoreParamsOriginalResiduesForAllProteins(taskMonitor);
 			annotatePredictedLocation(taskMonitor, epochs);
 
 			predictDomainsBasedOnTransmemInfo();
@@ -975,7 +975,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								epochs = 1;
 								OrganizeResidueCompartment(taskMonitor);
 								all_knownResidues = getAllKnownResidues();
-								computeResiduesScore(taskMonitor);
+								computeResiduesScoreForAllProteins(taskMonitor);
 								computeNewResidues(taskMonitor, all_knownResidues, true);
 								epochs = 1;
 								// TODO: TEMP
@@ -1547,9 +1547,61 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * Method responsible for restoring parameters of residues that contain original
 	 * domain
 	 * 
+	 * @param protein current protein
+	 */
+	public static void resetParamsOriginalResidues(Protein protein) {
+		List<Residue> residues = protein.reactionSites;
+
+		if (residues == null)
+			return;
+
+		for (Residue residue : residues) {
+			if (residue.predictedLocation.equals("UK"))
+				continue;
+
+			residue.history_residues = null;
+			residue.predicted_epoch = -1;
+			residue.previous_residue = null;
+
+			residue.score = -1;
+			residue.predictedLocation = "UK";
+			residue.isConflicted = false;
+			residue.conflicted_residue = null;
+			residue.conflicted_score = 0.0;
+			residue.location = "UK";
+		}
+	}
+
+	/**
+	 * Method responsible for restoring parameters of residues that contain original
+	 * domain
+	 * 
+	 * @param protein current protein
+	 */
+	public static void restoreParamsOriginalResidues(Protein protein) {
+		List<Residue> residues = protein.reactionSites;
+
+		if (residues == null)
+			return;
+
+		for (Residue residue : residues) {
+			if (residue.predictedLocation.equals("UK"))
+				continue;
+
+			residue.history_residues = null;
+			residue.predicted_epoch = -1;
+			residue.previous_residue = null;
+
+		}
+	}
+
+	/**
+	 * Method responsible for restoring parameters of residues that contain original
+	 * domain
+	 * 
 	 * @param taskMonitor task monitor
 	 */
-	private void restoreParamsOriginalResidues(TaskMonitor taskMonitor) {
+	private void restoreParamsOriginalResiduesForAllProteins(TaskMonitor taskMonitor) {
 
 		List<Protein> allProteins = Util.getProteins(myNetwork, true);
 
@@ -1565,19 +1617,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			if (protein.predicted_domain_epoch != -1)
 				continue;
 
-			List<Residue> residues = protein.reactionSites;
-
-			if (residues == null)
-				continue;
-
-			for (Residue residue : residues) {
-				if (residue.predictedLocation.equals("UK"))
-					continue;
-
-				residue.history_residues = null;
-				residue.predicted_epoch = -1;
-				residue.previous_residue = null;
-			}
+			restoreParamsOriginalResidues(protein);
 
 			summary_processed++;
 
@@ -1607,7 +1647,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 */
 	private void processLocation(TaskMonitor taskMonitor) {
 
-		restoreParamsOriginalResidues(taskMonitor);
+		restoreParamsOriginalResiduesForAllProteins(taskMonitor);
 
 		if (isNewPrediction) {
 			epochs = 1;
@@ -1672,7 +1712,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * @param taskMonitor task monitor
 	 * @param protein     current protein
 	 */
-	private void checkConflictProteinDomains(TaskMonitor taskMonitor, Protein protein) {
+	public static void checkConflictProteinDomains(Protein protein) {
 
 		List<String> unique_domain = new ArrayList<String>();
 
@@ -1761,7 +1801,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			return;
 
 		for (Protein protein : allProteins) {
-			checkConflictProteinDomains(taskMonitor, protein);
+			checkConflictProteinDomains(protein);
 		}
 	}
 
@@ -1772,7 +1812,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * @param protein current protein
 	 * @return true if contains conflict residue
 	 */
-	private boolean containsConflictResidue(Protein protein) {
+	public static boolean containsConflictResidue(Protein protein) {
 
 		if (protein != null && protein.reactionSites.stream().filter(value -> value.isConflicted)
 				.collect(Collectors.toList()).size() > 0)
@@ -1787,7 +1827,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * 
 	 * @param protein current proteinF
 	 */
-	private void updateResiduesLocationAndScore(Protein protein) {
+	public static void updateResiduesLocationAndScore(Protein protein) {
 
 		if (protein == null || !protein.isValid)
 			return;
@@ -2152,7 +2192,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								}
 							}
 
-							checkConflictProteinDomains(taskMonitor, protein);
+							checkConflictProteinDomains(protein);
 
 						}
 					}
@@ -2359,7 +2399,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								protein.domainScores.put(proteinDomain.name, Double.valueOf(proteinDomain.eValue));
 							}
 						}
-						checkConflictProteinDomains(taskMonitor, protein);
+						checkConflictProteinDomains(protein);
 					}
 				}
 			} catch (Exception e) {
@@ -2969,7 +3009,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 			if (epochs == 1) {
 
-				computeResiduesScore(taskMonitor);
+				computeResiduesScoreForAllProteins(taskMonitor);
 			}
 
 			computeNewResidues(taskMonitor, all_unknownResidues, false);
@@ -3004,7 +3044,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * @param end_domain   end domain
 	 * @return domain
 	 */
-	private ProteinDomain getProteinDomain(Protein protein, final int start_domain, final int end_domain) {
+	public static ProteinDomain getProteinDomain(Protein protein, final int start_domain, final int end_domain) {
 
 		if (protein.domains != null && protein.domains.size() > 0) {
 
@@ -3098,9 +3138,65 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	/**
 	 * Method responsible for computing initial residues scoring
 	 * 
+	 * @param protein current protein
+	 */
+	public static void computeResiduesScore(Protein protein) {
+
+		if (protein == null || !protein.isValid)
+			return;
+
+		List<Residue> residues = protein.reactionSites;
+
+		if (residues == null)
+			return;
+
+		// Residues that contain initialResidue or belong to Transmem are localization
+		// markers
+		for (Residue residue : residues.stream().filter(value -> !(value.score == Util.initialResidueScore
+				|| value.location.toLowerCase().equals(TRANSMEMBRANE))).collect(Collectors.toList())) {
+
+			// It means the score has already been computed
+			if (-Math.log10(residue.score) < 0)
+				continue;
+
+			int pos = residue.position;
+
+			List<CrossLink> all_links = new ArrayList<CrossLink>();
+			if (protein.intraLinks != null) {
+				all_links.addAll(
+						protein.intraLinks.stream().filter(value -> value.pos_site_a == pos || value.pos_site_b == pos)
+								.collect(Collectors.toList()));
+			}
+			if (protein.interLinks != null)
+				all_links.addAll(protein.interLinks.stream()
+						.filter(value -> (value.protein_a.equals(protein.proteinID) && value.pos_site_a == pos)
+								|| (value.protein_b.equals(protein.proteinID) && value.pos_site_b == pos))
+						.collect(Collectors.toList()));
+
+			double residue_score = 0;
+			int countValidLinks = 0;
+			for (CrossLink crossLink : all_links) {
+				Protein proteinA = Util.getProtein(myNetwork, crossLink.protein_a);
+				if (proteinA != null && proteinA.isValid) {
+
+					Protein proteinB = Util.getProtein(myNetwork, crossLink.protein_b);
+					if (proteinB != null && proteinB.isValid) {
+						residue_score += Math.pow(crossLink.score, 2);
+						countValidLinks++;
+					}
+				}
+			}
+			if (residue_score > 0)
+				residue.score = Math.sqrt(residue_score / countValidLinks);
+		}
+	}
+
+	/**
+	 * Method responsible for computing initial residues scoring
+	 * 
 	 * @param taskMonitor current task monitor
 	 */
-	private static void computeResiduesScore(TaskMonitor taskMonitor) {
+	private static void computeResiduesScoreForAllProteins(TaskMonitor taskMonitor) {
 
 		// Sqrt(Sum[xl_score^2] / # xl)
 
@@ -3119,41 +3215,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			Util.progressBar(summary_processed, old_progress, total_ptns, "Computing residues score: ", taskMonitor,
 					textLabel_status_result);
 
-			List<Residue> residues = protein.reactionSites;
-
-			if (residues == null)
-				continue;
-
-			// Residues that contain initialResidue or belong to Transmem are localization
-			// markers
-			for (Residue residue : residues.stream().filter(value -> !(value.score == Util.initialResidueScore
-					|| value.location.toLowerCase().equals(TRANSMEMBRANE))).collect(Collectors.toList())) {
-
-				// It means the score has already been computed
-				if (-Math.log10(residue.score) < 0)
-					continue;
-
-				int pos = residue.position;
-
-				List<CrossLink> all_links = new ArrayList<CrossLink>();
-				if (protein.intraLinks != null) {
-					all_links.addAll(protein.intraLinks.stream()
-							.filter(value -> value.pos_site_a == pos || value.pos_site_b == pos)
-							.collect(Collectors.toList()));
-				}
-				if (protein.interLinks != null)
-					all_links.addAll(protein.interLinks.stream()
-							.filter(value -> (value.protein_a.equals(protein.proteinID) && value.pos_site_a == pos)
-									|| (value.protein_b.equals(protein.proteinID) && value.pos_site_b == pos))
-							.collect(Collectors.toList()));
-
-				double residue_score = 0;
-				for (CrossLink crossLink : all_links) {
-					residue_score += Math.pow(crossLink.score, 2);
-				}
-				if (residue_score > 0)
-					residue.score = Math.sqrt(residue_score / all_links.size());
-			}
+			computeResiduesScore(protein);
 		}
 	}
 

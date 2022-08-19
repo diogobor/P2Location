@@ -20,6 +20,7 @@ public class MainSingleNodeTaskFactory extends AbstractTaskFactory {
 
 	private CyApplicationManager cyApplicationManager;
 	private VisualMappingManager vmmServiceRef;
+	@SuppressWarnings("rawtypes")
 	private CyCustomGraphics2Factory vgFactory;
 	private HandleFactory handleFactory;
 	private BendFactory bendFactory;

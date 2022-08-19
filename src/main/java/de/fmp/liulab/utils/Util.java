@@ -920,12 +920,105 @@ public class Util {
 	}
 
 	/**
+	 * Method responsible for updating protein domains
+	 * 
+	 * @param myNetwork current network
+	 * @param node      current node
+	 * @param domains   current predicted domains
+	 */
+	public static void updateProteinDomains(CyNetwork myNetwork, CyNode node, List<String> domains) {
+		// Update protein information
+		CyRow myCurrentRow = myNetwork.getRow(node);
+		if (myCurrentRow == null)
+			return;
+
+		String node_name = myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME).toString();
+		Protein protein = getProtein(myNetwork, node_name);
+		if (protein == null)
+			return;
+
+		List<ProteinDomain> localizationMarkersAndTransm = protein.domains.stream()
+				.filter(value -> !value.isPredicted || value.name.toLowerCase().equals("transmem"))
+				.collect(Collectors.toList());
+
+		List<ProteinDomain> updatedPredictedDomains = parserProteinDomainColumnFromNodeCytoTable(domains, null, true,
+				node_name);
+
+		localizationMarkersAndTransm.addAll(updatedPredictedDomains);
+		if (!checkDomainsEquality(protein, updatedPredictedDomains))
+			protein.domains = localizationMarkersAndTransm;
+		ProcessProteinLocationTask.checkConflictProteinDomains(protein);
+		ProcessProteinLocationTask.resetParamsOriginalResidues(protein);
+		ProcessProteinLocationTask.computeResiduesScore(protein);
+		ProcessProteinLocationTask.updateResiduesLocationAndScore(protein);
+		updateCrosslinksLocationBasedOnProteinDomains(myNetwork, protein);
+		updateProtein(null, protein, myNetwork, null, false);
+	}
+
+	private static boolean checkDomainsEquality(Protein protein, List<ProteinDomain> domainList) {
+
+		if (protein.domains.size() != domainList.size())
+			return false;
+
+		for (ProteinDomain proteinDomain1 : domainList) {
+			ProteinDomain proteinDomain2 = ProcessProteinLocationTask.getProteinDomain(protein, proteinDomain1.startId,
+					proteinDomain1.endId);
+			if (proteinDomain2 == null)
+				return false;
+		}
+		return true;
+	}
+
+	public static List<ProteinDomain> parserProteinDomainColumnFromNodeCytoTable(List<String> domains,
+			TaskMonitor taskMonitor, boolean isPredicted, String nodeName) {
+		List<ProteinDomain> proteinDomains = new ArrayList<ProteinDomain>();
+		try {
+
+			for (String domain : domains) {
+
+				String domainName = "";
+				String score = "";
+				ProteinDomain pd;
+				if (domain.contains("#Score:")) {
+					// e.g. TRANSMEM#Score:0.9992[30-40]
+					String[] domainScore = domain.split("#Score:");
+					domainName = domainScore[0].trim();
+
+					// e.g. 0.9992[30-40]
+					String[] domainsArray = domainScore[1].split("\\[|\\]");
+					score = domainsArray[0];
+					String[] colRange = domainsArray[1].split("-");
+					int startId = Integer.parseInt(colRange[0]);
+					int endId = Integer.parseInt(colRange[1]);
+					pd = new ProteinDomain(domainName, startId, endId, isPredicted, score);
+				} else {
+					// e.g. TRANSMEM[30-40]
+					String[] domainsArray = domain.split("\\[|\\]");
+					domainName = domainsArray[0].trim();
+					String[] colRange = domainsArray[1].split("-");
+					int startId = Integer.parseInt(colRange[0]);
+					int endId = Integer.parseInt(colRange[1]);
+					pd = new ProteinDomain(domainName, startId, endId, isPredicted, "");
+				}
+				proteinDomains.add(pd);
+
+			}
+
+			return proteinDomains;
+		} catch (Exception e) {
+			if (taskMonitor != null)
+				taskMonitor.showMessage(TaskMonitor.Level.WARN, "ERROR: Node: " + nodeName
+						+ " - Protein domains don't match with the pattern 'name[start_index-end_index]'\n");
+			return null;
+		}
+	}
+
+	/**
 	 * Method responsible for updating protein information (valid parameter)
 	 * 
-	 * @param myNetwork    current network
-	 * @param selectedNode protein node
-	 * @param proteinSUID  protein SUID
-	 * @param value        true if the protein is valid
+	 * @param myNetwork current network
+	 * @param node      protein node
+	 * @param value     true if the protein is valid
 	 */
 	public static void updateValidProteinInfo(CyNetwork myNetwork, CyNode node, boolean value) {
 
@@ -935,7 +1028,7 @@ public class Util {
 			return;
 
 		String node_name = myNetwork.getDefaultNodeTable().getRow(node.getSUID()).getRaw(CyNetwork.NAME).toString();
-		Protein protein = Util.getProtein(myNetwork, node_name);
+		Protein protein = getProtein(myNetwork, node_name);
 		if (protein == null)
 			return;
 
@@ -1347,7 +1440,42 @@ public class Util {
 	}
 
 	/**
-	 * Update Protein domain column
+	 * Method responsible for updating the information for a specific protein in
+	 * Cytoscape node table
+	 * 
+	 * @param taskMonitor             task monitor
+	 * @param protein                 current protein
+	 * @param myNetwork               current network
+	 * @param textLabel_status_result label status
+	 * @param getXLs                  get or not crosslinkgs
+	 * @param updateResiduesLocation  update the residue location
+	 */
+	public static void updateProtein(TaskMonitor taskMonitor, Protein protein, CyNetwork myNetwork,
+			JLabel textLabel_status_result, boolean getXLs) {
+
+		CyNode node = getNode(myNetwork, protein.gene);
+		if (node == null)
+			return;
+
+		fillProteinDomainColumns(myNetwork, protein, node);
+		fillProteinSequenceColumn(myNetwork, protein, node);
+		fillProteinNameColumn(myNetwork, protein, node);
+		fillSubcellularLocationColumn(myNetwork, protein, node);
+		fillConflictedResiduesColumn(myNetwork, protein, node);
+		fillProteinDomainsScoresColumn(myNetwork, protein, node);
+
+		/**
+		 * Get intra and interlinks
+		 */
+		if (getXLs) {
+			if (protein.interLinks == null && protein.intraLinks == null)
+				getXLsOneProtein(taskMonitor, protein, myNetwork);
+		}
+
+	}
+
+	/**
+	 * Update information for all Proteins
 	 * 
 	 * @param taskMonitor task monitor
 	 * @param myNetwork   current network
@@ -1371,24 +1499,7 @@ public class Util {
 
 		for (final Protein protein : proteinList) {
 
-			CyNode node = getNode(myNetwork, protein.gene);
-			if (node == null)
-				continue;
-
-			fillProteinDomainColumns(myNetwork, protein, node);
-			fillProteinSequenceColumn(myNetwork, protein, node);
-			fillProteinNameColumn(myNetwork, protein, node);
-			fillSubcellularLocationColumn(myNetwork, protein, node);
-			fillConflictedResiduesColumn(myNetwork, protein, node);
-			fillProteinDomainsScoresColumn(myNetwork, protein, node);
-
-			/**
-			 * Get intra and interlinks
-			 */
-			if (getXLs) {
-				if (protein.interLinks == null && protein.intraLinks == null)
-					getXLsOneProtein(taskMonitor, protein, myNetwork);
-			}
+			updateProtein(taskMonitor, protein, myNetwork, textLabel_status_result, getXLs);
 
 			summary_processed++;
 			progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ", taskMonitor,
@@ -1696,6 +1807,50 @@ public class Util {
 			} else {
 				CyRow row = myNetwork.getRow(node);
 				if (protein.isConflictedDomain)
+					row.set(columnName, true);
+				else
+					myNetwork.getRow(node).set(columnName, false);
+			}
+		}
+
+	}
+
+	/**
+	 * Method responsible for updating valid protein information
+	 * 
+	 * @param myNetwork  current network
+	 * @param node       current node
+	 * @param protein    current protein
+	 * @param columnName column name
+	 */
+	public static void updateValidProteinInformationInCytoScapeNodeTable(CyNetwork myNetwork, CyNode node, final Protein protein,
+			String columnName) {
+
+		if (myNetwork.getRow(node).get(columnName, Boolean.class) != null) {
+			if (protein.isValid)
+				myNetwork.getRow(node).set(columnName, true);
+			else
+				myNetwork.getRow(node).set(columnName, false);
+		} else {
+			// Create protein domain status
+			CyTable nodeTable = myNetwork.getDefaultNodeTable();
+			if (nodeTable.getColumn(columnName) == null) {
+				try {
+					nodeTable.createColumn(columnName, Boolean.class, false);
+
+					CyRow row = myNetwork.getRow(node);
+					if (protein.isValid)
+						row.set(columnName, true);
+					else
+						myNetwork.getRow(node).set(columnName, false);
+
+				} catch (IllegalArgumentException e) {
+				} catch (Exception e) {
+				}
+
+			} else {
+				CyRow row = myNetwork.getRow(node);
+				if (protein.isValid)
 					row.set(columnName, true);
 				else
 					myNetwork.getRow(node).set(columnName, false);
@@ -4206,7 +4361,7 @@ public class Util {
 		VisualProperty<CyCustomGraphics2<?>> vp_node_linear_gradient = (VisualProperty<CyCustomGraphics2<?>>) lexicon
 				.lookup(CyNode.class, "NODE_CUSTOMGRAPHICS_1");
 
-		if (myProtein == null)
+		if (myProtein == null || myProtein.domains == null || myProtein.domains.size() == 0)
 			return;
 
 		float protein_length = Util.getProteinLength();
