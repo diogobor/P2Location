@@ -151,25 +151,25 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 		}
 	}
 
-	/**
-	 * Method responsible for updating predicted protein domains
-	 * 
-	 * @param e
-	 */
-	private void updatePredictedDomains(RowsSetEvent e) {
-
-		if (myNetwork == null || netView == null)
-			return;
-
-		if (e.getColumns().size() == 1 && e.getColumnRecords(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN).size() == 1) {
-			RowSetRecord record = e.getColumnRecords(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN).iterator().next();
-			Long suid = record.getRow().get(CyIdentifiable.SUID, Long.class);
-			@SuppressWarnings("unchecked")
-			List<String> domains = (List<String>) record.getValue();
-			CyNode selectedNode = myNetwork.getNode(suid);
-			Util.updateProteinDomains(myNetwork, selectedNode, domains);
-		}
-	}
+//	/**
+//	 * Method responsible for updating predicted protein domains
+//	 * 
+//	 * @param e
+//	 */
+//	private void updatePredictedDomains(RowsSetEvent e) {
+//
+//		if (myNetwork == null || netView == null)
+//			return;
+//
+//		if (e.getColumns().size() == 1 && e.getColumnRecords(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN).size() == 1) {
+//			RowSetRecord record = e.getColumnRecords(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN).iterator().next();
+//			Long suid = record.getRow().get(CyIdentifiable.SUID, Long.class);
+//			@SuppressWarnings("unchecked")
+//			List<String> domains = (List<String>) record.getValue();
+//			CyNode selectedNode = myNetwork.getNode(suid);
+//			Util.updateProteinDomains(myNetwork, selectedNode, domains);
+//		}
+//	}
 
 	/**
 	 * Method responsible for capturing the selected node.
@@ -189,12 +189,6 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 			// First check whether 'valid_proteins' column has been changed
 			if (e.containsColumn(Util.VALID_PROTEINS_COLUMN)) {
 				hiddenNotValidProteins(e);
-			}
-
-			// Check whether some predicted domains have been modified (e.g.: a conflict
-			// domain has been selected to be used)
-			if (e.containsColumn(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN)) {
-				updatePredictedDomains(e);
 			}
 
 			// Check whether this event has anything to do with selections

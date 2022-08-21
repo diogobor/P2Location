@@ -9,6 +9,7 @@ import javax.swing.JFrame;
 import de.fmp.liulab.task.LoadPTMsTask;
 import de.fmp.liulab.task.MainSingleNodeTask;
 import de.fmp.liulab.task.ProcessProteinLocationTask;
+import de.fmp.liulab.task.UpdateProteinInformationTask;
 
 /**
  * Class responsible for creating JFrames without max nor min buttons
@@ -45,6 +46,9 @@ public class JFrameWithoutMaxAndMinButton extends JDialog {
 						frame.dispose();
 				} else if (originalFrame == 3) {
 					if (ProcessProteinLocationTask.cancelProcess())
+						frame.dispose();
+				} else if (originalFrame == 4) {
+					if (UpdateProteinInformationTask.cancelProcess())
 						frame.dispose();
 				} else if (originalFrame == -1) {
 					frame.dispose();

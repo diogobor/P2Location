@@ -349,7 +349,7 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 						List<String> domains = row.get(Util.PROTEIN_DOMAIN_COLUMN, List.class);
 
 						if (domains != null && domains.size() > 0 && proteinDomainsMapOK) {
-							updateProteinDomainsMap(nodeName, domains, false, taskMonitor);
+							updateProteinDomainsMap(nodeName, domains, false, true, taskMonitor);
 						}
 					}
 				}
@@ -398,7 +398,7 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 						List<String> domains = row.get(Util.PREDICTED_PROTEIN_DOMAIN_COLUMN, List.class);
 
 						if (domains != null && domains.size() > 0 && proteinDomainsMapOK) {
-							updateProteinDomainsMap(nodeName, domains, true, taskMonitor);
+							updateProteinDomainsMap(nodeName, domains, true, false, taskMonitor);
 						}
 					}
 				}
@@ -444,6 +444,55 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 
 						if (scores != null && scores.size() > 0 && proteinDomainsMapOK) {
 							updateProteinDomainsScores(nodeName, scores, taskMonitor);
+						}
+					}
+				}
+			} catch (Exception e) {
+			}
+		}
+
+		// ######## VALID PROTEIN DOMAINS ########
+		if (nodeTable.getColumn(Util.VALID_DOMAINS_COLUMN) == null) {
+			try {
+				nodeTable.createListColumn(Util.VALID_DOMAINS_COLUMN, String.class, false);
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					row.set(Util.VALID_DOMAINS_COLUMN, new ArrayList<String>());
+				}
+
+			} catch (IllegalArgumentException e) {
+				try {
+					for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+						if (row.get(Util.VALID_DOMAINS_COLUMN, List.class) == null)
+							row.set(Util.VALID_DOMAINS_COLUMN, new ArrayList<String>());
+					}
+				} catch (Exception e2) {
+				}
+			} catch (Exception e) {
+			}
+
+		} else { // The column exists, but it's necessary to check the cells
+			try {
+
+				// Check if proteinDomainsMap has been initialized
+				boolean proteinDomainsMapOK = true;
+				if (Util.proteinsMap == null)
+					proteinDomainsMapOK = false;
+
+				// Initialize protein domain colors map if LoadProteinDomainTask has not been
+				// initialized
+				Util.init_availableProteinDomainColorsMap();
+
+				for (CyRow row : myNetwork.getDefaultNodeTable().getAllRows()) {
+					if (row.get(Util.VALID_DOMAINS_COLUMN, List.class) == null)
+						row.set(Util.VALID_DOMAINS_COLUMN, new ArrayList<String>());
+					else {
+						String nodeName = row.get(CyNetwork.NAME, String.class);
+						@SuppressWarnings("unchecked")
+						List<String> domains = row.get(Util.VALID_DOMAINS_COLUMN, List.class);
+
+						if (domains != null && domains.size() > 0 && proteinDomainsMapOK) {
+							updateProteinDomainsMap(nodeName, domains, true, true, taskMonitor);
 						}
 					}
 				}
@@ -910,14 +959,14 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 	 * @param isPredicted predicted or original domain
 	 * @param taskMonitor task monitor
 	 */
-	private void updateProteinDomainsMap(String nodeName, List<String> domains, boolean isPredicted,
+	private void updateProteinDomainsMap(String nodeName, List<String> domains, boolean isPredicted, boolean isValid,
 			TaskMonitor taskMonitor) {
 
 		if (domains == null || domains.size() == 0 || domains.get(0).isBlank() || domains.get(0).isEmpty())
 			return;
 
 		List<ProteinDomain> proteinDomains = Util.parserProteinDomainColumnFromNodeCytoTable(domains, taskMonitor,
-				isPredicted, nodeName);
+				isPredicted, isValid, nodeName);
 
 		// Check if the node exists in the network
 
@@ -934,7 +983,30 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 				if (isPtnPresent.isPresent()) {
 					Protein _myProtein = isPtnPresent.get();
 					_myProtein.predicted_domain_epoch = 0;
-					if (isPredicted) {
+
+					if (isValid) {
+
+						if (_myProtein.domains != null) {
+
+							for (ProteinDomain domain : proteinDomains) {
+
+								Optional<ProteinDomain> current_domain = _myProtein.domains.stream()
+										.filter(value -> value.name.equals(domain.name) && value.endId == domain.endId
+												&& value.startId == domain.startId
+												&& value.eValue.equals(domain.eValue))
+										.findFirst();
+
+								if (current_domain.isPresent()) {
+									ProteinDomain current_dom = current_domain.get();
+									current_dom.isValid = true;
+								} else {
+									_myProtein.domains.add(domain);
+								}
+							}
+						} else {
+							noDomains = true;
+						}
+					} else if (isPredicted) {
 						if (_myProtein.domains != null && _myProtein.domains.size() > 0) {
 							_myProtein.domains.addAll(proteinDomains);
 							_myProtein.domains = _myProtein.domains.stream().distinct().collect(Collectors.toList());

@@ -1556,8 +1556,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			return;
 
 		for (Residue residue : residues) {
-			if (residue.predictedLocation.equals("UK"))
-				continue;
 
 			residue.history_residues = null;
 			residue.predicted_epoch = -1;
@@ -1723,18 +1721,21 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		if (protein.domains == null)
 			return;
 
-		Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+		List<ProteinDomain> onlyValidDomains = protein.domains.stream().filter(value -> value.isValid)
+				.collect(Collectors.toList());
+
+		Collections.sort(onlyValidDomains, new Comparator<ProteinDomain>() {
 			@Override
 			public int compare(ProteinDomain lhs, ProteinDomain rhs) {
 				return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
 			}
 		});
 
-		if (protein.domains.stream().filter(value -> value.name.toLowerCase().equals(TRANSMEMBRANE))
+		if (onlyValidDomains.stream().filter(value -> value.name.toLowerCase().equals(TRANSMEMBRANE))
 				.collect(Collectors.toList()).size() > 0)
 			isThereTransmem = true;
 
-		for (ProteinDomain domain : protein.domains.stream()
+		for (ProteinDomain domain : onlyValidDomains.stream()
 				.filter(value -> !value.name.toLowerCase().equals(TRANSMEMBRANE)).collect(Collectors.toList())) {
 			unique_domain.add(domain.name);
 		}
@@ -1745,12 +1746,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			unique_domain.clear();
 
 			// There are only Transmembrane domains
-			if (protein.domains.size() == 1)
+			if (onlyValidDomains.size() == 1)
 				return;
 
 			// Copy protein domains collection because it will be changed on
 			// UnifyResiduesDomains method
-			List<ProteinDomain> current_ptn_domain_list = protein.domains.stream().collect(Collectors.toList());
+			List<ProteinDomain> current_ptn_domain_list = onlyValidDomains.stream().collect(Collectors.toList());
 
 			for (int i = 0; i < current_ptn_domain_list.size() - 1; i++) {
 
@@ -1836,7 +1837,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			return;
 
 		if (!(protein.isConflictedDomain || containsConflictResidue(protein))) {
-			for (ProteinDomain domain : protein.domains) {
+			for (ProteinDomain domain : protein.domains.stream().filter(value -> value.isValid)
+					.collect(Collectors.toList())) {
 
 				if (domain.eValue.isBlank() || domain.eValue.isEmpty() || domain.eValue.equals("predicted")
 						|| domain.name.isBlank() || domain.name.isEmpty())
@@ -1863,8 +1865,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 			// Group domains based on the range position
 			Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
-					.filter(value -> !value.name.isBlank() && !value.name.isEmpty() && !value.eValue.isBlank()
-							&& !value.eValue.isEmpty() && !value.eValue.equals("predicted"))
+					.filter(value -> value.isValid && !value.name.isBlank() && !value.name.isEmpty()
+							&& !value.eValue.isBlank() && !value.eValue.isEmpty() && !value.eValue.equals("predicted"))
 					.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
 
 			for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
@@ -3058,6 +3060,32 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				return null;
 		} else
 			return null;
+	}
+
+	/**
+	 * Method responsible for checking if there is a specific protein domain
+	 * 
+	 * @param proteinDomains list of protein domains
+	 * @param start_domain   start domain
+	 * @param end_domain     end domain
+	 * @return true if exists a protein domain
+	 */
+	public static boolean hasSimilarProteinDomain(List<ProteinDomain> proteinDomains, final int start_domain,
+			final int end_domain) {
+
+		if (proteinDomains != null && proteinDomains.size() > 0) {
+
+			// eg: Matrix[10,20] => start_d = 12, end_d = 18
+			List<ProteinDomain> candidates_domains = proteinDomains.stream()
+					.filter(value -> value.isValid && value.startId <= start_domain && value.endId >= end_domain)
+					.collect(Collectors.toList());
+
+			if (candidates_domains.size() > 1)
+				return true;
+			else
+				return false;
+		} else
+			return false;
 	}
 
 	/**

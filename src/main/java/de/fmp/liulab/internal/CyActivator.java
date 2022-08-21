@@ -47,6 +47,7 @@ import de.fmp.liulab.internal.action.LoadProteinLocationAction;
 import de.fmp.liulab.internal.action.MainPanelAction;
 import de.fmp.liulab.internal.action.ReadMeAction;
 import de.fmp.liulab.internal.action.ResiduesTreeNodeExecuteAction;
+import de.fmp.liulab.internal.action.ShortcutUpdateProteinDomainsAction;
 import de.fmp.liulab.internal.action.ShortcutValidateProteinAction;
 import de.fmp.liulab.internal.action.ShortcutWindowSingleNodeLayout;
 import de.fmp.liulab.task.MainSingleEdgeTaskFactory;
@@ -219,6 +220,9 @@ public class CyActivator extends AbstractCyActivator {
 		UpdateProteinInformationTaskFactory updateProteinInformation = new UpdateProteinInformationTaskFactory(
 				cyApplicationManager, vmmServiceRef, customChartListener, bendFactory, handleFactory);
 
+		ShortcutUpdateProteinDomainsAction myShortcutUpdateProteinDomains = new ShortcutUpdateProteinDomainsAction(
+				dialogTaskManager, updateProteinInformation);
+
 		ShortcutValidateProteinAction myShortcutValidateProteinAction = new ShortcutValidateProteinAction(
 				dialogTaskManager, updateProteinInformation);
 		// ##############################
@@ -268,6 +272,7 @@ public class CyActivator extends AbstractCyActivator {
 		registerService(bc, myExportProteinDomainsAction, CyAction.class, new Properties());
 //		registerService(bc, mySetProteinDomainsAction, CyAction.class, new Properties());
 		registerService(bc, myShortcutValidateProteinAction, CyAction.class, new Properties());
+		registerService(bc, myShortcutUpdateProteinDomains, CyAction.class, new Properties());
 
 		registerService(bc, mainControlPanel, CytoPanelComponent.class, new Properties());
 		registerService(bc, panelAction, CyAction.class, new Properties());

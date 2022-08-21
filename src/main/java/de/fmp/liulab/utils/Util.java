@@ -104,6 +104,7 @@ public class Util {
 	public static String CONFLICTED_PREDICTED_RESIDUES_COLUMN = PROJECT_NAME + "conflicted_residues";
 	public static String CONFLICTED_PROTEIN_DOMAINS_COLUMN = PROJECT_NAME + "conflicted_protein_domains";
 	public static String VALID_PROTEINS_COLUMN = PROJECT_NAME + "valid_proteins";
+	public static String VALID_DOMAINS_COLUMN = PROJECT_NAME + "valid_domains";
 	public static String PROTEIN_SEQUENCE_COLUMN = PROJECT_NAME + "sequence";
 	public static String PROTEIN_NAME_COLUMN = PROJECT_NAME + "protein_name";
 	public static String SUBCELLULAR_LOCATION_COLUMN = PROJECT_NAME + "subcellular_location";
@@ -924,9 +925,8 @@ public class Util {
 	 * 
 	 * @param myNetwork current network
 	 * @param node      current node
-	 * @param domains   current predicted domains
 	 */
-	public static void updateProteinDomains(CyNetwork myNetwork, CyNode node, List<String> domains) {
+	public static void updateProteinDomains(CyNetwork myNetwork, CyNode node) {
 		// Update protein information
 		CyRow myCurrentRow = myNetwork.getRow(node);
 		if (myCurrentRow == null)
@@ -937,16 +937,6 @@ public class Util {
 		if (protein == null)
 			return;
 
-		List<ProteinDomain> localizationMarkersAndTransm = protein.domains.stream()
-				.filter(value -> !value.isPredicted || value.name.toLowerCase().equals("transmem"))
-				.collect(Collectors.toList());
-
-		List<ProteinDomain> updatedPredictedDomains = parserProteinDomainColumnFromNodeCytoTable(domains, null, true,
-				node_name);
-
-		localizationMarkersAndTransm.addAll(updatedPredictedDomains);
-		if (!checkDomainsEquality(protein, updatedPredictedDomains))
-			protein.domains = localizationMarkersAndTransm;
 		ProcessProteinLocationTask.checkConflictProteinDomains(protein);
 		ProcessProteinLocationTask.resetParamsOriginalResidues(protein);
 		ProcessProteinLocationTask.computeResiduesScore(protein);
@@ -955,22 +945,8 @@ public class Util {
 		updateProtein(null, protein, myNetwork, null, false);
 	}
 
-	private static boolean checkDomainsEquality(Protein protein, List<ProteinDomain> domainList) {
-
-		if (protein.domains.size() != domainList.size())
-			return false;
-
-		for (ProteinDomain proteinDomain1 : domainList) {
-			ProteinDomain proteinDomain2 = ProcessProteinLocationTask.getProteinDomain(protein, proteinDomain1.startId,
-					proteinDomain1.endId);
-			if (proteinDomain2 == null)
-				return false;
-		}
-		return true;
-	}
-
 	public static List<ProteinDomain> parserProteinDomainColumnFromNodeCytoTable(List<String> domains,
-			TaskMonitor taskMonitor, boolean isPredicted, String nodeName) {
+			TaskMonitor taskMonitor, boolean isPredicted, boolean isValid, String nodeName) {
 		List<ProteinDomain> proteinDomains = new ArrayList<ProteinDomain>();
 		try {
 
@@ -998,7 +974,7 @@ public class Util {
 					String[] colRange = domainsArray[1].split("-");
 					int startId = Integer.parseInt(colRange[0]);
 					int endId = Integer.parseInt(colRange[1]);
-					pd = new ProteinDomain(domainName, startId, endId, isPredicted, "");
+					pd = new ProteinDomain(domainName, startId, endId, isPredicted, "", isValid);
 				}
 				proteinDomains.add(pd);
 
@@ -1665,10 +1641,16 @@ public class Util {
 
 			List<String> list_original_domains = new ArrayList<>();
 			List<String> list_predicted_domains = new ArrayList<>();
+			List<String> list_valid_domains = new ArrayList<>();
 			for (ProteinDomain domain : protein.domains) {
 				if (domain.isPredicted) {
 					list_predicted_domains.add(domain.name + "#Score:" + domain.eValue + "["
 							+ Integer.toString(domain.startId) + "-" + Integer.toString(domain.endId) + "]");
+
+					if (domain.isValid)
+						list_valid_domains.add(domain.name + "#Score:" + domain.eValue + "["
+								+ Integer.toString(domain.startId) + "-" + Integer.toString(domain.endId) + "]");
+
 				} else if (domain.name.toLowerCase().contains("transmem")) {
 					String score = "";
 					if (!(domain.eValue.isBlank() || domain.eValue.isEmpty()))
@@ -1677,9 +1659,17 @@ public class Util {
 						score = String.valueOf(initialTransmembraneScore);
 					list_original_domains.add(domain.name + "#Score:" + score + "[" + Integer.toString(domain.startId)
 							+ "-" + Integer.toString(domain.endId) + "]");
+					if (domain.isValid)
+						list_valid_domains.add(domain.name + "#Score:" + score + "[" + Integer.toString(domain.startId)
+								+ "-" + Integer.toString(domain.endId) + "]");
 				} else {
 					list_original_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
 							+ Integer.toString(domain.endId) + "]");
+
+					if (domain.isValid)
+						list_valid_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
+								+ Integer.toString(domain.endId) + "]");
+
 				}
 
 			}
@@ -1688,6 +1678,8 @@ public class Util {
 					PREDICTED_PROTEIN_DOMAIN_COLUMN);
 
 			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, list_original_domains, PROTEIN_DOMAIN_COLUMN);
+
+			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, list_valid_domains, VALID_DOMAINS_COLUMN);
 		}
 
 		updateProteinDomainsConflictedStatus(myNetwork, node, protein, CONFLICTED_PROTEIN_DOMAINS_COLUMN);
@@ -1823,8 +1815,8 @@ public class Util {
 	 * @param protein    current protein
 	 * @param columnName column name
 	 */
-	public static void updateValidProteinInformationInCytoScapeNodeTable(CyNetwork myNetwork, CyNode node, final Protein protein,
-			String columnName) {
+	public static void updateValidProteinInformationInCytoScapeNodeTable(CyNetwork myNetwork, CyNode node,
+			final Protein protein, String columnName) {
 
 		if (myNetwork.getRow(node).get(columnName, Boolean.class) != null) {
 			if (protein.isValid)
@@ -1979,8 +1971,10 @@ public class Util {
 			}
 		}
 
-		if (protein.domains != null && protein.domains.size() > 0) {
-			for (ProteinDomain domain : protein.domains) {
+		if (protein.domains != null) {
+			List<ProteinDomain> validDomains = protein.domains.stream().filter(value -> value.isValid)
+					.collect(Collectors.toList());
+			for (ProteinDomain domain : validDomains) {
 
 				int startPos = domain.startId;
 				int endPos = domain.endId;
