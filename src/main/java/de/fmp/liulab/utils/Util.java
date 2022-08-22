@@ -1152,7 +1152,7 @@ public class Util {
 
 		for (final Protein protein : proteinList) {
 
-			if (protein.reactionSites == null || protein.reactionSites.size() == 0)
+			if (!protein.isValid || protein.reactionSites == null || protein.reactionSites.size() == 0)
 				continue;
 
 			for (Residue residue : protein.reactionSites) {

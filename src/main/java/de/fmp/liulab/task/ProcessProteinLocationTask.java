@@ -1995,6 +1995,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				List<ProteinDomain> newDomains = new ArrayList<ProteinDomain>();
 				transmCount = 0;
 
+				List<ProteinDomain> validDomains = null;
 				if (protein.domains != null) {
 					Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
 						@Override
@@ -2004,9 +2005,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					});
 
 					transmCount = protein.domains.stream()
-							.filter(value -> value.name.toLowerCase().equals(TRANSMEMBRANE))
+							.filter(value -> value.isValid && value.name.toLowerCase().equals(TRANSMEMBRANE))
 							.collect(Collectors.toList()).size();
 
+					validDomains = protein.domains.stream().filter(value -> value.isValid).collect(Collectors.toList());
 				}
 
 				if (protein.domainScores == null)
@@ -2016,16 +2018,16 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					// There is no Transmembrane domain
 
 					// There is only one non-predicted domain
-					if (protein.domains != null && protein.domains.size() == 1) {
+					if (validDomains != null && validDomains.size() == 1) {
 
-						if (!protein.domains.get(0).isPredicted)
+						if (!validDomains.get(0).isPredicted)
 							continue;
 
 						if (!Util.dualLocalization_conflict)
-							protein.domains = ComputeDomainsScore(protein.reactionSites, 1, protein.sequence.length(),
+							validDomains = ComputeDomainsScore(protein.reactionSites, 1, protein.sequence.length(),
 									true);
 						else if (protein.domains == null)
-							protein.domains = new ArrayList<ProteinDomain>();
+							validDomains = new ArrayList<ProteinDomain>();
 
 						if (addDomainScore) {
 							protein.domainScores.put(protein.domains.get(0).name,
@@ -2038,22 +2040,22 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					// e.g. Matrix [11-30], IMS [55-70] => Matrix [1-120] and IMS [1-120]
 					if (!Util.dualLocalization_conflict) {
 						newDomains = ComputeDomainsScore(protein.reactionSites, 1, protein.sequence.length(), true);
-						if (protein.domains != null)
-							newDomains.addAll(protein.domains.stream().filter(value -> !value.isPredicted)
+						if (validDomains != null)
+							newDomains.addAll(validDomains.stream().filter(value -> !value.isPredicted)
 									.collect(Collectors.toList()));
 
-						protein.domains = newDomains.stream().distinct().collect(Collectors.toList());
-					} else if (protein.domains == null)
-						protein.domains = new ArrayList<ProteinDomain>();
-					if (protein.domains.size() == 0)
+						validDomains = newDomains.stream().distinct().collect(Collectors.toList());
+					} else if (validDomains == null)
+						validDomains = new ArrayList<ProteinDomain>();
+					if (validDomains.size() == 0)
 						continue;
 
 					// remove domains created from null conflict residues
-					protein.domains.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty())
+					validDomains.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty())
 							&& !value.eValue.isBlank() && !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
 
 					if (addDomainScore) {
-						for (ProteinDomain proteinDomain : protein.domains) {
+						for (ProteinDomain proteinDomain : validDomains) {
 							if (proteinDomain.isPredicted)
 								protein.domainScores.put(proteinDomain.name, Double.valueOf(proteinDomain.eValue));
 							else {
@@ -2065,7 +2067,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						}
 					}
 
-					if (protein.domains.size() == 1) {
+					if (validDomains.size() == 1) {
 						protein.isConflictedDomain = false;
 					} else {
 						if (!Util.dualLocalization_conflict) {
@@ -2076,21 +2078,33 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						}
 					}
 
+					List<ProteinDomain> invalidDomains = protein.domains.stream().filter(value -> !value.isValid)
+							.collect(Collectors.toList());
+					validDomains.addAll(invalidDomains);
+					validDomains = validDomains.stream().distinct().collect(Collectors.toList());
+					protein.domains = validDomains;
+
 				} else {
 
 					if (transmCount == 1) {
 
 						// There is only one transmembrane
-						if (protein.domains.size() == 1) {
+						if (validDomains.size() == 1) {
 
 							// Remove low confidence transmem regions
-							protein.domains.removeIf(value -> Double
-									.parseDouble(value.eValue) < Util.transmemPredictionRegionsUpperScore);
+
+							validDomains.stream()
+									.filter(value -> Double
+											.parseDouble(value.eValue) < Util.transmemPredictionRegionsUpperScore)
+									.collect(Collectors.toList()).forEach(candidate -> candidate.isValid = false);
+
+//							validDomains.removeIf(value -> Double
+//									.parseDouble(value.eValue) < Util.transmemPredictionRegionsUpperScore);
 							continue;
 						}
 
-						ProteinDomain transmem = protein.domains.stream()
-								.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
+						ProteinDomain transmem = validDomains.stream()
+								.filter(value -> value.isValid && value.name.toLowerCase().contains(TRANSMEMBRANE))
 								.collect(Collectors.toList()).get(0);
 
 						double transm_score = Util.initialTransmembraneScore;
@@ -2099,13 +2113,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 						if (transm_score < Util.transmemPredictionRegionsUpperScore) {
 
-							// Remove transmembrane domains from protein.domains and all 'predicted' domains
-							protein.domains = protein.domains.stream()
-									.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)
-											&& !value.eValue.equals("predicted"))
+							transmem.isValid = false;
+							// Remove all 'predicted' domains
+							validDomains = validDomains.stream().filter(value -> !value.eValue.equals("predicted"))
 									.collect(Collectors.toList());
 
-							if (protein.domains.size() > 0 && !Util.dualLocalization_conflict)
+							if (validDomains.size() > 0 && !Util.dualLocalization_conflict)
 								protein.isConflictedDomain = true;
 							else
 								protein.isConflictedDomain = false;
@@ -2115,7 +2128,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							newDomains.clear();
 
 							// Group domains based on the range position
-							Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+							Map<String, List<ProteinDomain>> groupedDomains = validDomains.stream()
 									.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)
 											&& !value.eValue.equals("predicted"))
 									.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
@@ -2165,24 +2178,25 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									newDomains.addAll(proteinDomain.getValue());
 							}
 
-							newDomains.addAll(protein.domains.stream().filter(value -> value.eValue.equals("predicted"))
+							newDomains.addAll(validDomains.stream().filter(value -> value.eValue.equals("predicted"))
 									.collect(Collectors.toList()));
 							newDomains.add(transmem);
-							protein.domains = newDomains;
+//							protein.domains = newDomains;
+							validDomains = newDomains;
 
 							// remove domains created from null conflict residues
-							protein.domains.removeIf(
+							validDomains.removeIf(
 									value -> ((value.name.isBlank() || value.name.isEmpty()) && !value.eValue.isBlank()
 											&& !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
 
-							Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+							Collections.sort(validDomains, new Comparator<ProteinDomain>() {
 								@Override
 								public int compare(ProteinDomain lhs, ProteinDomain rhs) {
 									return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
 								}
 							});
 
-							for (ProteinDomain proteinDomain : protein.domains.stream()
+							for (ProteinDomain proteinDomain : validDomains.stream()
 									.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)
 											&& !value.eValue.equals("predicted"))
 									.collect(Collectors.toList())) {
@@ -2194,15 +2208,19 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								}
 							}
 
+							List<ProteinDomain> invalidDomains = protein.domains.stream()
+									.filter(value -> !value.isValid).collect(Collectors.toList());
+							validDomains.addAll(invalidDomains);
+							validDomains = validDomains.stream().distinct().collect(Collectors.toList());
+							protein.domains = validDomains;
+
 							checkConflictProteinDomains(protein);
 
 						}
-					}
-
-					else {// There are more than one transmem
+					} else {// There are more than one transmem
 
 						// Get only transmembrane regions that contain score >= UpperScore
-						List<ProteinDomain> all_transmem = protein.domains.stream()
+						List<ProteinDomain> all_transmem = validDomains.stream()
 								.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE)
 										&& Double.parseDouble(value.eValue) >= Util.transmemPredictionRegionsUpperScore)
 								.collect(Collectors.toList());
@@ -2215,7 +2233,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							if (transmem == null)
 								continue;
 
-							int transm_index = protein.domains.indexOf(transmem);
+							int transm_index = validDomains.indexOf(transmem);
 							double transm_score = Double.parseDouble(transmem.eValue);
 
 							if ((i + 1) >= all_transmem.size()) {
@@ -2225,7 +2243,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									// ... |Transm (score 0.5) | Last Domain
 									// Add Last Domain
 									newDomains
-											.addAll(protein.domains.stream()
+											.addAll(validDomains.stream()
 													.filter(value -> !value.eValue.equals("predicted")
 															&& (value.startId > transmem.endId))
 													.collect(Collectors.toList()));
@@ -2233,7 +2251,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								} else {
 
 									// Group domains based on the range position
-									Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+									Map<String, List<ProteinDomain>> groupedDomains = validDomains.stream()
 											.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)
 													&& !value.eValue.equals("predicted")
 													&& value.startId > transmem.endId)
@@ -2259,7 +2277,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									}
 
 									// Add Last Domain (predicted)
-									newDomains.addAll(protein.domains.stream().filter(
+									newDomains.addAll(validDomains.stream().filter(
 											value -> value.eValue.equals("predicted") && value.startId > transmem.endId)
 											.collect(Collectors.toList()));
 
@@ -2279,7 +2297,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								// [Domain 1 | Transm (score 0.5) | Domain 2 (predicted) | Transm (score 0.7) |
 								// Domain 3]
 								// => Remove Domain 2
-								newDomains.addAll(protein.domains.stream().filter(value -> !(value.eValue
+								newDomains.addAll(validDomains.stream().filter(value -> !(value.eValue
 										.equals("predicted")
 										&& (value.startId > transmem.endId && value.endId < next_transmem.startId)))
 										.collect(Collectors.toList()));
@@ -2289,7 +2307,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								// => Remove Domain 1 (predicted)
 								if (transm_index == 1) {
 									newDomains
-											.addAll(protein.domains.stream()
+											.addAll(validDomains.stream()
 													.filter(value -> !(value.eValue.equals("predicted")
 															&& value.endId < transmem.startId))
 													.collect(Collectors.toList()));
@@ -2303,7 +2321,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 								// Group domains based on the range position
 								// Domain 2 and Domain 4
-								Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+								Map<String, List<ProteinDomain>> groupedDomains = validDomains.stream()
 										.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)
 												&& !value.eValue.equals("predicted") && value.startId > transmem.endId
 												&& value.endId < next_transmem.startId)
@@ -2328,7 +2346,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								}
 
 								// Add Domain 2 (predicted)
-								newDomains.addAll(protein.domains.stream()
+								newDomains.addAll(validDomains.stream()
 										.filter(value -> value.eValue.equals("predicted")
 												&& value.startId > transmem.endId
 												&& value.endId < next_transmem.startId)
@@ -2341,7 +2359,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 									// Group domains based on the range position
 									// Domain 1 and Domain 5
-									groupedDomains = protein.domains.stream()
+									groupedDomains = validDomains.stream()
 											.filter(value -> !value.name.toLowerCase().contains(TRANSMEMBRANE)
 													&& !value.eValue.equals("predicted")
 													&& value.endId < transmem.startId)
@@ -2366,7 +2384,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									}
 
 									// Add Domain 1 (predicted)
-									newDomains.addAll(protein.domains.stream().filter(
+									newDomains.addAll(validDomains.stream().filter(
 											value -> value.eValue.equals("predicted") && value.endId < transmem.startId)
 											.collect(Collectors.toList()));
 
@@ -2375,7 +2393,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							}
 
 						}
-						protein.domains = newDomains;
+
+						validDomains = newDomains;
+						List<ProteinDomain> invalidDomains = protein.domains.stream().filter(value -> !value.isValid)
+								.collect(Collectors.toList());
+						validDomains.addAll(invalidDomains);
+						validDomains = validDomains.stream().distinct().collect(Collectors.toList());
+						protein.domains = validDomains;
 
 						// remove domains created from null conflict residues
 						protein.domains.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty())
@@ -2434,7 +2458,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				if (protein.domains == null)
 					continue;
 
-				Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+				List<ProteinDomain> validDomains = protein.domains.stream().filter(value -> value.isValid)
+						.collect(Collectors.toList());
+
+				Collections.sort(validDomains, new Comparator<ProteinDomain>() {
 					@Override
 					public int compare(ProteinDomain lhs, ProteinDomain rhs) {
 						return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
@@ -2445,7 +2472,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				count_transmem = 0;
 				List<ProteinDomain> new_domain_list = new ArrayList<ProteinDomain>();
 
-				for (ProteinDomain domain : protein.domains) {
+				for (ProteinDomain domain : validDomains) {
 
 					if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
 						count_transmem++;
@@ -2457,7 +2484,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 				if (count_transmem > 0 && unique_domain.size() > 0) {
 
-					List<ProteinDomain> transmemDomains = protein.domains.stream()
+					List<ProteinDomain> transmemDomains = validDomains.stream()
 							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
 							.collect(Collectors.toList());
 					Collections.sort(transmemDomains, new Comparator<ProteinDomain>() {
@@ -2468,7 +2495,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					});
 
 					// Group domains based on the range position
-					Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+					Map<String, List<ProteinDomain>> groupedDomains = validDomains.stream()
 							.filter(value -> !value.eValue.equals("predicted"))
 							.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
 
@@ -2501,7 +2528,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						if (new_domain_list.size() > 0)
 							last_new_domain = new_domain_list.get(new_domain_list.size() - 1);
 
-						if (current_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+						if (current_domain.name.toLowerCase().contains(TRANSMEMBRANE) && Double
+								.parseDouble(current_domain.eValue) > Util.transmemPredictionRegionsUpperScore) {
 
 							if (new_domain_list.size() == 0
 									|| last_new_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
@@ -2573,10 +2601,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 						}
 
-						if (current_domain.startId < next_transmem.startId) {
+						if (current_domain.startId < next_transmem.startId && Double
+								.parseDouble(next_transmem.eValue) > Util.transmemPredictionRegionsUpperScore) {
 
 							// e.g [IMS | Transmem | ??? ]
-							if (next_domain != null && next_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+							if (next_domain != null && next_domain.name.toLowerCase().contains(TRANSMEMBRANE) && Double
+									.parseDouble(next_domain.eValue) > Util.transmemPredictionRegionsUpperScore) {
 
 								if (current_domains.size() == 1)
 									predicted_protein_domain_name = current_domain.name;
@@ -2620,34 +2650,39 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							// e.g [??? | Transmem | IMS ]
 
-							if (current_domains.size() == 1)
-								predicted_protein_domain_name = current_domain.name;
-							else // There is conflict domains
-								predicted_protein_domain_name = "";
+							if (Double.parseDouble(next_transmem.eValue) > Util.transmemPredictionRegionsUpperScore) {
 
-							String current_domain_index = current_domain.startId + "_" + current_domain.endId;
-							if (current_domain_index.equals(domain_range_keys.get(indexOfLastDomain))) {
+								if (current_domains.size() == 1)
+									predicted_protein_domain_name = current_domain.name;
+								else // There is conflict domains
+									predicted_protein_domain_name = "Unknown";
 
-								// It is the last domain
-								// update range in all domains of the current range
-								for (ProteinDomain domain : current_domains) {
-									domain.endId = protein.sequence.length();
-									domain.startId = next_transmem.endId + 1;
+								String current_domain_index = current_domain.startId + "_" + current_domain.endId;
+								if (current_domain_index.equals(domain_range_keys.get(indexOfLastDomain))) {
+
+									// It is the last domain
+									// update range in all domains of the current range
+									for (ProteinDomain domain : current_domains) {
+										domain.endId = protein.sequence.length();
+										domain.startId = next_transmem.endId + 1;
+									}
+
 								}
 
+								startDomain = 1;
+
+								addPredictedDomainBasedOnOMMorIMMDomain(new_domain_list, protein, next_transmem,
+										startDomain);
+								startDomain = next_transmem.endId + 1;
+
+								// update range in all domains of the current range
+								for (ProteinDomain domain : current_domains) {
+									domain.isPredicted = true;
+								}
+
+								protein.isPredictedBasedOnTransmemInfo = true;
 							}
 
-							startDomain = 1;
-							addPredictedDomainBasedOnOMMorIMMDomain(new_domain_list, protein, next_transmem,
-									startDomain);
-							startDomain = next_transmem.endId + 1;
-
-							// update range in all domains of the current range
-							for (ProteinDomain domain : current_domains) {
-								domain.isPredicted = true;
-							}
-
-							protein.isPredictedBasedOnTransmemInfo = true;
 						}
 						new_domain_list.addAll(current_domains);
 
@@ -2682,7 +2717,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					if (last_domain.endId < protein.sequence.length()) {
 
 						// It is necessary to add the last domain
-						if (last_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+						if (last_domain.name.toLowerCase().equals(TRANSMEMBRANE)
+								&& Double.parseDouble(last_domain.eValue) > Util.transmemPredictionRegionsUpperScore) {
 
 							if (predicted_protein_domain_name.isEmpty() || predicted_protein_domain_name.isBlank()) {
 								ProteinDomain new_domain = new ProteinDomain(UNKNOWN_DOMAIN, startDomain,
@@ -2787,6 +2823,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						}
 					}
 
+					List<ProteinDomain> invalidDomains = protein.domains.stream().filter(value -> !value.isValid)
+							.collect(Collectors.toList());
+					new_domain_list.addAll(invalidDomains);
+					new_domain_list = new_domain_list.stream().distinct().collect(Collectors.toList());
 					protein.domains = new_domain_list;
 
 					// Update protein domain status
@@ -3018,9 +3058,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 			annotatePredictedLocation(taskMonitor, epochs);
 
-			if (epochs == 1) {
-				labelPredictedTransmAsPredicted();
-			}
+//			if (epochs == 1) {
+//				labelPredictedTransmAsPredicted();
+//			}
 			predictDomainsBasedOnTransmemInfo();
 			UnifyProteinsDomains();
 
@@ -3372,8 +3412,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 												Protein current_ptn_rs = residue.protein;
 												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
-														.filter(value -> value.startId <= (residue.position
-																+ Util.transmemNeighborAA)
+														.filter(value -> value.isValid
+																&& value.startId <= (residue.position
+																		+ Util.transmemNeighborAA)
 																&& value.startId >= (residue.position
 																		- Util.transmemNeighborAA))
 														.collect(Collectors.toList());
@@ -3467,7 +3508,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											if (residue.location.toLowerCase().contains(TRANSMEMBRANE)) {
 												Protein current_ptn_rs = residue.protein;
 												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
-														.filter(value -> !value.isPredicted
+														.filter(value -> value.isValid && !value.isPredicted
 																&& value.startId <= (residue.position
 																		+ Util.transmemNeighborAA)
 																&& value.startId >= (residue.position
@@ -3698,7 +3739,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											if (residue.location.toLowerCase().contains(TRANSMEMBRANE)) {
 												Protein current_ptn_rs = residue.protein;
 												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
-														.filter(value -> !value.isPredicted
+														.filter(value -> value.isValid && !value.isPredicted
 																&& value.startId <= (residue.position
 																		+ Util.transmemNeighborAA)
 																&& value.startId >= (residue.position
@@ -3849,8 +3890,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											if (residue.predictedLocation.toLowerCase().contains(TRANSMEMBRANE)) {
 												Protein current_ptn_rs = residue.protein;
 												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
-														.filter(value -> value.startId <= (res.position
-																+ Util.transmemNeighborAA)
+														.filter(value -> value.isValid
+																&& value.startId <= (res.position
+																		+ Util.transmemNeighborAA)
 																&& value.startId >= (res.position
 																		- Util.transmemNeighborAA))
 														.collect(Collectors.toList());
@@ -3944,7 +3986,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											if (residue.location.toLowerCase().contains(TRANSMEMBRANE)) {
 												Protein current_ptn_rs = residue.protein;
 												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
-														.filter(value -> !value.isPredicted
+														.filter(value -> value.isValid && !value.isPredicted
 																&& value.startId <= (residue.position
 																		+ Util.transmemNeighborAA)
 																&& value.startId >= (residue.position
@@ -4175,7 +4217,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 											if (residue.location.toLowerCase().contains(TRANSMEMBRANE)) {
 												Protein current_ptn_rs = residue.protein;
 												List<ProteinDomain> neighbors = current_ptn_rs.domains.stream()
-														.filter(value -> !value.isPredicted
+														.filter(value -> value.isValid && !value.isPredicted
 																&& value.startId <= (residue.position
 																		+ Util.transmemNeighborAA)
 																&& value.startId >= (residue.position
@@ -4466,6 +4508,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					protein.domains.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty())
 							&& !value.eValue.isBlank() && !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
 
+					protein.domains = protein.domains.stream().distinct().collect(Collectors.toList());
+
 					// Sort protein domains list
 					Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
 						@Override
@@ -4521,7 +4565,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				// contain only valid
 				// transmem
 				current_protein.domains.stream()
-						.filter(value -> Double.parseDouble(value.eValue) > Util.transmemPredictionRegionsUpperScore
+						.filter(value -> value.isValid
+								&& Double.parseDouble(value.eValue) > Util.transmemPredictionRegionsUpperScore
 								&& value.name.toLowerCase().equals(TRANSMEMBRANE))
 						.collect(Collectors.toList()).size() != current_protein.domains.size())
 			return current_protein.domains;
@@ -4579,7 +4624,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				continue;
 
 			ProteinDomain new_domain = new ProteinDomain(entry.getKey(), start_pos, end_pos, true,
-					Util.RoundScore(score));
+					Util.RoundScore(score), true);
 			newDomains.add(new_domain);
 		}
 
@@ -4707,7 +4752,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		List<ProteinDomain> final_domain_list = new ArrayList<ProteinDomain>();
 
 		// Group domains by name
-		Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream()
+		Map<String, List<ProteinDomain>> groupedDomains = protein.domains.stream().filter(value -> value.isValid)
 				.collect(Collectors.groupingBy(w -> w.name));
 
 		for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
@@ -4831,7 +4876,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		}
 
 		if (final_domain_list.size() > 0) {
-			protein.domains = final_domain_list.stream().distinct().collect(Collectors.toList());
+
+			List<ProteinDomain> invalidDomains = protein.domains.stream().filter(value -> !value.isValid)
+					.collect(Collectors.toList());
+			final_domain_list.addAll(invalidDomains);
+			final_domain_list = final_domain_list.stream().distinct().collect(Collectors.toList());
+			protein.domains = final_domain_list;
 
 			Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
 				@Override
@@ -4869,7 +4919,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			// e.g. Domain[716-722] and Domain[717-723] => Domain[716-723] -> delta == 0
 			// e.g. Domain[136-142] and Domain[144-150] => Domain[136-150] -> delta == 2
 			List<ProteinDomain> candidates_domains = protein.domains.stream()
-					.filter(value -> value.startId >= domain.startId - delta_aa
+					.filter(value -> value.isValid && value.startId >= domain.startId - delta_aa
 							&& value.startId <= domain.endId + delta_aa && value.endId >= domain.endId
 							&& value.name.equals(domain.name))
 					.collect(Collectors.toList());
