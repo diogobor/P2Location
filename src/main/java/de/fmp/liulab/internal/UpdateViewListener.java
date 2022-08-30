@@ -519,16 +519,22 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 				Util.proteinsWithPredTransmDict.remove(current_network_name);
 			}
 
-			// Check if the network exists in the network list
-			Optional<CyNetwork> isNetworkPresent = Util.myCyNetworkList.stream().filter(new Predicate<CyNetwork>() {
-				public boolean test(CyNetwork o) {
-					return o.getSUID() == myNetwork.getSUID();
-				}
-			}).findFirst();
+			try {
 
-			if (isNetworkPresent.isPresent()) {// Get node if exists
-				CyNetwork current_network = isNetworkPresent.get();
-				Util.myCyNetworkList.remove(current_network);
+				// Check if the network exists in the network list
+				Optional<CyNetwork> isNetworkPresent = Util.myCyNetworkList.stream().filter(new Predicate<CyNetwork>() {
+					public boolean test(CyNetwork o) {
+						return o.getSUID() == myNetwork.getSUID();
+					}
+				}).findFirst();
+
+				if (isNetworkPresent.isPresent()) {// Get node if exists
+					CyNetwork current_network = isNetworkPresent.get();
+					Util.myCyNetworkList.remove(current_network);
+				}
+
+			} catch (Exception e) {
+				System.out.println("ERROR: Unable to remove current network from the main list.");
 			}
 
 		}
@@ -538,6 +544,7 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 		MainControlPanel.unselectCheckboxes();
 		MainControlPanel.myNetwork = null;
 		MainControlPanel.setProcessButtonLabel("Run");
+		ProcessProteinLocationTask.number_unknown_residues.clear();
 	}
 
 	@Override

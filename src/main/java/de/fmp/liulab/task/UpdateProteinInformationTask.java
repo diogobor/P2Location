@@ -345,13 +345,10 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 
 		boolean hasPredictedDomains = true;
 
-		if (myProtein != null && !myProtein.isConflictedDomain) {
-			throw new Exception("WARNING: There is no conflict domain for the selected protein.");
-		}
-
-		else if (myProtein != null && myProtein.domains != null) {
+		if (myProtein != null && myProtein.domains != null) {
 
 			if (myProtein.domains.stream().filter(value -> value.isPredicted).collect(Collectors.toList()).size() > 0) {
+
 				createFrame();
 				setFrameObjects(taskMonitor);
 
@@ -359,6 +356,7 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 				mainFrame.add(mainPanel, BorderLayout.CENTER);
 				mainFrame.setLocationRelativeTo(null);
 				mainFrame.setVisible(true);
+
 			} else
 				hasPredictedDomains = false;
 		} else
@@ -460,7 +458,10 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		else
 			offset_y = 65;
 
-		textLabel_status_result = new JLabel("???");
+		if (myProtein != null && !myProtein.isConflictedDomain)
+			textLabel_status_result = new JLabel("There is no domain conflict!");
+		else
+			textLabel_status_result = new JLabel("???");
 		textLabel_status_result.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		textLabel_status_result.setForeground(new Color(159, 17, 17));
 		textLabel_status_result.setBounds(55, offset_y, 450, 100);

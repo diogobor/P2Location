@@ -2045,6 +2045,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 							protein.domainScores.put(protein.domains.get(0).name,
 									Double.valueOf(protein.domains.get(0).eValue));
 						}
+
+						List<ProteinDomain> invalidDomains = protein.domains.stream().filter(value -> !value.isValid)
+								.collect(Collectors.toList());
+						validDomains.addAll(invalidDomains);
+						validDomains = validDomains.stream().distinct().collect(Collectors.toList());
+						protein.domains = validDomains;
 						continue;
 					}
 
@@ -2552,6 +2558,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									|| last_new_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
 
 								if (Double.parseDouble(current_domain.eValue) > Util.transmemPredictionRegionsUpperScore
+										&& last_new_domain != null && !last_new_domain.eValue.isBlank()
+										&& !last_new_domain.eValue.isEmpty()
+										&& Double.parseDouble(
+												last_new_domain.eValue) > Util.transmemPredictionRegionsUpperScore
 										&& current_domain.startId != 1 && startDomain < current_domain.startId) {
 									ProteinDomain new_domain = new ProteinDomain(UNKNOWN_DOMAIN, startDomain,
 											current_domain.startId - 1, true, "predicted");
@@ -2575,16 +2585,18 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								: null;
 
 						if (next_transmem == null) {
+							// There is no further transmem
 
 							if (current_domain.startId != last_new_domain.startId
 									&& current_domain.endId != last_new_domain.endId) {
 
 								// update range in all domains of the current range
 								for (ProteinDomain domain : current_domains) {
-									domain.startId = last_new_domain.endId + 1;
+									domain.startId = startDomain;
+									if (domain.endId < protein.sequence.length())
+										domain.endId = protein.sequence.length();
 								}
 
-								startDomain = current_domain.endId + 1;
 							}
 							new_domain_list.addAll(current_domains);
 							continue;
@@ -3858,9 +3870,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 														.collect(Collectors.toList());
 
 												if (neighbors.size() > 0) {
+
+													boolean thereIsOnlyTransmem = true;
+
 													for (ProteinDomain neighbor : neighbors) {
 														if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
 
+															thereIsOnlyTransmem = false;
 															if (neighbor.name.equals(current_residue.location)) {
 																isConflict = false;
 																residue.location = neighbor.name;
@@ -3875,6 +3891,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 															}
 														}
 													}
+													if (thereIsOnlyTransmem)
+														isConflict = false;
 												} else
 													// It means there is no conflicted neighbor
 													isConflict = false;
@@ -4105,6 +4123,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 														.collect(Collectors.toList());
 
 												if (neighbors.size() > 0) {
+
+													boolean thereIsOnlyTransmem = true;
+
 													for (ProteinDomain neighbor : neighbors) {
 														if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
 
@@ -4122,6 +4143,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 															}
 														}
 													}
+													if (thereIsOnlyTransmem)
+														isConflict = false;
 												} else
 													// It means there is no conflicted neighbor
 													isConflict = false;
@@ -4688,6 +4711,10 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		for (Residue residue : residues.stream().filter(value -> value.position >= start_pos
 				&& value.position <= end_pos && value.isConflicted && value.conflicted_residue != null)
 				.collect(Collectors.toList())) {
+
+			if (residue.conflicted_residue.predictedLocation.isBlank()
+					|| residue.conflicted_residue.predictedLocation.isEmpty())
+				continue;
 
 			// Transmem does not predict and conflict other residues
 			if (residue.conflicted_residue.predictedLocation.toLowerCase().equals(TRANSMEMBRANE))
