@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
+import java.lang.reflect.Field;
 import java.math.RoundingMode;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -118,8 +119,8 @@ public class Util {
 	public static String XL_PROTEIN_B_A = "crosslinks_ba";
 	public static String PROTEIN_A = "protein_a";
 	public static String PROTEIN_B = "protein_b";
-	private static String XL_SCORE_AB = "score_ab";
-	private static String XL_SCORE_BA = "score_ba";
+	public static String XL_SCORE_AB = "score_ab";
+	public static String XL_SCORE_BA = "score_ba";
 	public static String XL_COMB_SCORE = "ppi_score";
 	public static String PYMOL_PATH = "";
 	public static String PDB_PATH = "\"/Applications/\"";
@@ -167,7 +168,7 @@ public class Util {
 	public static boolean getThreshold_score = false;
 	public static Integer neighborAA = 3;
 	public static Integer transmemNeighborAA = 3;
-	public static boolean dualLocalization_conflict = true;
+	public static boolean dualLocalization_conflict = false;
 	public static double deltaScore = 0.5;
 	public static double transmemPredictionRegionsUpperScore = 0.7;
 	public static double transmemPredictionRegionsLowerScore = 0.015;
@@ -192,6 +193,9 @@ public class Util {
 	public static Map<String, Map<Long, Protein>> monolinksMap = new HashMap<String, Map<Long, Protein>>();
 
 	public static Map<CyNode, Tuple2> mapLastNodesPosition = new HashMap<CyNode, Tuple2>();
+
+	// Map <Network name, Map <Epoch, NodeTable>
+	public static Map<String, Map<Integer, CyTable>> mapNodeTable = new HashMap<String, Map<Integer, CyTable>>();
 
 	public static float proteinLength;
 
@@ -956,25 +960,51 @@ public class Util {
 				String score = "";
 				ProteinDomain pd;
 				if (domain.contains("#Score:")) {
-					// e.g. TRANSMEM#Score:0.9992[30-40]
+					// e.g. TRANSMEM#Score:0.9992[30-40]#Epoch:1
 					String[] domainScore = domain.split("#Score:");
 					domainName = domainScore[0].trim();
 
-					// e.g. 0.9992[30-40]
+					// e.g. 0.9992[30-40]#Epoch:1
 					String[] domainsArray = domainScore[1].split("\\[|\\]");
 					score = domainsArray[0];
+
+					// e.g. 30-40#Epoch:1
 					String[] colRange = domainsArray[1].split("-");
 					int startId = Integer.parseInt(colRange[0]);
 					int endId = Integer.parseInt(colRange[1]);
-					pd = new ProteinDomain(domainName, startId, endId, isPredicted, score);
+
+					// e.g. 40#Epoch:1
+					String[] epochRange = domainsArray[2].split("#Epoch:");
+					int epoch = Integer.parseInt(epochRange[1]);
+
+					pd = new ProteinDomain(domainName, startId, endId, isPredicted, score, isValid, epoch);
+				} else if (domain.contains("#Epoch:")) {
+					// e.g. TRANSMEM[30-40]#Epoch:1
+					String[] domainsArray = domain.split("\\[|\\]");
+					domainName = domainsArray[0].trim();
+
+					// e.g. 30-40#Epoch:1
+					String[] colRange = domainsArray[1].split("-");
+					int startId = Integer.parseInt(colRange[0]);
+					int endId = Integer.parseInt(colRange[1]);
+
+					// e.g. 40#Epoch:1
+					String[] epochRange = domainsArray[2].split("#Epoch:");
+					int epoch = Integer.parseInt(epochRange[1]);
+
+					pd = new ProteinDomain(domainName, startId, endId, isPredicted, "", isValid, epoch);
 				} else {
 					// e.g. TRANSMEM[30-40]
 					String[] domainsArray = domain.split("\\[|\\]");
 					domainName = domainsArray[0].trim();
+
+					// e.g. 30-40
 					String[] colRange = domainsArray[1].split("-");
 					int startId = Integer.parseInt(colRange[0]);
 					int endId = Integer.parseInt(colRange[1]);
-					pd = new ProteinDomain(domainName, startId, endId, isPredicted, "", isValid);
+
+					pd = new ProteinDomain(domainName, startId, endId, isPredicted, "", isValid, 1);
+
 				}
 				proteinDomains.add(pd);
 
@@ -1451,6 +1481,108 @@ public class Util {
 	}
 
 	/**
+	 * Method responsible for removing extra nodes, e.g., source and target nodes
+	 * 
+	 * @param nodeTable current node table
+	 */
+	public static void cleanUnusableNodes(CyTable nodeTable) {
+
+		List<Long> pKeys = new ArrayList<>();
+		for (CyRow row : nodeTable.getAllRows()) {
+
+			String node_name = row.get(CyNetwork.NAME, String.class);
+			if (node_name.contains("Source") || node_name.contains("Target")) {
+
+				Long node_SUID = row.get(CyNetwork.SUID, Long.class);
+				pKeys.add(node_SUID);
+			}
+
+		}
+		nodeTable.deleteRows(pKeys);
+
+	}
+
+	/**
+	 * Method responsible for saving Node Table for a specific epoch
+	 * 
+	 * @param taskMonitor task Monitor
+	 * @param myNetwork   current monitor
+	 * @param epoch       current epoch
+	 */
+	public static void saveNodeTable(TaskMonitor taskMonitor, String myNetworkName, CyTable nodeTable, Integer epoch) {
+
+		if (taskMonitor != null)
+			taskMonitor.setTitle("Save node table");
+
+		if (myNetworkName.isBlank() || myNetworkName.isEmpty() || Util.mapNodeTable.size() == 0)
+			return;
+
+		if (!Util.mapNodeTable.containsKey(myNetworkName))
+			Util.mapNodeTable.put(myNetworkName, new HashMap<Integer, CyTable>());
+
+		Map<Integer, CyTable> epoch_nodeTable = Util.mapNodeTable.get(myNetworkName);
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Saving nodes...");
+
+		if (!epoch_nodeTable.containsKey(epoch)) {
+			epoch_nodeTable.put(epoch, (CyTable) nodeTable);
+		} else {
+			@SuppressWarnings("unused")
+			CyTable current_table = epoch_nodeTable.get(epoch);
+			current_table = (CyTable) nodeTable;
+		}
+
+		if (taskMonitor != null)
+			taskMonitor.showMessage(TaskMonitor.Level.INFO, "Nodes have been saved successfully!");
+
+	}
+
+	/**
+	 * Method responsible for restoring protein information
+	 * 
+	 * @param taskMonitor task monitor
+	 * @param myNetwork   current network
+	 */
+	public static void restoreProteinInformation(TaskMonitor taskMonitor, CyNetwork myNetwork) {
+
+		if (taskMonitor != null)
+			taskMonitor.setTitle("Restoring protein information");
+
+		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
+			return;
+
+		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		if (proteinList == null || proteinList.size() == 0)
+			return;
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_rows = proteinList.size();
+
+		for (final Protein protein : proteinList) {
+
+			if (protein.domains != null) {
+				protein.domains = protein.domains.stream().filter(value -> !value.isPredicted)
+						.collect(Collectors.toList());
+				protein.domains.forEach(value -> value.isValid = true);
+			}
+			protein.domainScores = null;
+			protein.isConflictedDomain = false;
+			protein.isPredictedBasedOnTransmemInfo = false;
+			protein.isValid = true;
+			protein.predicted_domain_epoch = -1;
+			// Reset reaction sites
+			ProcessProteinLocationTask.addReactionSites(protein, false);
+			ProcessProteinLocationTask.updateResiduesLocationAndScore(protein);
+
+			summary_processed++;
+			progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ", taskMonitor,
+					null);
+		}
+	}
+
+	/**
 	 * Update information for all Proteins
 	 * 
 	 * @param taskMonitor task monitor
@@ -1644,12 +1776,14 @@ public class Util {
 			List<String> list_valid_domains = new ArrayList<>();
 			for (ProteinDomain domain : protein.domains) {
 				if (domain.isPredicted) {
-					list_predicted_domains.add(domain.name + "#Score:" + domain.eValue + "["
-							+ Integer.toString(domain.startId) + "-" + Integer.toString(domain.endId) + "]");
+					list_predicted_domains
+							.add(domain.name + "#Score:" + domain.eValue + "[" + Integer.toString(domain.startId) + "-"
+									+ Integer.toString(domain.endId) + "]#Epoch:" + ProcessProteinLocationTask.epochs);
 
 					if (domain.isValid)
 						list_valid_domains.add(domain.name + "#Score:" + domain.eValue + "["
-								+ Integer.toString(domain.startId) + "-" + Integer.toString(domain.endId) + "]");
+								+ Integer.toString(domain.startId) + "-" + Integer.toString(domain.endId) + "]#Epoch:"
+								+ ProcessProteinLocationTask.epochs);
 
 				} else if (domain.name.toLowerCase().contains("transmem")) {
 					String score = "";
@@ -1658,17 +1792,18 @@ public class Util {
 					else
 						score = String.valueOf(initialTransmembraneScore);
 					list_original_domains.add(domain.name + "#Score:" + score + "[" + Integer.toString(domain.startId)
-							+ "-" + Integer.toString(domain.endId) + "]");
+							+ "-" + Integer.toString(domain.endId) + "]#Epoch:" + ProcessProteinLocationTask.epochs);
 					if (domain.isValid)
 						list_valid_domains.add(domain.name + "#Score:" + score + "[" + Integer.toString(domain.startId)
-								+ "-" + Integer.toString(domain.endId) + "]");
+								+ "-" + Integer.toString(domain.endId) + "]#Epoch:"
+								+ ProcessProteinLocationTask.epochs);
 				} else {
 					list_original_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
-							+ Integer.toString(domain.endId) + "]");
+							+ Integer.toString(domain.endId) + "]#Epoch:" + ProcessProteinLocationTask.epochs);
 
 					if (domain.isValid)
 						list_valid_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
-								+ Integer.toString(domain.endId) + "]");
+								+ Integer.toString(domain.endId) + "]#Epoch:" + ProcessProteinLocationTask.epochs);
 
 				}
 
@@ -6725,7 +6860,8 @@ public class Util {
 						int startID = Integer.parseInt(child_start.getAttributes().item(0).getNodeValue());
 						int endID = Integer.parseInt(child_end.getAttributes().item(0).getNodeValue());
 
-						ProteinDomain new_transm_domain = new ProteinDomain("TRANSMEM", startID, endID, false, "1.0");
+						ProteinDomain new_transm_domain = new ProteinDomain("TRANSMEM", startID, endID, false, "1.0",
+								1);
 						transmem_regions.add(new_transm_domain);
 					}
 				}

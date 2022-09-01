@@ -1,6 +1,7 @@
 package de.fmp.liulab.task;
 
 import org.cytoscape.application.CyApplicationManager;
+import org.cytoscape.model.CyNetworkFactory;
 import org.cytoscape.view.vizmap.VisualMappingManager;
 import org.cytoscape.work.AbstractTaskFactory;
 import org.cytoscape.work.TaskIterator;
@@ -15,6 +16,7 @@ public class ProcessProteinLocationTaskFactory extends AbstractTaskFactory {
 
 	private CyApplicationManager cyApplicationManager;
 	private VisualMappingManager vmmServiceRef;
+	private CyNetworkFactory netFactory;
 
 	/**
 	 * Constructor
@@ -22,10 +24,11 @@ public class ProcessProteinLocationTaskFactory extends AbstractTaskFactory {
 	 * @param cyApplicationManager main app manager
 	 * @param vmmServiceRef        visual mapping manager
 	 */
-	public ProcessProteinLocationTaskFactory(CyApplicationManager cyApplicationManager,
+	public ProcessProteinLocationTaskFactory(CyApplicationManager cyApplicationManager, CyNetworkFactory netFactory,
 			final VisualMappingManager vmmServiceRef) {
 		this.cyApplicationManager = cyApplicationManager;
 		this.vmmServiceRef = vmmServiceRef;
+		this.netFactory = netFactory;
 	}
 
 	/**
@@ -39,8 +42,8 @@ public class ProcessProteinLocationTaskFactory extends AbstractTaskFactory {
 	 */
 	public TaskIterator createTaskIterator(boolean isPredictLocation, boolean updateAnnotationDomain,
 			boolean isNewPrediction) {
-		return new TaskIterator(new ProcessProteinLocationTask(cyApplicationManager, vmmServiceRef, isPredictLocation,
-				updateAnnotationDomain, isNewPrediction));
+		return new TaskIterator(new ProcessProteinLocationTask(cyApplicationManager, netFactory, vmmServiceRef,
+				isPredictLocation, updateAnnotationDomain, isNewPrediction));
 	}
 
 	@Override

@@ -99,7 +99,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JCheckBox enable_score;
 	private static JCheckBox enable_specCount;
 //	private static JCheckBox enable_conflict;
-	private static JCheckBox dualLocalization_conflict;
+//	private static JCheckBox dualLocalization_conflict;
 	private static JCheckBox show_monolinks;
 
 	private static JSpinner spinner_font_size_link_legend;
@@ -977,7 +977,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 						else if (valid && Util.isThereConflictResidue(null, myNetwork, null)) {
 
 							int input = JOptionPane.showConfirmDialog(null,
-									"There are some conflict residues in the network.\nDo you want to continue with the prediction?",
+									"There are some residue conflicts in the network.\nDo you want to continue with the prediction?",
 									"P2Location - Information", JOptionPane.YES_NO_OPTION);
 
 							if (input == 1)
@@ -1091,29 +1091,29 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		fix_conflict_panel.setLayout(null);
 		protein_domains_prediction_panel.add(fix_conflict_panel);
 
-		dualLocalization_conflict = new JCheckBox("Dual localizing protein");
-		dualLocalization_conflict.setBackground(Color.WHITE);
-		dualLocalization_conflict.setSelected(Util.dualLocalization_conflict);
-		dualLocalization_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-		if (Util.isWindows())
-			dualLocalization_conflict.setBounds(5, offset_y + 5, 155, 20);
-		else
-			dualLocalization_conflict.setBounds(5, offset_y + 5, 170, 20);
-		fix_conflict_panel.add(dualLocalization_conflict);
+//		dualLocalization_conflict = new JCheckBox("Dual localizing protein");
+//		dualLocalization_conflict.setBackground(Color.WHITE);
+//		dualLocalization_conflict.setSelected(Util.dualLocalization_conflict);
+//		dualLocalization_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+//		if (Util.isWindows())
+//			dualLocalization_conflict.setBounds(5, offset_y + 5, 155, 20);
+//		else
+//			dualLocalization_conflict.setBounds(5, offset_y + 5, 170, 20);
+//		fix_conflict_panel.add(dualLocalization_conflict);
 		offset_y += 20;
-		dualLocalization_conflict.addItemListener(new ItemListener() {
-			@Override
-			public void itemStateChanged(ItemEvent e) {
-				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
-					Util.dualLocalization_conflict = true;
-					P2LocationProps.setProperty("p2location.dioLocalization_conflict", "true");
-
-				} else {
-					Util.dualLocalization_conflict = false;
-					P2LocationProps.setProperty("p2location.dioLocalization_conflict", "false");
-				}
-			}
-		});
+//		dualLocalization_conflict.addItemListener(new ItemListener() {
+//			@Override
+//			public void itemStateChanged(ItemEvent e) {
+//				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
+//					Util.dualLocalization_conflict = true;
+//					P2LocationProps.setProperty("p2location.dioLocalization_conflict", "true");
+//
+//				} else {
+//					Util.dualLocalization_conflict = false;
+//					P2LocationProps.setProperty("p2location.dioLocalization_conflict", "false");
+//				}
+//			}
+//		});
 
 		JLabel deltaScoreLabel = new JLabel("\u0394 score:");
 		deltaScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
@@ -1262,7 +1262,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 												JOptionPane.showMessageDialog(null,
 														"Protein annotations have been updated successfully!\n# Unknown Residue location: "
 																+ ProcessProteinLocationTask.number_unknown_residues
-																		.get(ProcessProteinLocationTask.epochs),
+																		.get(ProcessProteinLocationTask.epochs - 1),
 														"P2Location - Predict protein location",
 														JOptionPane.INFORMATION_MESSAGE,
 														new ImageIcon(getClass().getResource("/images/logo.png")));
@@ -1306,8 +1306,8 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			enable_score.setEnabled(enable);
 		if (enable_specCount != null)
 			enable_specCount.setEnabled(enable);
-		if (dualLocalization_conflict != null)
-			dualLocalization_conflict.setEnabled(enable);
+//		if (dualLocalization_conflict != null)
+//			dualLocalization_conflict.setEnabled(enable);
 	}
 
 	public static void enable_disable_spinners(boolean enable) {
@@ -1374,7 +1374,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		enable_epochs.setSelected(false);
 		enable_score.setSelected(false);
 		enable_specCount.setSelected(false);
-		dualLocalization_conflict.setSelected(false);
+//		dualLocalization_conflict.setSelected(false);
 
 		// Except this checkbox
 //		enable_conflict.setSelected(true);

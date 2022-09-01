@@ -57,6 +57,7 @@ import de.fmp.liulab.utils.Util;
 
 /**
  * Class responsible for loading PTM(s) task
+ * 
  * @author borges.diogo
  *
  */
@@ -729,7 +730,7 @@ public class LoadPTMsTask extends AbstractTask implements ActionListener {
 				continue;
 			List<PTM> ptmList = entry.getValue();
 			if (ptmList.size() > 0) {
-				updatePTMsMap(myNetwork, node, ptmList);
+				updatePTMsMap(myNetwork.toString(), node.getSUID(), ptmList);
 
 			}
 
@@ -919,17 +920,16 @@ public class LoadPTMsTask extends AbstractTask implements ActionListener {
 	 * @param node
 	 * @param myPTMs
 	 */
-	public static void updatePTMsMap(CyNetwork myNetwork, CyNode node, List<PTM> myPTMs) {
-		String network_name = myNetwork.toString();
+	public static void updatePTMsMap(String network_name, Long node_SUID, List<PTM> myPTMs) {
 		if (Util.ptmsMap.containsKey(network_name)) {
 
 			Map<Long, List<PTM>> all_ptms = Util.ptmsMap.get(network_name);
-			all_ptms.put(node.getSUID(), myPTMs);
+			all_ptms.put(node_SUID, myPTMs);
 
 		} else {// Network does not exists
 
 			Map<Long, List<PTM>> PTMs = new HashMap<Long, List<PTM>>();
-			PTMs.put(node.getSUID(), myPTMs);
+			PTMs.put(node_SUID, myPTMs);
 			Util.ptmsMap.put(network_name, PTMs);
 		}
 	}

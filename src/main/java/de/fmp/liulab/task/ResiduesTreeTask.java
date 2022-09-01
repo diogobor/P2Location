@@ -151,6 +151,10 @@ public class ResiduesTreeTask extends AbstractTask implements ActionListener {
 
 		if (myResidue.conflicted_residue == null)
 			throw new Exception("There are no conflicting residues.");
+		
+		if(myResidue.conflicted_residue != null && myResidue.conflicted_residue.aminoacid == '_') {
+			throw new Exception("This protein contains conflict on domain level.");
+		}
 
 		CyNetwork myNetwork = myNetFactory.createNetwork();
 

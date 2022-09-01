@@ -8,6 +8,9 @@ import java.awt.Image;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -49,6 +52,7 @@ import org.cytoscape.view.vizmap.VisualStyle;
 import org.cytoscape.work.AbstractTask;
 import org.cytoscape.work.TaskMonitor;
 
+import de.fmp.liulab.internal.MainControlPanel;
 import de.fmp.liulab.internal.view.JFrameWithoutMaxAndMinButton;
 import de.fmp.liulab.model.Protein;
 import de.fmp.liulab.model.ProteinDomain;
@@ -80,10 +84,11 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 	private static JLabel textLabel_status_result;
 
 	// Table
-	private String[] columnNamesDomainTable = { "Domain(*)", "Start Residue(*)", "End Residue(*)", "Score", "Valid" };
+	private String[] columnNamesDomainTable = { "Domain(*)", "Start Residue(*)", "End Residue(*)", "Score", "Valid",
+			"Epoch" };
 	@SuppressWarnings("rawtypes")
 	private final Class[] columnClassDomainTable = new Class[] { String.class, Integer.class, Integer.class,
-			String.class, Boolean.class };
+			String.class, Boolean.class, Integer.class };
 	private static DefaultTableModel domainTableDataModel;
 	private static JTable mainProteinDomainTable;
 	@SuppressWarnings("rawtypes")
@@ -140,8 +145,32 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 		mainFrame.setLocation((screenSize.width - appSize.width) / 2, (screenSize.height - appSize.height) / 2);
 		mainFrame.setVisible(true);
+		// add Key Listener to JFrame
+		mainFrame.addKeyListener(closeWindowListener());
 
 		initThreads();
+	}
+
+	/**
+	 * Method responsible for creating event to close window
+	 * 
+	 * @return key listener
+	 */
+	private KeyListener closeWindowListener() {
+		// Create a KeyListener that can listen when someone press Esc key on keyboard
+		// You can change for what key that you want, by change value at:
+		// VK_ESCAPE
+		KeyListener kl = new KeyAdapter() {
+			public void keyPressed(KeyEvent evt) {
+				// If someone click Esc key, this program will exit
+				if (evt.getKeyCode() == KeyEvent.VK_ESCAPE) {
+					if (cancelProcess())
+						mainFrame.dispose();
+				}
+			}
+		};
+
+		return kl;
 	}
 
 	private void initThreads() {
@@ -458,10 +487,13 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		else
 			offset_y = 65;
 
-		if (myProtein != null && !myProtein.isConflictedDomain)
+		if (myProtein != null && !myProtein.isConflictedDomain) {
+			isStoredProteinDomains = true;
 			textLabel_status_result = new JLabel("There is no domain conflict!");
-		else
+		} else {
+			isStoredProteinDomains = false;
 			textLabel_status_result = new JLabel("???");
+		}
 		textLabel_status_result.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
 		textLabel_status_result.setForeground(new Color(159, 17, 17));
 		textLabel_status_result.setBounds(55, offset_y, 450, 100);
@@ -491,6 +523,13 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		// Get indexes of non-predicted domains
 		List<Integer> nonPredictedDomains = new ArrayList<Integer>();
 		if (myProtein != null && myProtein.domains != null && myProtein.domains.size() > 0) {
+			Collections.sort(myProtein.domains, new Comparator<ProteinDomain>() {
+				@Override
+				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+				}
+			});
+			
 			for (int i = 0; i < myProtein.domains.size(); i++) {
 				ProteinDomain ptnDomain = myProtein.domains.get(i);
 				if (!ptnDomain.isPredicted)
@@ -509,7 +548,7 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 
 			@Override
 			public boolean isCellEditable(int row, int column) {
-				if (column == 0 || column == 3)
+				if (column == 0 || column == 3 || column == 5)
 					return false;
 
 				if (nonPredictedDomains.contains(row))
@@ -564,13 +603,12 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 				domainTableDataModel.setValueAt(domain.endId, countPtnDomain, 2);
 				domainTableDataModel.setValueAt(domain.eValue, countPtnDomain, 3);
 				domainTableDataModel.setValueAt(domain.isValid, countPtnDomain, 4);
+				domainTableDataModel.setValueAt(domain.epoch, countPtnDomain, 5);
 				countPtnDomain++;
 			}
 			setTableProperties(myProtein.domains.size());
-		} else {
+		} else
 			setTableProperties(1);
-		}
-
 	}
 
 	/**
@@ -730,7 +768,10 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 
 			boolean isPredicted = domainTableDataModel.isCellEditable(row, 4);
 
-			myProteinDomains.add(new ProteinDomain(domain, startId, endId, isPredicted, eValue, isValid));
+			int epoch = domainTableDataModel.getValueAt(row, 5) != null ? (int) domainTableDataModel.getValueAt(row, 5)
+					: 0;
+
+			myProteinDomains.add(new ProteinDomain(domain, startId, endId, isPredicted, eValue, isValid, epoch));
 
 		}
 
@@ -746,7 +787,26 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 
 		myProtein.domains = myProteinDomains;
 		updateProteinMap(myNetwork, node, myProtein);
+		ProcessProteinLocationTask.epochs--;
 		Util.updateProteinDomains(myNetwork, node);
+		ProcessProteinLocationTask.epochs++;
+
+		// Self-checking
+		ProcessProteinLocationTask.OrganizeResidueCompartment(null);
+		int old_number_uk_residues = ProcessProteinLocationTask.number_unknown_residues
+				.get(ProcessProteinLocationTask.number_unknown_residues.size());
+
+		int uk_res = 0;
+		if (ProcessProteinLocationTask.compartments.containsKey(ProcessProteinLocationTask.UNKNOWN_RESIDUE))
+			uk_res = ProcessProteinLocationTask.compartments.get(ProcessProteinLocationTask.UNKNOWN_RESIDUE).size();
+		boolean hasMoreResidueToBePredicted = true;
+		// It means there is no possibility to predict more residues location
+		if (ProcessProteinLocationTask.epochs > 1 && uk_res == old_number_uk_residues) {
+			hasMoreResidueToBePredicted = false;
+		}
+
+		if (hasMoreResidueToBePredicted)
+			MainControlPanel.setProcessButtonLabel("Continue");
 
 	}
 

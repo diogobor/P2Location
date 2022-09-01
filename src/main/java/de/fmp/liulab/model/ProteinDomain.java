@@ -14,6 +14,7 @@ public class ProteinDomain implements Comparable<ProteinDomain>, Cloneable {
 	public java.awt.Color color;
 	public boolean isPredicted = false;
 	public boolean isValid = true;
+	public int epoch = 0;
 
 	public int getEndId() {
 		return endId;
@@ -47,12 +48,13 @@ public class ProteinDomain implements Comparable<ProteinDomain>, Cloneable {
 	 * @param isPredicted predicted or original domain
 	 * @param eValue      score
 	 */
-	public ProteinDomain(String name, int startId, int endId, boolean isPredicted, String eValue) {
+	public ProteinDomain(String name, int startId, int endId, boolean isPredicted, String eValue, int epoch) {
 		this.name = name;
 		this.startId = startId;
 		this.endId = endId;
 		this.eValue = eValue;
 		this.isPredicted = isPredicted;
+		this.epoch = epoch;
 	}
 
 	/**
@@ -65,13 +67,15 @@ public class ProteinDomain implements Comparable<ProteinDomain>, Cloneable {
 	 * @param eValue      score
 	 * @param isValid     current domain is valid or not
 	 */
-	public ProteinDomain(String name, int startId, int endId, boolean isPredicted, String eValue, boolean isValid) {
+	public ProteinDomain(String name, int startId, int endId, boolean isPredicted, String eValue, boolean isValid,
+			int epoch) {
 		this.name = name;
 		this.startId = startId;
 		this.endId = endId;
 		this.eValue = eValue;
 		this.isPredicted = isPredicted;
 		this.isValid = isValid;
+		this.epoch = epoch;
 	}
 
 	/**
@@ -134,8 +138,7 @@ public class ProteinDomain implements Comparable<ProteinDomain>, Cloneable {
 		if (eValue == null) {
 			if (other.eValue != null)
 				return false;
-		} else if (!eValue.equals(other.eValue))
-			return false;
+		}
 		if (endId != other.endId)
 			return false;
 		if (isPredicted != other.isPredicted)

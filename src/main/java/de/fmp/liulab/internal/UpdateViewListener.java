@@ -19,6 +19,7 @@ import org.cytoscape.model.CyIdentifiable;
 import org.cytoscape.model.CyNetwork;
 import org.cytoscape.model.CyNode;
 import org.cytoscape.model.CyRow;
+import org.cytoscape.model.CyTable;
 import org.cytoscape.model.CyTableUtil;
 import org.cytoscape.model.events.AboutToRemoveEdgesEvent;
 import org.cytoscape.model.events.AboutToRemoveEdgesListener;
@@ -476,6 +477,10 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 						new HashMap<Protein, List<PredictedTransmem>>());
 			}
 
+			// Initialize mapNodeTable
+			if (!Util.mapNodeTable.containsKey(cyNetwork.toString()))
+				Util.mapNodeTable.put(cyNetwork.toString(), new HashMap<Integer, CyTable>());
+
 			createAuxiliarColumnsTable();
 
 			MainControlPanel.enable_disableDisplayBox(false, true);
@@ -518,6 +523,9 @@ public class UpdateViewListener implements ViewChangedListener, RowsSetListener,
 			if (Util.proteinsWithPredTransmDict.containsKey(current_network_name)) {
 				Util.proteinsWithPredTransmDict.remove(current_network_name);
 			}
+
+			if (Util.mapNodeTable.containsKey(current_network_name))
+				Util.mapNodeTable.remove(current_network_name);
 
 			try {
 

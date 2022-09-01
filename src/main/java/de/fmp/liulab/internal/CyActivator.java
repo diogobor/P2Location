@@ -114,6 +114,7 @@ public class CyActivator extends AbstractCyActivator {
 		HandleFactory handleFactory = getService(bc, HandleFactory.class);
 		BendFactory bendFactory = getService(bc, BendFactory.class);
 		DialogTaskManager dialogTaskManager = getService(bc, DialogTaskManager.class);
+		CyNetworkFactory networkFactory = getService(bc, CyNetworkFactory.class);
 
 		// ### 3 - MONOLINKED PEPTIDES ####
 
@@ -123,7 +124,7 @@ public class CyActivator extends AbstractCyActivator {
 		// ### 3.2 - LOAD ####
 
 		ProcessProteinLocationTaskFactory myProcessProteinLocationTaskFactory = new ProcessProteinLocationTaskFactory(
-				cyApplicationManager, vmmServiceRef);
+				cyApplicationManager, networkFactory, vmmServiceRef);
 
 		ProcessTransmemRegionsTaskFactory myProcessTransmemRegionsTaskFactory = new ProcessTransmemRegionsTaskFactory(
 				cyApplicationManager, vmmServiceRef);
@@ -191,7 +192,6 @@ public class CyActivator extends AbstractCyActivator {
 		TaskFactory mySingleNodeShortCutFactory = new MainSingleNodeTaskFactory(cyApplicationManager, vmmServiceRef,
 				customChartListener, bendFactory, handleFactory, false);
 
-		CyNetworkFactory networkFactory = getService(bc, CyNetworkFactory.class);
 		CyNetworkManager networkManager = getService(bc, CyNetworkManager.class);
 		CyNetworkViewManager viewManager = getService(bc, CyNetworkViewManager.class);
 		CyNetworkViewFactory viewFactory = getService(bc, CyNetworkViewFactory.class);

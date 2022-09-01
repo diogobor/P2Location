@@ -237,7 +237,7 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 				}
 
 				ProteinDomain new_transm_domain = new ProteinDomain("TRANSMEM", startID, endID, false,
-						"" + transm_score);
+						"" + transm_score, 1);
 				new_transm_list.add(new_transm_domain);
 				i = j - 1;
 			}
