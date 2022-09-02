@@ -1082,7 +1082,7 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 							_myProtein.predicted_domain_epoch = -1;
 						ProcessProteinLocationTask.addReactionSites(_myProtein, true);
 					} else {
-						Util.updateResiduesBasedOnProteinDomains(_myProtein, false);
+						ProcessProteinLocationTask.updateResiduesLocationAndScore(_myProtein);
 					}
 				}
 

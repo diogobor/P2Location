@@ -198,7 +198,7 @@ public class ProcessTransmemRegionsTask extends AbstractTask implements ActionLi
 				current_protein.domains = protein.domains;
 				current_protein.domains = current_protein.domains.stream().distinct().collect(Collectors.toList());
 			}
-			Util.updateResiduesBasedOnProteinDomains(protein, false);
+			ProcessProteinLocationTask.updateResiduesLocationAndScore(protein);
 		}
 
 		Util.updateProteins(taskMonitor, myNetwork, null, false, false);

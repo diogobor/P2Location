@@ -268,7 +268,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					CyTable nodeTable = epoch_nodeTable.get(epochs);
 
-					Util.restoreProteinInformation(taskMonitor, myNetwork);
+					restoreProteinInformation(taskMonitor, myNetwork);
 					ProteinScalingFactorHorizontalExpansionTableTask.updateNodeTable(taskMonitor, nodeTable,
 							myNetwork.toString());
 					checkTransmemValidity();
@@ -1297,7 +1297,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			residues.add(new Residue(Util.REACTION_RESIDUE, "UK", (index + 1), protein));
 		}
 
-		if (protein.reactionSites != null && protein.reactionSites.size() > 0) {
+		if (!isNewDomainSet && protein.reactionSites != null && protein.reactionSites.size() > 0) {
 			residues.addAll(protein.reactionSites);
 		}
 
@@ -1305,8 +1305,84 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		protein.reactionSites = residues;
 
 		if (isNewDomainSet)
-			Util.updateResiduesBasedOnProteinDomains(protein, true);
+			updateResiduesLocationAndScore(protein);
+//			Util.updateResiduesBasedOnProteinDomains(protein, true);
 
+	}
+
+	/**
+	 * Method responsible for restoring reaction sites information
+	 * 
+	 * @param taskMonitor task monitor
+	 * @param myNetwork   current network
+	 */
+	public void restoreReactionSites(TaskMonitor taskMonitor, CyNetwork myNetwork) {
+		if (taskMonitor != null)
+			taskMonitor.setTitle("Restoring reaction sites information");
+
+		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
+			return;
+
+		List<Protein> proteinList = Util.getProteins(myNetwork, false);
+		if (proteinList == null || proteinList.size() == 0)
+			return;
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_rows = proteinList.size();
+
+		for (final Protein protein : proteinList) {
+
+			// Reset reaction sites
+			addReactionSites(protein, true);
+
+			summary_processed++;
+			Util.progressBar(summary_processed, old_progress, total_rows, "Restoring reaction sites information: ",
+					taskMonitor, null);
+		}
+	}
+
+	/**
+	 * Method responsible for restoring protein information
+	 * 
+	 * @param taskMonitor task monitor
+	 * @param myNetwork   current network
+	 */
+	public static void restoreProteinInformation(TaskMonitor taskMonitor, CyNetwork myNetwork) {
+
+		if (taskMonitor != null)
+			taskMonitor.setTitle("Restoring protein information");
+
+		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
+			return;
+
+		List<Protein> proteinList = Util.getProteins(myNetwork, false);
+		if (proteinList == null || proteinList.size() == 0)
+			return;
+
+		int old_progress = 0;
+		int summary_processed = 0;
+		int total_rows = proteinList.size();
+
+		for (final Protein protein : proteinList) {
+
+			if (protein.domains != null) {
+				protein.domains = protein.domains.stream().filter(value -> !value.isPredicted)
+						.collect(Collectors.toList());
+				protein.domains.forEach(value -> value.isValid = true);
+			}
+			protein.domainScores = null;
+			protein.isConflictedDomain = false;
+			protein.isPredictedBasedOnTransmemInfo = false;
+			protein.isValid = true;
+			protein.predicted_domain_epoch = -1;
+			// Reset reaction sites
+			addReactionSites(protein, true);
+
+			summary_processed++;
+			Util.progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ",
+					taskMonitor, null);
+		}
 	}
 
 	/**
@@ -1703,6 +1779,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				number_unknown_residues.remove(i);
 			}
 		}
+
+//		restoreProteinInformation(taskMonitor, myNetwork);
 	}
 
 	private CyTable prepareNodeTable(TaskMonitor taskMonitor) {
@@ -1921,6 +1999,22 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 		if (protein.domains == null)
 			return;
 
+		// Transmembrane regions
+		for (ProteinDomain domain : protein.domains.stream()
+				.filter(value -> value.name.toLowerCase().equals(TRANSMEMBRANE)).collect(Collectors.toList())) {
+			// Get all residues of a specific domain
+			List<Residue> residues = protein.reactionSites.stream()
+					.filter(value -> value.position >= domain.startId && value.position <= domain.endId)
+					.collect(Collectors.toList());
+
+			for (Residue residue : residues) {
+				residue.score = -1;
+				residue.location = domain.name;
+				residue.predictedLocation = domain.name;
+			}
+		}
+
+		// Other domains
 		if (!(protein.isConflictedDomain || containsConflictResidue(protein))) {
 			for (ProteinDomain domain : protein.domains.stream().filter(value -> value.isValid)
 					.collect(Collectors.toList())) {
@@ -2531,7 +2625,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					}
 				}
 			} catch (Exception e) {
-				// TODO: handle exception
 				System.out.println("ERROR: computeFinalDomainScore -> index:" + summary_processed);
 			}
 		}
@@ -3263,14 +3356,12 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 			annotatePredictedLocation(taskMonitor, epochs);
 
-//			if (epochs == 1) {
-//				labelPredictedTransmAsPredicted();
-//			}
 			predictDomainsBasedOnTransmemInfo();
 			UnifyProteinsDomains();
 
 			computeFinalDomainScore(taskMonitor, false);
-			updateResidueScoresBasedOnDomainScore(taskMonitor);
+			restoreReactionSites(taskMonitor, myNetwork);
+//			updateResidueScoresBasedOnDomainScore(taskMonitor);
 			checkConflictProteinsDomains(taskMonitor);
 
 			if (compartments.get(UNKNOWN_RESIDUE) != null)
@@ -5011,7 +5102,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					current_ptn_domain_list.add((ProteinDomain) ptnDomain.clone());
 				} catch (Exception e) {
-					// TODO: handle exception
 				}
 
 				if (proteinDomain.getValue().size() == 1) {
@@ -5019,7 +5109,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 						final_domain_list.add((ProteinDomain) ptnDomain.clone());
 					} catch (Exception e) {
-						// TODO: handle exception
 					}
 					continue;
 				}
@@ -5036,7 +5125,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 							current_ptn_domain_list.add((ProteinDomain) ptnDomain2.clone());
 						} catch (Exception e) {
-							// TODO: handle exception
 						}
 
 						i++;
@@ -5106,7 +5194,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 						final_domain_list.add((ProteinDomain) ptnDomain.clone());
 					} catch (Exception e) {
-						// TODO: handle exception
 					}
 				}
 
@@ -5147,7 +5234,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 				current_ptn_domain_list.add((ProteinDomain) proteinDomain.clone());
 			} catch (Exception e) {
-				// TODO: handle exception
 			}
 		}
 

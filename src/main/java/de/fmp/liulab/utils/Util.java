@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
-import java.lang.reflect.Field;
 import java.math.RoundingMode;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -18,7 +17,6 @@ import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -1134,7 +1132,7 @@ public class Util {
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return;
 
-		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		List<Protein> proteinList = getProteins(myNetwork, false);
 		if (proteinList == null || proteinList.size() == 0)
 			return;
 
@@ -1172,7 +1170,7 @@ public class Util {
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return;
 
-		List<Protein> proteinList = Util.getProteins(myNetwork, true);
+		List<Protein> proteinList = getProteins(myNetwork, true);
 		if (proteinList == null || proteinList.size() == 0)
 			return;
 
@@ -1369,7 +1367,7 @@ public class Util {
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return false;
 
-		if (Util.proteinsMap.get(myNetwork.toString()).stream().filter(value -> value.predicted_domain_epoch == 0)
+		if (getProteins(myNetwork, false).stream().filter(value -> value.predicted_domain_epoch == 0)
 				.collect(Collectors.toList()).size() == 0)
 			return false;
 		else
@@ -1394,7 +1392,7 @@ public class Util {
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return false;
 
-		List<Protein> proteinList = Util.getProteins(myNetwork, true);
+		List<Protein> proteinList = getProteins(myNetwork, true);
 		if (proteinList == null || proteinList.size() == 0)
 			return false;
 
@@ -1422,7 +1420,7 @@ public class Util {
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return false;
 
-		List<Protein> proteinList = Util.getProteins(myNetwork, true);
+		List<Protein> proteinList = getProteins(myNetwork, true);
 		if (proteinList == null || proteinList.size() == 0)
 			return false;
 
@@ -1539,50 +1537,6 @@ public class Util {
 	}
 
 	/**
-	 * Method responsible for restoring protein information
-	 * 
-	 * @param taskMonitor task monitor
-	 * @param myNetwork   current network
-	 */
-	public static void restoreProteinInformation(TaskMonitor taskMonitor, CyNetwork myNetwork) {
-
-		if (taskMonitor != null)
-			taskMonitor.setTitle("Restoring protein information");
-
-		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
-			return;
-
-		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
-		if (proteinList == null || proteinList.size() == 0)
-			return;
-
-		int old_progress = 0;
-		int summary_processed = 0;
-		int total_rows = proteinList.size();
-
-		for (final Protein protein : proteinList) {
-
-			if (protein.domains != null) {
-				protein.domains = protein.domains.stream().filter(value -> !value.isPredicted)
-						.collect(Collectors.toList());
-				protein.domains.forEach(value -> value.isValid = true);
-			}
-			protein.domainScores = null;
-			protein.isConflictedDomain = false;
-			protein.isPredictedBasedOnTransmemInfo = false;
-			protein.isValid = true;
-			protein.predicted_domain_epoch = -1;
-			// Reset reaction sites
-			ProcessProteinLocationTask.addReactionSites(protein, false);
-			ProcessProteinLocationTask.updateResiduesLocationAndScore(protein);
-
-			summary_processed++;
-			progressBar(summary_processed, old_progress, total_rows, "Updating proteins information: ", taskMonitor,
-					null);
-		}
-	}
-
-	/**
 	 * Update information for all Proteins
 	 * 
 	 * @param taskMonitor task monitor
@@ -1597,7 +1551,7 @@ public class Util {
 		if (myNetwork == null || Util.proteinsMap == null || Util.proteinsMap.size() == 0)
 			return;
 
-		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		List<Protein> proteinList = getProteins(myNetwork, false);
 		if (proteinList == null || proteinList.size() == 0)
 			return;
 
@@ -2051,7 +2005,7 @@ public class Util {
 	public static void updateAllXLLocationBasedOnProteinDomains(TaskMonitor taskMonitor, CyNetwork myNetwork,
 			JLabel textLabel_status_result) {
 
-		List<Protein> proteinList = Util.proteinsMap.get(myNetwork.toString());
+		List<Protein> proteinList = getProteins(myNetwork, false);
 		if (proteinList == null || proteinList.size() == 0)
 			return;
 
@@ -2180,56 +2134,56 @@ public class Util {
 		}
 	}
 
-	/**
-	 * Method responsible for updating residue location based on protein domains
-	 * information
-	 * 
-	 * @param protein current protein
-	 * 
-	 */
-	public static void updateResiduesBasedOnProteinDomains(Protein protein, boolean isNewDomainSet) {
-
-		List<Residue> residues = protein.reactionSites;
-
-		if (protein.domains != null && protein.domains.size() > 0) {
-			for (ProteinDomain domain : protein.domains) {
-
-				residues.stream().filter(value -> value.position >= domain.startId && value.position <= domain.endId)
-						.forEach(
-
-								res -> {
-
-									if (isNewDomainSet) {
-										if (domain.name.toLowerCase().equals("transmem")) {
-											if (!(domain.eValue.isBlank() || domain.eValue.isEmpty()))
-												res.score = Double.parseDouble(domain.eValue);
-											else
-												res.score = 1;
-										} else
-											res.score = Util.initialResidueScore;
-									} else if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
-										try {
-											res.score = Double.parseDouble(domain.eValue);
-										} catch (Exception e) {
-											res.score = -1;
-										}
-									}
-
-									res.location = domain.name;
-									res.predictedLocation = domain.name;
-
-								});
-
-			}
-			Collections.sort(residues, new Comparator<Residue>() {
-				@Override
-				public int compare(Residue lhs, Residue rhs) {
-					return lhs.position > rhs.position ? 1 : (lhs.position < rhs.position) ? -1 : 0;
-				}
-			});
-			residues = residues.stream().distinct().collect(Collectors.toList());
-		}
-	}
+//	/**
+//	 * Method responsible for updating residue location based on protein domains
+//	 * information
+//	 * 
+//	 * @param protein current protein
+//	 * 
+//	 */
+//	public static void updateResiduesBasedOnProteinDomains(Protein protein, boolean isNewDomainSet) {
+//
+//		List<Residue> residues = protein.reactionSites;
+//
+//		if (protein.domains != null && protein.domains.size() > 0) {
+//			for (ProteinDomain domain : protein.domains) {
+//
+//				residues.stream().filter(value -> value.position >= domain.startId && value.position <= domain.endId)
+//						.forEach(
+//
+//								res -> {
+//
+//									if (isNewDomainSet) {
+//										if (domain.name.toLowerCase().equals("transmem")) {
+//											if (!(domain.eValue.isBlank() || domain.eValue.isEmpty()))
+//												res.score = Double.parseDouble(domain.eValue);
+//											else
+//												res.score = 1;
+//										} else
+//											res.score = Util.initialResidueScore;
+//									} else if (!(domain.eValue.isBlank() || domain.eValue.isEmpty())) {
+//										try {
+//											res.score = Double.parseDouble(domain.eValue);
+//										} catch (Exception e) {
+//											res.score = -1;
+//										}
+//									}
+//
+//									res.location = domain.name;
+//									res.predictedLocation = domain.name;
+//
+//								});
+//
+//			}
+//			Collections.sort(residues, new Comparator<Residue>() {
+//				@Override
+//				public int compare(Residue lhs, Residue rhs) {
+//					return lhs.position > rhs.position ? 1 : (lhs.position < rhs.position) ? -1 : 0;
+//				}
+//			});
+//			residues = residues.stream().distinct().collect(Collectors.toList());
+//		}
+//	}
 
 	/**
 	 * Method responsible for retrieving a specific XL
@@ -2419,7 +2373,7 @@ public class Util {
 			return ptn;
 
 		try {
-			List<Protein> all_proteins = Util.proteinsMap.get(myNetwork.toString());
+			List<Protein> all_proteins = getProteins(myNetwork, false);
 			Optional<Protein> isPtnPresent = all_proteins.stream().filter(value -> value.gene.equals(node_name))
 					.findFirst();
 			if (isPtnPresent.isPresent()) {
