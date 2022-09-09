@@ -168,8 +168,8 @@ public class Util {
 	public static Integer transmemNeighborAA = 3;
 	public static boolean dualLocalization_conflict = false;
 	public static double deltaScore = 0.5;
-	public static double transmemPredictionRegionsUpperScore = 0.7;
-	public static double transmemPredictionRegionsLowerScore = 0.015;
+	public static double transmemPredictionRegionsUpperScore = 0.75;
+	public static double transmemPredictionRegionsLowerScore = 0.03;
 	public static boolean considerConflict = true;
 	public static boolean fixDomainManually = true;
 	public static double initialResidueScore = 150.0;
@@ -1746,21 +1746,18 @@ public class Util {
 					else
 						score = String.valueOf(initialTransmembraneScore);
 					list_original_domains.add(domain.name + "#Score:" + score + "[" + Integer.toString(domain.startId)
-							+ "-" + Integer.toString(domain.endId) + "]#Epoch:" + ProcessProteinLocationTask.epochs);
+							+ "-" + Integer.toString(domain.endId) + "]#Epoch:1");
 					if (domain.isValid)
 						list_valid_domains.add(domain.name + "#Score:" + score + "[" + Integer.toString(domain.startId)
-								+ "-" + Integer.toString(domain.endId) + "]#Epoch:"
-								+ ProcessProteinLocationTask.epochs);
+								+ "-" + Integer.toString(domain.endId) + "]#Epoch:1");
 				} else {
 					list_original_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
-							+ Integer.toString(domain.endId) + "]#Epoch:" + ProcessProteinLocationTask.epochs);
+							+ Integer.toString(domain.endId) + "]#Epoch:1");
 
 					if (domain.isValid)
 						list_valid_domains.add(domain.name + "[" + Integer.toString(domain.startId) + "-"
-								+ Integer.toString(domain.endId) + "]#Epoch:" + ProcessProteinLocationTask.epochs);
-
+								+ Integer.toString(domain.endId) + "]#Epoch:1");
 				}
-
 			}
 
 			addDomainsOrConflictedResiduesIntoTheTable(myNetwork, node, list_predicted_domains,

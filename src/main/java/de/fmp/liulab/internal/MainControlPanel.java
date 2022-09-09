@@ -99,7 +99,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 	private static JCheckBox enable_score;
 	private static JCheckBox enable_specCount;
 //	private static JCheckBox enable_conflict;
-//	private static JCheckBox dualLocalization_conflict;
+	private static JCheckBox solve_conflict_automatically;
 	private static JCheckBox show_monolinks;
 
 	private static JSpinner spinner_font_size_link_legend;
@@ -1091,29 +1091,29 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		fix_conflict_panel.setLayout(null);
 		protein_domains_prediction_panel.add(fix_conflict_panel);
 
-//		dualLocalization_conflict = new JCheckBox("Dual localizing protein");
-//		dualLocalization_conflict.setBackground(Color.WHITE);
-//		dualLocalization_conflict.setSelected(Util.dualLocalization_conflict);
-//		dualLocalization_conflict.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
-//		if (Util.isWindows())
-//			dualLocalization_conflict.setBounds(5, offset_y + 5, 155, 20);
-//		else
-//			dualLocalization_conflict.setBounds(5, offset_y + 5, 170, 20);
-//		fix_conflict_panel.add(dualLocalization_conflict);
+		solve_conflict_automatically = new JCheckBox("Solve conflict automatically");
+		solve_conflict_automatically.setBackground(Color.WHITE);
+		solve_conflict_automatically.setSelected(Util.dualLocalization_conflict);
+		solve_conflict_automatically.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
+		if (Util.isWindows())
+			solve_conflict_automatically.setBounds(5, offset_y + 5, 175, 20);
+		else
+			solve_conflict_automatically.setBounds(5, offset_y + 5, 190, 20);
+//		fix_conflict_panel.add(solve_conflict_automatically);
 		offset_y += 20;
-//		dualLocalization_conflict.addItemListener(new ItemListener() {
-//			@Override
-//			public void itemStateChanged(ItemEvent e) {
-//				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
-//					Util.dualLocalization_conflict = true;
-//					P2LocationProps.setProperty("p2location.dioLocalization_conflict", "true");
-//
-//				} else {
-//					Util.dualLocalization_conflict = false;
-//					P2LocationProps.setProperty("p2location.dioLocalization_conflict", "false");
-//				}
-//			}
-//		});
+		solve_conflict_automatically.addItemListener(new ItemListener() {
+			@Override
+			public void itemStateChanged(ItemEvent e) {
+				if (e.getStateChange() == ItemEvent.SELECTED) {// checkbox has been selected
+					Util.fixDomainManually = false;
+					P2LocationProps.setProperty("p2location.fixDomainManually", "false");
+
+				} else {
+					Util.fixDomainManually = true;
+					P2LocationProps.setProperty("p2location.fixDomainManually", "true");
+				}
+			}
+		});
 
 		JLabel deltaScoreLabel = new JLabel("\u0394 score:");
 		deltaScoreLabel.setFont(new java.awt.Font("Tahoma", Font.PLAIN, 12));
@@ -1306,8 +1306,8 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 			enable_score.setEnabled(enable);
 		if (enable_specCount != null)
 			enable_specCount.setEnabled(enable);
-//		if (dualLocalization_conflict != null)
-//			dualLocalization_conflict.setEnabled(enable);
+		if (solve_conflict_automatically != null)
+			solve_conflict_automatically.setEnabled(enable);
 	}
 
 	public static void enable_disable_spinners(boolean enable) {
@@ -1374,7 +1374,7 @@ public class MainControlPanel extends JPanel implements CytoPanelComponent {
 		enable_epochs.setSelected(false);
 		enable_score.setSelected(false);
 		enable_specCount.setSelected(false);
-//		dualLocalization_conflict.setSelected(false);
+		solve_conflict_automatically.setSelected(false);
 
 		// Except this checkbox
 //		enable_conflict.setSelected(true);

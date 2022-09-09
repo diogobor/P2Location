@@ -19,7 +19,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.swing.BorderFactory;
@@ -88,7 +90,7 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 			"Epoch" };
 	@SuppressWarnings("rawtypes")
 	private final Class[] columnClassDomainTable = new Class[] { String.class, Integer.class, Integer.class,
-			String.class, Boolean.class, Integer.class };
+			String.class, Boolean.class, String.class };
 	private static DefaultTableModel domainTableDataModel;
 	private static JTable mainProteinDomainTable;
 	@SuppressWarnings("rawtypes")
@@ -521,22 +523,22 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 	private void initTableScreen() {
 
 		// Get indexes of non-predicted domains
-		List<Integer> nonPredictedDomains = new ArrayList<Integer>();
-		if (myProtein != null && myProtein.domains != null && myProtein.domains.size() > 0) {
-			Collections.sort(myProtein.domains, new Comparator<ProteinDomain>() {
-				@Override
-				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
-					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
-				}
-			});
-			
-			for (int i = 0; i < myProtein.domains.size(); i++) {
-				ProteinDomain ptnDomain = myProtein.domains.get(i);
-				if (!ptnDomain.isPredicted)
-					nonPredictedDomains.add(i);
-
-			}
-		}
+//		List<Integer> nonPredictedDomains = new ArrayList<Integer>();
+//		if (myProtein != null && myProtein.domains != null && myProtein.domains.size() > 0) {
+//			Collections.sort(myProtein.domains, new Comparator<ProteinDomain>() {
+//				@Override
+//				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+//					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+//				}
+//			});
+//			
+//			for (int i = 0; i < myProtein.domains.size(); i++) {
+//				ProteinDomain ptnDomain = myProtein.domains.get(i);
+//				if (!ptnDomain.isPredicted)
+//					nonPredictedDomains.add(i);
+//
+//			}
+//		}
 
 		Object[][] domainDataObj = new Object[1][5];
 		// create table model with data
@@ -551,8 +553,8 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 				if (column == 0 || column == 3 || column == 5)
 					return false;
 
-				if (nonPredictedDomains.contains(row))
-					return false;
+//				if (nonPredictedDomains.contains(row))
+//					return false;
 				return true;
 			}
 
@@ -586,25 +588,54 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 
 		if (myProtein != null && myProtein.domains != null && myProtein.domains.size() > 0) {
 
-			domainDataObj = new Object[myProtein.domains.size()][5];
-			domainTableDataModel.setDataVector(domainDataObj, columnNamesDomainTable);
+			// Group domains based on the range position
+			Map<String, List<ProteinDomain>> groupedDomains = myProtein.domains.stream()
+					.filter(value -> !value.eValue.equals("predicted"))
+					.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId + "_" + w.name));
 
-			Collections.sort(myProtein.domains, new Comparator<ProteinDomain>() {
+			List<String> domain_range_keys = new ArrayList<String>(groupedDomains.keySet());
+
+			Collections.sort(domain_range_keys, new Comparator<String>() {
 				@Override
-				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
-					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+				public int compare(String lhs, String rhs) {
+
+					String[] split_lhs = lhs.split("_");
+					String[] split_rhs = rhs.split("_");
+
+					int lhs_startId = Integer.parseInt(split_lhs[0]);
+					int rhs_startId = Integer.parseInt(split_rhs[0]);
+
+					return lhs_startId > rhs_startId ? 1 : (lhs_startId < rhs_startId) ? -1 : 0;
 				}
 			});
 
-			int countPtnDomain = 0;
-			for (ProteinDomain domain : myProtein.domains) {
+			domainDataObj = new Object[domain_range_keys.size()][5];
+			domainTableDataModel.setDataVector(domainDataObj, columnNamesDomainTable);
+
+			for (int countPtnDomain = 0; countPtnDomain < domain_range_keys.size(); countPtnDomain++) {
+
+				List<ProteinDomain> current_domains = groupedDomains.get(domain_range_keys.get(countPtnDomain));
+				int max_epoch = Collections.max(current_domains, Comparator.comparing(s -> s.getEpoch())).epoch;
+				ProteinDomain domain = current_domains.stream().filter(value -> value.epoch == max_epoch).findFirst()
+						.get();
+
 				domainTableDataModel.setValueAt(domain.name, countPtnDomain, 0);
 				domainTableDataModel.setValueAt(domain.startId, countPtnDomain, 1);
 				domainTableDataModel.setValueAt(domain.endId, countPtnDomain, 2);
 				domainTableDataModel.setValueAt(domain.eValue, countPtnDomain, 3);
 				domainTableDataModel.setValueAt(domain.isValid, countPtnDomain, 4);
-				domainTableDataModel.setValueAt(domain.epoch, countPtnDomain, 5);
-				countPtnDomain++;
+
+				if (current_domains.size() > 1) {
+
+					List<String> epochs_list = new ArrayList<String>();
+					current_domains.stream().forEach(value -> {
+						epochs_list.add(Integer.toString(value.epoch));
+					});
+
+					String epochs = String.join(",", epochs_list);
+					domainTableDataModel.setValueAt(epochs, countPtnDomain, 5);
+				} else
+					domainTableDataModel.setValueAt(domain.epoch, countPtnDomain, 5);
 			}
 			setTableProperties(myProtein.domains.size());
 		} else
@@ -768,13 +799,46 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 
 			boolean isPredicted = domainTableDataModel.isCellEditable(row, 4);
 
-			int epoch = domainTableDataModel.getValueAt(row, 5) != null ? (int) domainTableDataModel.getValueAt(row, 5)
-					: 0;
+			String epochStr = domainTableDataModel.getValueAt(row, 5) != null
+					? domainTableDataModel.getValueAt(row, 5).toString()
+					: "";
+			String[] epochs = epochStr.split(",");
+			int epoch = 0;
+			if (epochs.length == 1) {
 
-			myProteinDomains.add(new ProteinDomain(domain, startId, endId, isPredicted, eValue, isValid, epoch));
+				epoch = Integer.parseInt(epochs[0]);
+				myProteinDomains.add(new ProteinDomain(domain, startId, endId, isPredicted, eValue, isValid, epoch));
+
+			} else {
+
+				for (String _epoch : epochs) {
+					myProteinDomains.add(new ProteinDomain(domain, startId, endId, isPredicted, eValue, isValid,
+							Integer.parseInt(_epoch)));
+				}
+
+			}
 
 		}
 
+	}
+
+	private ProteinDomain getProteinDomain(Protein protein, final int start_domain, final int end_domain, int epoch,
+			String name) {
+
+		if (protein.domains != null && protein.domains.size() > 0) {
+
+			// eg: Matrix[10,20] => start_d = 12, end_d = 18
+			Optional<ProteinDomain> isProteinDomainPresent = protein.domains.stream()
+					.filter(value -> value.name.equals(name) && value.epoch == epoch && value.startId <= start_domain
+							&& value.endId >= end_domain)
+					.findFirst();
+
+			if (isProteinDomainPresent.isPresent())
+				return isProteinDomainPresent.get();
+			else
+				return null;
+		} else
+			return null;
 	}
 
 	/**
@@ -782,10 +846,25 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 	 */
 	private void storeProteinDomains() {
 
-		if (myProtein == null)
+		if (myProtein == null || myProteinDomains == null)
 			return;
 
-		myProtein.domains = myProteinDomains;
+		for (ProteinDomain domain : myProteinDomains) {
+			ProteinDomain current_domain = getProteinDomain(myProtein, domain.startId, domain.endId, domain.epoch,
+					domain.name);
+			if (current_domain != null) {
+				current_domain.startId = domain.startId;
+				current_domain.endId = domain.endId;
+				current_domain.isValid = domain.isValid;
+			} else {
+				if (myProtein.domains == null) {
+					myProtein.domains = new ArrayList<ProteinDomain>();
+					myProtein.domains.add(domain);
+				} else
+					myProtein.domains.add(domain);
+			}
+		}
+
 		updateProteinMap(myNetwork, node, myProtein);
 		ProcessProteinLocationTask.epochs--;
 		Util.updateProteinDomains(myNetwork, node);
@@ -820,7 +899,38 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		if (myProteinDomains == null)
 			return;
 
-		List<ProteinDomain> validDomains = myProteinDomains.stream().filter(value -> value.isValid)
+		// Group domains based on the range position
+		Map<String, List<ProteinDomain>> groupedDomains = myProteinDomains.stream()
+				.filter(value -> !value.eValue.equals("predicted"))
+				.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId + "_" + w.name));
+
+		List<String> domain_range_keys = new ArrayList<String>(groupedDomains.keySet());
+
+		Collections.sort(domain_range_keys, new Comparator<String>() {
+			@Override
+			public int compare(String lhs, String rhs) {
+
+				String[] split_lhs = lhs.split("_");
+				String[] split_rhs = rhs.split("_");
+
+				int lhs_startId = Integer.parseInt(split_lhs[0]);
+				int rhs_startId = Integer.parseInt(split_rhs[0]);
+
+				return lhs_startId > rhs_startId ? 1 : (lhs_startId < rhs_startId) ? -1 : 0;
+			}
+		});
+
+		List<ProteinDomain> notDuplicateProteins = new ArrayList<ProteinDomain>();
+		for (int countPtnDomain = 0; countPtnDomain < domain_range_keys.size(); countPtnDomain++) {
+
+			List<ProteinDomain> current_domains = groupedDomains.get(domain_range_keys.get(countPtnDomain));
+			int max_epoch = Collections.max(current_domains, Comparator.comparing(s -> s.getEpoch())).epoch;
+			ProteinDomain domain = current_domains.stream().filter(value -> value.epoch == max_epoch).findFirst().get();
+			notDuplicateProteins.add(domain);
+
+		}
+
+		List<ProteinDomain> validDomains = notDuplicateProteins.stream().filter(value -> value.isValid)
 				.collect(Collectors.toList());
 
 		for (ProteinDomain proteinDomain : validDomains) {
@@ -831,7 +941,7 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		}
 
 		Protein current_protein = new Protein();
-		current_protein.domains = myProteinDomains;
+		current_protein.domains = notDuplicateProteins;
 
 		ProcessProteinLocationTask.checkConflictProteinDomains(current_protein);
 

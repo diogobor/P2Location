@@ -16,6 +16,10 @@ public class ProteinDomain implements Comparable<ProteinDomain>, Cloneable {
 	public boolean isValid = true;
 	public int epoch = 0;
 
+	public int getEpoch() {
+		return epoch;
+	}
+
 	public int getEndId() {
 		return endId;
 	}
