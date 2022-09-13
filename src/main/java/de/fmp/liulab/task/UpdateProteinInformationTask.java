@@ -19,9 +19,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.swing.BorderFactory;
@@ -129,18 +127,18 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		mainFrame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		Dimension appSize = null;
 		if (Util.isWindows()) {
-			appSize = new Dimension(545, 375);
+			appSize = new Dimension(685, 375);
 		} else if (Util.isMac()) {
-			appSize = new Dimension(530, 355);
+			appSize = new Dimension(670, 355);
 		} else {
-			appSize = new Dimension(530, 365);
+			appSize = new Dimension(670, 365);
 		}
 		mainFrame.setSize(appSize);
 		mainFrame.setResizable(false);
 
 		if (mainPanel == null)
 			mainPanel = new JPanel();
-		mainPanel.setBounds(10, 10, 495, 365);
+		mainPanel.setBounds(10, 10, 635, 365);
 		mainPanel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), ""));
 		mainPanel.setLayout(null);
 
@@ -230,12 +228,13 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 	 */
 	public static void setTableProperties(int number_lines) {
 		if (mainProteinDomainTable != null) {
-			mainProteinDomainTable.setPreferredScrollableViewportSize(new Dimension(490, 90));
-			mainProteinDomainTable.getColumnModel().getColumn(0).setPreferredWidth(150);
-			mainProteinDomainTable.getColumnModel().getColumn(1).setPreferredWidth(150);
-			mainProteinDomainTable.getColumnModel().getColumn(2).setPreferredWidth(150);
-			mainProteinDomainTable.getColumnModel().getColumn(3).setPreferredWidth(80);
-			mainProteinDomainTable.getColumnModel().getColumn(4).setPreferredWidth(100);
+			mainProteinDomainTable.setPreferredScrollableViewportSize(new Dimension(600, 90));
+			mainProteinDomainTable.getColumnModel().getColumn(0).setPreferredWidth(440);
+			mainProteinDomainTable.getColumnModel().getColumn(1).setPreferredWidth(170);
+			mainProteinDomainTable.getColumnModel().getColumn(2).setPreferredWidth(160);
+			mainProteinDomainTable.getColumnModel().getColumn(3).setPreferredWidth(100);
+			mainProteinDomainTable.getColumnModel().getColumn(4).setPreferredWidth(80);
+			mainProteinDomainTable.getColumnModel().getColumn(5).setPreferredWidth(80);
 			mainProteinDomainTable.setFillsViewportHeight(true);
 			mainProteinDomainTable.setAutoCreateRowSorter(true);
 
@@ -421,11 +420,11 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		protein_panel = new JPanel();
 		protein_panel.setBorder(BorderFactory.createTitledBorder("Protein"));
 		if (Util.isWindows())
-			protein_panel.setBounds(10, 10, 250, 90);
+			protein_panel.setBounds(10, 10, 390, 90);
 		else if (Util.isMac())
-			protein_panel.setBounds(10, 10, 275, 90);
+			protein_panel.setBounds(10, 10, 415, 90);
 		else
-			protein_panel.setBounds(10, 10, 277, 90);
+			protein_panel.setBounds(10, 10, 417, 90);
 		protein_panel.setLayout(null);
 		mainPanel.add(protein_panel);
 
@@ -461,11 +460,11 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		JPanel logo_panel = new JPanel();
 		logo_panel.setBorder(BorderFactory.createTitledBorder(""));
 		if (Util.isWindows())
-			logo_panel.setBounds(265, 16, 245, 82);
+			logo_panel.setBounds(405, 16, 245, 82);
 		else if (Util.isMac())
-			logo_panel.setBounds(290, 16, 220, 82);
+			logo_panel.setBounds(430, 16, 220, 82);
 		else
-			logo_panel.setBounds(290, 25, 220, 72);
+			logo_panel.setBounds(430, 25, 220, 72);
 		logo_panel.setLayout(null);
 		mainPanel.add(logo_panel);
 
@@ -478,7 +477,7 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 
 		JLabel jLabelIcon = new JLabel();
 		if (Util.isWindows())
-			jLabelIcon.setBounds(80, -60, 200, 200);
+			jLabelIcon.setBounds(70, -60, 200, 200);
 		else
 			jLabelIcon.setBounds(65, -60, 200, 200);
 		jLabelIcon.setIcon(imageIcon);
@@ -569,18 +568,18 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		proteinDomainTableScrollPanel = new JScrollPane();
 
 		if (Util.isWindows())
-			proteinDomainTableScrollPanel.setBounds(8, 20, 485, 90);
+			proteinDomainTableScrollPanel.setBounds(8, 20, 625, 90);
 		else
-			proteinDomainTableScrollPanel.setBounds(8, 20, 485, 90);
+			proteinDomainTableScrollPanel.setBounds(8, 20, 625, 90);
 		proteinDomainTableScrollPanel.setViewportView(mainProteinDomainTable);
 		proteinDomainTableScrollPanel.setRowHeaderView(rowHeaderDomainTable);
 
 		domain_panel = new JPanel();
 		domain_panel.setBorder(BorderFactory.createTitledBorder("Predicted domains"));
 		if (Util.isWindows())
-			domain_panel.setBounds(10, 145, 503, 140);
+			domain_panel.setBounds(10, 145, 643, 140);
 		else
-			domain_panel.setBounds(10, 135, 503, 140);
+			domain_panel.setBounds(10, 135, 643, 140);
 		domain_panel.setLayout(null);
 		mainPanel.add(domain_panel);
 
@@ -677,9 +676,9 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		okButton = new JButton(iconBtnOk);
 		okButton.setText("OK");
 		if (Util.isWindows())
-			okButton.setBounds(30, 300, 220, 25);
+			okButton.setBounds(110, 300, 220, 25);
 		else
-			okButton.setBounds(30, 290, 220, 25);
+			okButton.setBounds(110, 290, 220, 25);
 
 		okButton.addActionListener(new ActionListener() {
 
@@ -706,9 +705,9 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		JButton cancelButton = new JButton(iconBtnCancel);
 		cancelButton.setText("Cancel");
 		if (Util.isWindows())
-			cancelButton.setBounds(265, 300, 220, 25);
+			cancelButton.setBounds(345, 300, 220, 25);
 		else
-			cancelButton.setBounds(265, 290, 220, 25);
+			cancelButton.setBounds(345, 290, 220, 25);
 
 		cancelButton.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
@@ -865,6 +864,35 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 			}
 		}
 
+		// remove "predicted" domains (domains that have been predicted based on
+		// neighbor information)
+		myProtein.domains = myProtein.domains.stream().filter(
+				value -> !(!value.eValue.isBlank() && !value.eValue.isBlank() && value.eValue.equals("predicted")))
+				.collect(Collectors.toList());
+
+		List<ProteinDomain> originalTransmem = new ArrayList<ProteinDomain>();
+		for (ProteinDomain transm : myProtein.domains.stream()
+				.filter(value -> value.name.toLowerCase().equals("transmem")).collect(Collectors.toList())) {
+
+			ProteinDomain newTransm = new ProteinDomain(transm.name, transm.startId, transm.endId, transm.isPredicted,
+					transm.eValue, transm.isValid, transm.epoch);
+			originalTransmem.add(newTransm);
+		}
+
+		// validate all transmembrane to predict domains
+		myProtein.domains.stream().filter(value -> value.name.toLowerCase().equals("transmem")).forEach(value -> {
+			value.isValid = true;
+		});
+		ProcessProteinLocationTask.predictDomainsBasedOnTransmemInfo(myProtein);
+		for (ProteinDomain transm : originalTransmem) {
+			Optional<ProteinDomain> current_transm = myProtein.domains.stream()
+					.filter(value -> value.name.equals(transm.name) && value.startId == transm.startId
+							&& value.endId == transm.endId && value.eValue.equals(transm.eValue) && !value.isPredicted)
+					.findFirst();
+			if (current_transm.isPresent()) {
+				current_transm.get().isValid = transm.isValid;
+			}
+		}
 		updateProteinMap(myNetwork, node, myProtein);
 		ProcessProteinLocationTask.epochs--;
 		Util.updateProteinDomains(myNetwork, node);
@@ -896,7 +924,7 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 	 */
 	private void checkProteinDomains() throws Exception {
 
-		if (myProteinDomains == null)
+		if (myProtein == null || myProteinDomains == null)
 			return;
 
 		// Group domains based on the range position
@@ -948,6 +976,7 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 		if (current_protein.isConflictedDomain)
 			throw new Exception("There is a domain conflict. Please select only one domain for each region.");
 
+		myProtein.isConflictedDomain = current_protein.isConflictedDomain;
 	}
 
 	/**
@@ -1032,6 +1061,7 @@ public class UpdateProteinInformationTask extends AbstractTask implements Action
 				ptn.location = myProtein.location;
 				ptn.predicted_domain_epoch = myProtein.predicted_domain_epoch;
 				ptn.isValid = myProtein.isValid;
+				ptn.isConflictedDomain = myProtein.isConflictedDomain;
 			} else {
 				all_proteins.add(myProtein);
 			}

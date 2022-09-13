@@ -148,7 +148,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	private static Map<Long, Protein> proteinsMap = new HashMap<Long, Protein>();
 
 	// OMM / IMM prediction
-	private String predicted_protein_domain_name;
+	private static String predicted_protein_domain_name;
 
 	// It is a new prediction (true) or the method was called by pressing 'continue'
 	// button (false)
@@ -1424,6 +1424,13 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					sbError.append("ERROR: Row: " + (row + 1)
 							+ " - Protein domains don't match with the pattern 'name[start_index-end_index]'\n");
 				}
+
+				Collections.sort(proteinDomains, new Comparator<ProteinDomain>() {
+					@Override
+					public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+						return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+					}
+				});
 			}
 
 			String description = tableDataModel.getValueAt(row, 1) != null
@@ -1913,9 +1920,22 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 						}
 					} else if (current_ptn_domain_list.get(i).name.toLowerCase()
 							.equals(current_ptn_domain_list.get(i + 1).name.toLowerCase())) {
-						if (Util.fixDomainManually) {
-							protein.isConflictedDomain = true;
-							break;
+
+						int end_first_domain = current_ptn_domain_list.get(i).endId;
+						int start_next_domain = current_ptn_domain_list.get(i + 1).startId;
+
+						// [IMS | T <<< score | IMS] => it's valid
+						Optional<ProteinDomain> possible_transm_low_score = protein.domains.stream()
+								.filter(value -> value.name.toLowerCase().equals("transmem") && !value.isValid
+										&& value.startId > end_first_domain && value.endId < start_next_domain)
+								.findFirst();
+
+						if (possible_transm_low_score.isEmpty()) {
+
+							if (Util.fixDomainManually) {
+								protein.isConflictedDomain = true;
+								break;
+							}
 						}
 					}
 
@@ -2645,162 +2665,192 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	/**
 	 * Method responsible for predicting missed domains based on the 'Transmembrane'
 	 * information
+	 * 
+	 * @param protein current protein
 	 */
-	private void predictDomainsBasedOnTransmemInfo() {
+	public static void predictDomainsBasedOnTransmemInfo(Protein protein) {
 
-		List<Protein> allProteins = Util.getProteins(myNetwork, true);
-		if (allProteins == null || allProteins.size() == 0)
+		if (protein.domains == null)
 			return;
 
 		int count_transmem = 0;
 		List<String> unique_domain = new ArrayList<String>();
 
-		int count_protein = 0;
+		List<ProteinDomain> validDomains = protein.domains.stream().filter(value -> value.isValid)
+				.collect(Collectors.toList());
 
-		for (Protein protein : allProteins.stream().filter(value -> !value.isPredictedBasedOnTransmemInfo)
-				.collect(Collectors.toList())) {
-			try {
+		Collections.sort(validDomains, new Comparator<ProteinDomain>() {
+			@Override
+			public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+				return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+			}
+		});
 
-				if (protein.domains == null)
+		count_transmem = 0;
+		List<ProteinDomain> new_domain_list = new ArrayList<ProteinDomain>();
+
+		for (ProteinDomain domain : validDomains) {
+
+			if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
+				count_transmem++;
+			else
+				unique_domain.add(domain.name);
+		}
+
+		unique_domain = unique_domain.stream().distinct().collect(Collectors.toList());
+
+		if (count_transmem > 0 && unique_domain.size() > 0) {
+
+			List<ProteinDomain> transmemDomains = validDomains.stream()
+					.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE)).collect(Collectors.toList());
+			Collections.sort(transmemDomains, new Comparator<ProteinDomain>() {
+				@Override
+				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+				}
+			});
+
+			// Group domains based on the range position
+			Map<String, List<ProteinDomain>> groupedDomains = validDomains.stream()
+					.filter(value -> !value.eValue.equals("predicted"))
+					.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+
+			List<String> domain_range_keys = new ArrayList<String>(groupedDomains.keySet());
+
+			Collections.sort(domain_range_keys, new Comparator<String>() {
+				@Override
+				public int compare(String lhs, String rhs) {
+
+					String[] split_lhs = lhs.split("_");
+					String[] split_rhs = rhs.split("_");
+
+					int lhs_startId = Integer.parseInt(split_lhs[0]);
+					int rhs_startId = Integer.parseInt(split_rhs[0]);
+
+					return lhs_startId > rhs_startId ? 1 : (lhs_startId < rhs_startId) ? -1 : 0;
+				}
+			});
+
+			int indexOfLastDomain = domain_range_keys.size() - 1;
+			int startDomain = 1;
+			predicted_protein_domain_name = "Unknown";
+
+			int conflict_domain = -1;
+			List<ProteinDomain> conflict_domains = null;
+
+			for (int i = 0; i < domain_range_keys.size(); i++) {
+
+				List<ProteinDomain> current_domains = groupedDomains.get(domain_range_keys.get(i));
+				ProteinDomain current_domain = current_domains.get(0);
+
+				ProteinDomain last_new_domain = null;
+				if (new_domain_list.size() > 0)
+					last_new_domain = new_domain_list.get(new_domain_list.size() - 1);
+
+				if (current_domain.name.toLowerCase().equals(TRANSMEMBRANE)) {
+
+					if (new_domain_list.size() == 0 || last_new_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+
+						if (Double.parseDouble(current_domain.eValue) > Util.transmemPredictionRegionsUpperScore
+								&& last_new_domain != null && !last_new_domain.eValue.isBlank()
+								&& !last_new_domain.eValue.isEmpty()
+								&& Double.parseDouble(last_new_domain.eValue) > Util.transmemPredictionRegionsUpperScore
+								&& current_domain.startId != 1 && startDomain < current_domain.startId) {
+							ProteinDomain new_domain = new ProteinDomain(UNKNOWN_DOMAIN, startDomain,
+									current_domain.startId - 1, true, "predicted", epochs);
+							new_domain_list.add(new_domain);
+							predicted_protein_domain_name = "Unknown";
+						}
+					}
+					new_domain_list.add(current_domain);
+					startDomain = current_domain.endId + 1;
+
+					if (Double.parseDouble(current_domain.eValue) < Util.transmemPredictionRegionsUpperScore)
+						current_domain.isValid = false;
+
+					transmemDomains.remove(current_domain);
 					continue;
 
-				List<ProteinDomain> validDomains = protein.domains.stream().filter(value -> value.isValid)
-						.collect(Collectors.toList());
-
-				Collections.sort(validDomains, new Comparator<ProteinDomain>() {
-					@Override
-					public int compare(ProteinDomain lhs, ProteinDomain rhs) {
-						return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
-					}
-				});
-
-				unique_domain.clear();
-				count_transmem = 0;
-				List<ProteinDomain> new_domain_list = new ArrayList<ProteinDomain>();
-
-				for (ProteinDomain domain : validDomains) {
-
-					if (domain.name.toLowerCase().contains(TRANSMEMBRANE))
-						count_transmem++;
-					else
-						unique_domain.add(domain.name);
 				}
 
-				unique_domain = unique_domain.stream().distinct().collect(Collectors.toList());
+				ProteinDomain next_domain = null;
+				List<ProteinDomain> next_domains = null;
 
-				if (count_transmem > 0 && unique_domain.size() > 0) {
+				if (domain_range_keys.size() > (i + 1)) {
 
-					List<ProteinDomain> transmemDomains = validDomains.stream()
-							.filter(value -> value.name.toLowerCase().contains(TRANSMEMBRANE))
-							.collect(Collectors.toList());
-					Collections.sort(transmemDomains, new Comparator<ProteinDomain>() {
-						@Override
-						public int compare(ProteinDomain lhs, ProteinDomain rhs) {
-							return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+					// Get next group position
+
+					next_domains = groupedDomains.get(domain_range_keys.get(i + 1));
+					next_domain = next_domains.get(0);
+
+				}
+
+				ProteinDomain next_transmem = transmemDomains.size() > 0
+						? transmemDomains.get(transmemDomains.indexOf(Collections.min(transmemDomains)))
+						: null;
+
+				if (next_transmem == null) {
+					// There is no further transmem
+
+					if (current_domain.startId != last_new_domain.startId
+							&& current_domain.endId != last_new_domain.endId) {
+
+						// update range in all domains of the current range
+						for (ProteinDomain domain : current_domains) {
+							domain.startId = startDomain;
+							if (domain.endId < protein.sequence.length())
+								domain.endId = protein.sequence.length();
 						}
-					});
 
-					// Group domains based on the range position
-					Map<String, List<ProteinDomain>> groupedDomains = validDomains.stream()
-							.filter(value -> !value.eValue.equals("predicted"))
-							.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+					}
+					new_domain_list.addAll(current_domains);
 
-					List<String> domain_range_keys = new ArrayList<String>(groupedDomains.keySet());
+					// e.g. [Matrix (current) | IMS (next)]
+					if (next_domain != null) {
+						conflict_domain = domain_range_keys.indexOf(next_domain.startId + "_" + next_domain.endId);
 
-					Collections.sort(domain_range_keys, new Comparator<String>() {
-						@Override
-						public int compare(String lhs, String rhs) {
-
-							String[] split_lhs = lhs.split("_");
-							String[] split_rhs = rhs.split("_");
-
-							int lhs_startId = Integer.parseInt(split_lhs[0]);
-							int rhs_startId = Integer.parseInt(split_rhs[0]);
-
-							return lhs_startId > rhs_startId ? 1 : (lhs_startId < rhs_startId) ? -1 : 0;
+						if (conflict_domains == null)
+							conflict_domains = groupedDomains.get(domain_range_keys.get(conflict_domain));
+						// update range in all domains of the current range
+						for (ProteinDomain domain : conflict_domains) {
+							domain.startId = startDomain;
+							domain.isPredicted = true;
+							if (domain.endId < protein.sequence.length())
+								domain.endId = protein.sequence.length();
 						}
-					});
 
-					int indexOfLastDomain = domain_range_keys.size() - 1;
-					int startDomain = 1;
-					predicted_protein_domain_name = "Unknown";
+						new_domain_list.addAll(conflict_domains);
+						conflict_domain = -1;
+					}
 
-					int conflict_domain = -1;
-					List<ProteinDomain> conflict_domains = null;
+					continue;
+				}
 
-					for (int i = 0; i < domain_range_keys.size(); i++) {
+				if (current_domain.startId < next_transmem.startId) {
 
-						List<ProteinDomain> current_domains = groupedDomains.get(domain_range_keys.get(i));
-						ProteinDomain current_domain = current_domains.get(0);
+					// e.g [IMS | Transmem | ??? ]
+					if (next_domain != null && next_domain.name.toLowerCase().equals(TRANSMEMBRANE)) {
 
-						ProteinDomain last_new_domain = null;
-						if (new_domain_list.size() > 0)
-							last_new_domain = new_domain_list.get(new_domain_list.size() - 1);
+						if (current_domains.size() == 1
+								&& Double.parseDouble(next_domain.eValue) > Util.transmemPredictionRegionsUpperScore
+								&& conflict_domain == -1)
+							predicted_protein_domain_name = current_domain.name;
+						else // There is conflict domains
+							predicted_protein_domain_name = "Unknown";
 
-						if (current_domain.name.toLowerCase().equals(TRANSMEMBRANE)) {
+						i = domain_range_keys.indexOf(next_transmem.startId + "_" + next_transmem.endId) - 1;
 
-							if (new_domain_list.size() == 0
-									|| last_new_domain.name.toLowerCase().contains(TRANSMEMBRANE)) {
+						if (!(current_domain.eValue.isBlank() || current_domain.eValue.isEmpty())
+								&& current_domain.startId != startDomain
+								&& Double.parseDouble(current_domain.eValue) != Util.initialResidueScore) {
 
-								if (Double.parseDouble(current_domain.eValue) > Util.transmemPredictionRegionsUpperScore
-										&& last_new_domain != null && !last_new_domain.eValue.isBlank()
-										&& !last_new_domain.eValue.isEmpty()
-										&& Double.parseDouble(
-												last_new_domain.eValue) > Util.transmemPredictionRegionsUpperScore
-										&& current_domain.startId != 1 && startDomain < current_domain.startId) {
-									ProteinDomain new_domain = new ProteinDomain(UNKNOWN_DOMAIN, startDomain,
-											current_domain.startId - 1, true, "predicted", epochs);
-									new_domain_list.add(new_domain);
-									predicted_protein_domain_name = "Unknown";
-								}
+							// update range in all domains of the current range
+							for (ProteinDomain domain : current_domains) {
+								domain.startId = startDomain;
+								domain.isPredicted = true;
 							}
-							new_domain_list.add(current_domain);
-							startDomain = current_domain.endId + 1;
 
-							if (Double.parseDouble(current_domain.eValue) < Util.transmemPredictionRegionsUpperScore)
-								current_domain.isValid = false;
-
-							transmemDomains.remove(current_domain);
-							continue;
-
-						}
-
-						ProteinDomain next_domain = null;
-						List<ProteinDomain> next_domains = null;
-
-						if (domain_range_keys.size() > (i + 1)) {
-
-							// Get next group position
-
-							next_domains = groupedDomains.get(domain_range_keys.get(i + 1));
-							next_domain = next_domains.get(0);
-
-						}
-
-						ProteinDomain next_transmem = transmemDomains.size() > 0
-								? transmemDomains.get(transmemDomains.indexOf(Collections.min(transmemDomains)))
-								: null;
-
-						if (next_transmem == null) {
-							// There is no further transmem
-
-							if (current_domain.startId != last_new_domain.startId
-									&& current_domain.endId != last_new_domain.endId) {
-
-								// update range in all domains of the current range
-								for (ProteinDomain domain : current_domains) {
-									domain.startId = startDomain;
-									if (domain.endId < protein.sequence.length())
-										domain.endId = protein.sequence.length();
-								}
-
-							}
-							new_domain_list.addAll(current_domains);
-
-							// e.g. [Matrix (current) | IMS (next)]
-							if (next_domain != null) {
-								conflict_domain = domain_range_keys
-										.indexOf(next_domain.startId + "_" + next_domain.endId);
+							if (conflict_domain != -1) {
 
 								if (conflict_domains == null)
 									conflict_domains = groupedDomains.get(domain_range_keys.get(conflict_domain));
@@ -2808,395 +2858,371 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								for (ProteinDomain domain : conflict_domains) {
 									domain.startId = startDomain;
 									domain.isPredicted = true;
-									if (domain.endId < protein.sequence.length())
-										domain.endId = protein.sequence.length();
 								}
-
-								new_domain_list.addAll(conflict_domains);
-								conflict_domains = null;
-								conflict_domain = -1;
 							}
 
-							continue;
+							protein.isPredictedBasedOnTransmemInfo = true;
 						}
+						if (!(current_domain.eValue.isBlank() || current_domain.eValue.isEmpty())
 
-						if (current_domain.startId < next_transmem.startId) {
+								&& Double.parseDouble(current_domain.eValue) != Util.initialResidueScore) {
 
-							// e.g [IMS | Transmem | ??? ]
-							if (next_domain != null && next_domain.name.toLowerCase().equals(TRANSMEMBRANE)) {
+							// e.g. [IMS | TRANSMEM]
+							// e.g. [ 150 - 190 | 200 - 300 ]
+							if (current_domain.endId <= next_transmem.startId - 1) {
 
-								if (current_domains.size() == 1
-										&& Double.parseDouble(
-												next_domain.eValue) > Util.transmemPredictionRegionsUpperScore
-										&& conflict_domain == -1)
-									predicted_protein_domain_name = current_domain.name;
-								else // There is conflict domains
-									predicted_protein_domain_name = "Unknown";
-
-								i = domain_range_keys.indexOf(next_transmem.startId + "_" + next_transmem.endId) - 1;
-
-								if (!(current_domain.eValue.isBlank() || current_domain.eValue.isEmpty())
-										&& current_domain.startId != startDomain
-										&& Double.parseDouble(current_domain.eValue) != Util.initialResidueScore) {
-
-									// update range in all domains of the current range
-									for (ProteinDomain domain : current_domains) {
-										domain.startId = startDomain;
-										domain.isPredicted = true;
-									}
-
-									if (conflict_domain != -1) {
-
-										if (conflict_domains == null)
-											conflict_domains = groupedDomains
-													.get(domain_range_keys.get(conflict_domain));
-										// update range in all domains of the current range
-										for (ProteinDomain domain : conflict_domains) {
-											domain.startId = startDomain;
-											domain.isPredicted = true;
-										}
-									}
-
-									protein.isPredictedBasedOnTransmemInfo = true;
+								// update range in all domains of the current range
+								for (ProteinDomain domain : current_domains) {
+									domain.endId = next_transmem.startId - 1;
+									domain.isPredicted = true;
 								}
-								if (!(current_domain.eValue.isBlank() || current_domain.eValue.isEmpty())
 
-										&& Double.parseDouble(current_domain.eValue) != Util.initialResidueScore) {
+							} else {
+								// e.g. [IMS | TRANSMEM]
+								// e.g. [ 150 - 305 | 200 - 300 ] -> It's necessary to split IMS
+
+								List<ProteinDomain> new_splitted_domains = new ArrayList<ProteinDomain>();
+								// update range in all domains of the current range
+								for (ProteinDomain domain : current_domains) {
+									int current_endId = domain.endId;
+
+									// [150 - 199]
+									domain.endId = next_transmem.startId - 1;
+									domain.isPredicted = true;
+									domain.eValue = Util
+											.RoundScore(Util.ComputeDomainScore(protein, domain.startId, domain.endId));
+
+									// Create a new domain
+									// [301 - 305]
+									ProteinDomain new_splitted_domain = new ProteinDomain(domain.name,
+											next_transmem.endId + 1, current_endId, true, domain.eValue, epochs);
+									new_splitted_domain.eValue = Util.RoundScore(Util.ComputeDomainScore(protein,
+											new_splitted_domain.startId, new_splitted_domain.endId));
+									new_splitted_domains.add(new_splitted_domain);
+
+								}
+
+								current_domains.addAll(new_splitted_domains);
+
+							}
+
+							if (conflict_domain != -1) {
+
+								if (conflict_domains == null)
+									conflict_domains = groupedDomains.get(domain_range_keys.get(conflict_domain));
+
+								List<ProteinDomain> new_splitted_domains = new ArrayList<ProteinDomain>();
+								// update range in all domains of the current range
+								for (ProteinDomain domain : conflict_domains) {
 
 									// e.g. [IMS | TRANSMEM]
 									// e.g. [ 150 - 190 | 200 - 300 ]
 									if (current_domain.endId <= next_transmem.startId - 1) {
-
-										// update range in all domains of the current range
-										for (ProteinDomain domain : current_domains) {
-											domain.endId = next_transmem.startId - 1;
-											domain.isPredicted = true;
-										}
+										domain.endId = next_transmem.startId - 1;
+										domain.isPredicted = true;
 
 									} else {
 										// e.g. [IMS | TRANSMEM]
 										// e.g. [ 150 - 305 | 200 - 300 ] -> It's necessary to split IMS
 
-										List<ProteinDomain> new_splitted_domains = new ArrayList<ProteinDomain>();
 										// update range in all domains of the current range
-										for (ProteinDomain domain : current_domains) {
-											int current_endId = domain.endId;
 
-											// [150 - 199]
-											domain.endId = next_transmem.startId - 1;
-											domain.isPredicted = true;
-											domain.eValue = Util.RoundScore(
-													Util.ComputeDomainScore(protein, domain.startId, domain.endId));
+										int current_endId = domain.endId;
 
-											// Create a new domain
-											// [301 - 305]
-											ProteinDomain new_splitted_domain = new ProteinDomain(domain.name,
-													next_transmem.endId + 1, current_endId, true, domain.eValue,
-													epochs);
-											new_splitted_domain.eValue = Util.RoundScore(Util.ComputeDomainScore(
-													protein, new_splitted_domain.startId, new_splitted_domain.endId));
-											new_splitted_domains.add(new_splitted_domain);
+										// [150 - 199]
+										domain.endId = next_transmem.startId - 1;
+										domain.isPredicted = true;
+										domain.eValue = Util.RoundScore(
+												Util.ComputeDomainScore(protein, domain.startId, domain.endId));
 
-										}
-
-										current_domains.addAll(new_splitted_domains);
+										// Create a new domain
+										// [301 - 305]
+										ProteinDomain new_splitted_domain = new ProteinDomain(domain.name,
+												next_transmem.endId + 1, current_endId, true, domain.eValue, epochs);
+										new_splitted_domain.eValue = Util.RoundScore(Util.ComputeDomainScore(protein,
+												new_splitted_domain.startId, new_splitted_domain.endId));
+										new_splitted_domains.add(new_splitted_domain);
 
 									}
 
-									if (conflict_domain != -1) {
-
-										if (conflict_domains == null)
-											conflict_domains = groupedDomains
-													.get(domain_range_keys.get(conflict_domain));
-
-										List<ProteinDomain> new_splitted_domains = new ArrayList<ProteinDomain>();
-										// update range in all domains of the current range
-										for (ProteinDomain domain : conflict_domains) {
-
-											// e.g. [IMS | TRANSMEM]
-											// e.g. [ 150 - 190 | 200 - 300 ]
-											if (current_domain.endId <= next_transmem.startId - 1) {
-												domain.endId = next_transmem.startId - 1;
-												domain.isPredicted = true;
-
-											} else {
-												// e.g. [IMS | TRANSMEM]
-												// e.g. [ 150 - 305 | 200 - 300 ] -> It's necessary to split IMS
-
-												// update range in all domains of the current range
-
-												int current_endId = domain.endId;
-
-												// [150 - 199]
-												domain.endId = next_transmem.startId - 1;
-												domain.isPredicted = true;
-												domain.eValue = Util.RoundScore(
-														Util.ComputeDomainScore(protein, domain.startId, domain.endId));
-
-												// Create a new domain
-												// [301 - 305]
-												ProteinDomain new_splitted_domain = new ProteinDomain(domain.name,
-														next_transmem.endId + 1, current_endId, true, domain.eValue,
-														epochs);
-												new_splitted_domain.eValue = Util.RoundScore(
-														Util.ComputeDomainScore(protein, new_splitted_domain.startId,
-																new_splitted_domain.endId));
-												new_splitted_domains.add(new_splitted_domain);
-
-											}
-
-										}
-										conflict_domains.addAll(new_splitted_domains);
-
-									}
-
-									protein.isPredictedBasedOnTransmemInfo = true;
 								}
-								conflict_domain = -1;
+								conflict_domains.addAll(new_splitted_domains);
 
-								startDomain = next_transmem.endId + 1;
-								transmemDomains.remove(next_transmem);
-							} else if (next_domain == null || !(next_domain.startId < next_transmem.startId)) {
-								startDomain = current_domain.endId + 1;
-							} else
-								conflict_domain = domain_range_keys
-										.indexOf(current_domain.startId + "_" + current_domain.endId);
-
-						} else {
-
-							// e.g [??? | Transmem | IMS ]
-
-							if (Double.parseDouble(next_transmem.eValue) > Util.transmemPredictionRegionsUpperScore) {
-
-								if (current_domains.size() == 1)
-									predicted_protein_domain_name = current_domain.name;
-								else // There is conflict domains
-									predicted_protein_domain_name = "Unknown";
-
-								String current_domain_index = current_domain.startId + "_" + current_domain.endId;
-								if (current_domain_index.equals(domain_range_keys.get(indexOfLastDomain))) {
-
-									// It is the last domain
-									// update range in all domains of the current range
-									for (ProteinDomain domain : current_domains) {
-										domain.endId = protein.sequence.length();
-										domain.startId = next_transmem.endId + 1;
-									}
-
-								}
-
-								startDomain = 1;
-
-								addPredictedDomainBasedOnOMMorIMMDomain(new_domain_list, protein, next_transmem,
-										startDomain);
-								startDomain = next_transmem.endId + 1;
-
-								// update range in all domains of the current range
-								for (ProteinDomain domain : current_domains) {
-									domain.isPredicted = true;
-								}
-
-								protein.isPredictedBasedOnTransmemInfo = true;
 							}
 
+							protein.isPredictedBasedOnTransmemInfo = true;
 						}
-						if (conflict_domain == -1) {// If conflict_domain != -1 means conflict domains indexes need to
-													// be
-													// update before adding to new_domain_list
-							if (conflict_domains != null) {
-								new_domain_list.addAll(conflict_domains);
-								conflict_domains = null;
-							}
-							new_domain_list.addAll(current_domains);
-						}
+						conflict_domain = -1;
 
-					}
+						startDomain = next_transmem.endId + 1;
+						transmemDomains.remove(next_transmem);
+					} else if (next_domain == null || !(next_domain.startId < next_transmem.startId)) {
+						startDomain = current_domain.endId + 1;
+					} else
+						conflict_domain = domain_range_keys
+								.indexOf(current_domain.startId + "_" + current_domain.endId);
 
-					// remove domains created from null conflict residues
-					new_domain_list.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty())
-							&& !value.eValue.isBlank() && !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
+				} else {
 
-					groupedDomains = new_domain_list.stream()
-							.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+					// e.g [??? | Transmem | IMS ]
 
-					domain_range_keys = new ArrayList<String>(groupedDomains.keySet());
-					Collections.sort(domain_range_keys, new Comparator<String>() {
-						@Override
-						public int compare(String lhs, String rhs) {
+					if (Double.parseDouble(next_transmem.eValue) > Util.transmemPredictionRegionsUpperScore) {
 
-							String[] split_lhs = lhs.split("_");
-							String[] split_rhs = rhs.split("_");
+						if (current_domains.size() == 1)
+							predicted_protein_domain_name = current_domain.name;
+						else // There is conflict domains
+							predicted_protein_domain_name = "Unknown";
 
-							int lhs_startId = Integer.parseInt(split_lhs[0]);
-							int rhs_startId = Integer.parseInt(split_rhs[0]);
+						String current_domain_index = current_domain.startId + "_" + current_domain.endId;
+						if (current_domain_index.equals(domain_range_keys.get(indexOfLastDomain))) {
 
-							return lhs_startId > rhs_startId ? 1 : (lhs_startId < rhs_startId) ? -1 : 0;
-						}
-					});
-
-					indexOfLastDomain = domain_range_keys.size() - 1;
-					List<ProteinDomain> last_domains = groupedDomains.get(domain_range_keys.get(indexOfLastDomain));
-					ProteinDomain last_domain = last_domains.get(0);
-
-					if (last_domain.endId < protein.sequence.length()) {
-
-						// It is necessary to add the last domain
-						if (last_domain.name.toLowerCase().equals(TRANSMEMBRANE)
-								&& Double.parseDouble(last_domain.eValue) > Util.transmemPredictionRegionsUpperScore) {
-
-							if (predicted_protein_domain_name.isEmpty() || predicted_protein_domain_name.isBlank()
-									|| predicted_protein_domain_name.equals(UNKNOWN_PREDICTED_DOMAIN)) {
-								ProteinDomain new_domain = new ProteinDomain(UNKNOWN_DOMAIN, startDomain,
-										protein.sequence.length(), true, "predicted", epochs);
-								new_domain_list.add(new_domain);
-							} else {
-								addPredictedDomainBasedOnOMMorIMMDomain(
-										new_domain_list, protein, new ProteinDomain(TRANSMEMBRANE.toUpperCase(),
-												protein.sequence.length() + 1, -1, true, "predicted", epochs),
-										startDomain);
-							}
-						} else// Update range of the last domain
-						{
+							// It is the last domain
 							// update range in all domains of the current range
-							for (ProteinDomain domain : last_domains) {
-								if (!domain.name.toLowerCase().equals(TRANSMEMBRANE))
-									domain.endId = protein.sequence.length();
+							for (ProteinDomain domain : current_domains) {
+								domain.endId = protein.sequence.length();
+								domain.startId = next_transmem.endId + 1;
 							}
+
 						}
 
-					}
+						startDomain = 1;
 
-					new_domain_list = new_domain_list.stream().distinct().collect(Collectors.toList());
+						addPredictedDomainBasedOnOMMorIMMDomain(new_domain_list, protein, next_transmem, startDomain);
+						startDomain = next_transmem.endId + 1;
 
-					// Check if exists unknown domains (name == '###')
-					if (new_domain_list.stream().filter(value -> value.name.equals(UNKNOWN_DOMAIN))
-							.collect(Collectors.toList()).size() > 0) {
-
-						groupedDomains = new_domain_list.stream()
-								.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
-
-						domain_range_keys = new ArrayList<String>(groupedDomains.keySet());
-						Collections.sort(domain_range_keys, new Comparator<String>() {
-							@Override
-							public int compare(String lhs, String rhs) {
-
-								String[] split_lhs = lhs.split("_");
-								String[] split_rhs = rhs.split("_");
-
-								int lhs_startId = Integer.parseInt(split_lhs[0]);
-								int rhs_startId = Integer.parseInt(split_rhs[0]);
-
-								return lhs_startId > rhs_startId ? 1 : (lhs_startId < rhs_startId) ? -1 : 0;
-							}
-						});
-
-						for (int i = 0; i < domain_range_keys.size(); i++) {
-
-							List<ProteinDomain> domains = groupedDomains.get(domain_range_keys.get(i));
-							ProteinDomain domain = domains.get(0);
-
-							boolean isForward = false;
-							if (domain.name.equals(UNKNOWN_DOMAIN)) {
-
-								predicted_protein_domain_name = "Unknown";
-								int j = i + 1;
-								for (; j < domain_range_keys.size(); j++) {
-
-									List<ProteinDomain> next_domains = groupedDomains.get(domain_range_keys.get(j));
-									ProteinDomain next_domain = next_domains.get(0);
-
-									if (!next_domain.name.toLowerCase().contains(TRANSMEMBRANE)
-											&& !next_domain.name.equals(UNKNOWN_DOMAIN)) {
-										isForward = true;
-
-										if (next_domains.size() > 1)
-											predicted_protein_domain_name = "Unknown";
-										else
-											predicted_protein_domain_name = next_domain.name;
-										break;
-									}
-								}
-
-								if (!isForward && i > 0) {
-
-									j = i - 1;
-									for (; j >= 0; j--) {
-
-										List<ProteinDomain> previous_domains = groupedDomains
-												.get(domain_range_keys.get(j));
-										ProteinDomain previous_domain = previous_domains.get(0);
-
-										if (!previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)
-												&& !previous_domain.name.equals(UNKNOWN_DOMAIN)) {
-
-											if (previous_domains.size() > 1)
-												predicted_protein_domain_name = "Unknown";
-											else
-												predicted_protein_domain_name = previous_domain.name;
-											break;
-										}
-									}
-								}
-
-								// Set 'predicted_protein_domain_name' based on 'Transmem' info
-								if (!isForward)
-									predictDomainBasedOnOMMorIMM(i, j, new_domain_list, protein, isForward);
-								else
-									predictDomainBasedOnOMMorIMM(i, (j - 1), new_domain_list, protein, isForward);
-								domain.name = predicted_protein_domain_name;
-
-							}
-						}
-					}
-
-					// Check Transmem scores. If score < transmemPredictionRegionsUpperScore,
-					// domains is invalid
-					new_domain_list.stream()
-							.filter(value -> value.isValid && value.name.toLowerCase().equals(TRANSMEMBRANE)
-									&& Double.parseDouble(value.eValue) < Util.transmemPredictionRegionsUpperScore)
-							.forEach(value -> value.isValid = false);
-
-					List<ProteinDomain> invalidDomains = protein.domains.stream().filter(value -> !value.isValid)
-							.collect(Collectors.toList());
-
-					// Check if exists similar invalid domains and valid domains. If so, remove the
-					// one predicted in this round (valid domain)
-					for (ProteinDomain invalid_domain : invalidDomains) {
-
-						Optional<ProteinDomain> similar_valid = new_domain_list.stream()
-								.filter(value -> value.startId == invalid_domain.startId
-										&& value.endId == invalid_domain.endId
-										&& value.name.equals(invalid_domain.name))
-								.findFirst();
-						if (similar_valid.isPresent()) {
-							new_domain_list.remove(similar_valid.get());
+						// update range in all domains of the current range
+						for (ProteinDomain domain : current_domains) {
+							domain.isPredicted = true;
 						}
 
+						protein.isPredictedBasedOnTransmemInfo = true;
 					}
 
-					new_domain_list.addAll(invalidDomains);
-					new_domain_list = new_domain_list.stream().distinct().collect(Collectors.toList());
-					protein.domains = new_domain_list;
-					Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
-						@Override
-						public int compare(ProteinDomain lhs, ProteinDomain rhs) {
-							return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
-						}
-					});
-
-//					// Merge similar domains in different epochs
-//					mergeSimilarDomains(protein.domains);
-
-					validDomains = protein.domains.stream().filter(value -> value.isValid).collect(Collectors.toList());
-
-					// Update protein domain status
-					if (validDomains.size() > 1) {
-
-						checkConflictProteinDomains(protein);
-					}
-
-					updateResiduesLocationAndScore(protein);
 				}
+				if (conflict_domain == -1) {// If conflict_domain != -1 means conflict domains indexes need to
+											// be
+											// update before adding to new_domain_list
+					if (conflict_domains != null) {
+						new_domain_list.addAll(conflict_domains);
+						conflict_domains = null;
+					}
+					new_domain_list.addAll(current_domains);
+				}
+
+			}
+
+			// remove domains created from null conflict residues
+			new_domain_list.removeIf(value -> ((value.name.isBlank() || value.name.isEmpty()) && !value.eValue.isBlank()
+					&& !value.eValue.isEmpty()) || value.eValue.equals("0E0"));
+
+			groupedDomains = new_domain_list.stream().collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+
+			domain_range_keys = new ArrayList<String>(groupedDomains.keySet());
+			Collections.sort(domain_range_keys, new Comparator<String>() {
+				@Override
+				public int compare(String lhs, String rhs) {
+
+					String[] split_lhs = lhs.split("_");
+					String[] split_rhs = rhs.split("_");
+
+					int lhs_startId = Integer.parseInt(split_lhs[0]);
+					int rhs_startId = Integer.parseInt(split_rhs[0]);
+
+					return lhs_startId > rhs_startId ? 1 : (lhs_startId < rhs_startId) ? -1 : 0;
+				}
+			});
+
+			indexOfLastDomain = domain_range_keys.size() - 1;
+			List<ProteinDomain> last_domains = groupedDomains.get(domain_range_keys.get(indexOfLastDomain));
+			ProteinDomain last_domain = last_domains.get(0);
+
+			if (last_domain.endId < protein.sequence.length()) {
+
+				// It is necessary to add the last domain
+				if (last_domain.name.toLowerCase().equals(TRANSMEMBRANE)
+						&& Double.parseDouble(last_domain.eValue) > Util.transmemPredictionRegionsUpperScore) {
+
+					if (predicted_protein_domain_name.isEmpty() || predicted_protein_domain_name.isBlank()
+							|| predicted_protein_domain_name.equals(UNKNOWN_PREDICTED_DOMAIN)) {
+						ProteinDomain new_domain = new ProteinDomain(UNKNOWN_DOMAIN, startDomain,
+								protein.sequence.length(), true, "predicted", epochs);
+						new_domain_list.add(new_domain);
+					} else {
+						addPredictedDomainBasedOnOMMorIMMDomain(new_domain_list, protein,
+								new ProteinDomain(TRANSMEMBRANE.toUpperCase(), protein.sequence.length() + 1, -1, true,
+										"predicted", epochs),
+								startDomain);
+					}
+				} else// Update range of the last domain
+				{
+					// update range in all domains of the current range
+					for (ProteinDomain domain : last_domains) {
+						if (!domain.name.toLowerCase().equals(TRANSMEMBRANE))
+							domain.endId = protein.sequence.length();
+					}
+				}
+
+			}
+
+			new_domain_list = new_domain_list.stream().distinct().collect(Collectors.toList());
+
+			// Check if exists unknown domains (name == '###')
+			if (new_domain_list.stream().filter(value -> value.name.equals(UNKNOWN_DOMAIN)).collect(Collectors.toList())
+					.size() > 0) {
+
+				groupedDomains = new_domain_list.stream().filter(value -> value.isValid)
+						.collect(Collectors.groupingBy(w -> w.startId + "_" + w.endId));
+
+				domain_range_keys = new ArrayList<String>(groupedDomains.keySet());
+				Collections.sort(domain_range_keys, new Comparator<String>() {
+					@Override
+					public int compare(String lhs, String rhs) {
+
+						String[] split_lhs = lhs.split("_");
+						String[] split_rhs = rhs.split("_");
+
+						int lhs_startId = Integer.parseInt(split_lhs[0]);
+						int rhs_startId = Integer.parseInt(split_rhs[0]);
+
+						return lhs_startId > rhs_startId ? 1 : (lhs_startId < rhs_startId) ? -1 : 0;
+					}
+				});
+
+				List<ProteinDomain> domainsUsedToPredictBasedOnTransmInfo = new ArrayList<ProteinDomain>();
+				for (int i = 0; i < domain_range_keys.size(); i++) {
+					List<ProteinDomain> domains = groupedDomains.get(domain_range_keys.get(i));
+					ProteinDomain domain = domains.get(0);
+					domainsUsedToPredictBasedOnTransmInfo.add(domain);
+				}
+
+				for (int i = 0; i < domain_range_keys.size(); i++) {
+
+					List<ProteinDomain> domains = groupedDomains.get(domain_range_keys.get(i));
+					ProteinDomain domain = domains.get(0);
+
+					boolean isForward = false;
+					if (domain.name.equals(UNKNOWN_DOMAIN)) {
+
+						predicted_protein_domain_name = "Unknown";
+						int j = i + 1;
+						for (; j < domain_range_keys.size(); j++) {
+
+							List<ProteinDomain> next_domains = groupedDomains.get(domain_range_keys.get(j));
+							ProteinDomain next_domain = next_domains.get(0);
+
+							if (!next_domain.name.toLowerCase().contains(TRANSMEMBRANE)
+									&& !next_domain.name.equals(UNKNOWN_DOMAIN)) {
+								isForward = true;
+
+								if (next_domains.size() > 1)
+									predicted_protein_domain_name = "Unknown";
+								else
+									predicted_protein_domain_name = next_domain.name;
+								break;
+							}
+						}
+
+						if (!isForward && i > 0) {
+
+							j = i - 1;
+							for (; j >= 0; j--) {
+
+								List<ProteinDomain> previous_domains = groupedDomains.get(domain_range_keys.get(j));
+								ProteinDomain previous_domain = previous_domains.get(0);
+
+								if (!previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)
+										&& !previous_domain.name.equals(UNKNOWN_DOMAIN)) {
+
+									if (previous_domains.size() > 1)
+										predicted_protein_domain_name = "Unknown";
+									else
+										predicted_protein_domain_name = previous_domain.name;
+									break;
+								}
+							}
+						}
+
+						// Set 'predicted_protein_domain_name' based on 'Transmem' info
+						if (!isForward)
+							predictDomainBasedOnOMMorIMM(i, j, domainsUsedToPredictBasedOnTransmInfo, protein,
+									isForward);
+						else
+							predictDomainBasedOnOMMorIMM(i, (j - 1), domainsUsedToPredictBasedOnTransmInfo, protein,
+									isForward);
+						domain.name = predicted_protein_domain_name;
+
+					}
+				}
+				domainsUsedToPredictBasedOnTransmInfo.clear();
+			}
+
+			// Check Transmem scores. If score < transmemPredictionRegionsUpperScore,
+			// domains is invalid
+			new_domain_list.stream()
+					.filter(value -> value.isValid && value.name.toLowerCase().equals(TRANSMEMBRANE)
+							&& Double.parseDouble(value.eValue) < Util.transmemPredictionRegionsUpperScore)
+					.forEach(value -> value.isValid = false);
+
+			List<ProteinDomain> invalidDomains = protein.domains.stream().filter(value -> !value.isValid)
+					.collect(Collectors.toList());
+
+			// Check if exists similar invalid domains and valid domains. If so, remove the
+			// one predicted in this round (valid domain)
+			for (ProteinDomain invalid_domain : invalidDomains) {
+
+				Optional<ProteinDomain> similar_valid = new_domain_list
+						.stream().filter(value -> value.startId == invalid_domain.startId
+								&& value.endId == invalid_domain.endId && value.name.equals(invalid_domain.name))
+						.findFirst();
+				if (similar_valid.isPresent()) {
+					new_domain_list.remove(similar_valid.get());
+				}
+
+			}
+
+			new_domain_list.addAll(invalidDomains);
+			new_domain_list = new_domain_list.stream().distinct().collect(Collectors.toList());
+			protein.domains = new_domain_list;
+			Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+				@Override
+				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+				}
+			});
+
+//			// Merge similar domains in different epochs
+//			mergeSimilarDomains(protein.domains);
+
+			validDomains = protein.domains.stream().filter(value -> value.isValid).collect(Collectors.toList());
+
+			// Update protein domain status
+			if (validDomains.size() > 1) {
+
+				checkConflictProteinDomains(protein);
+			}
+
+			updateResiduesLocationAndScore(protein);
+		}
+
+	}
+
+	/**
+	 * Method responsible for predicting missed domains from all proteins based on
+	 * the 'Transmembrane' information
+	 */
+	private void predictDomainsFromAllProteinsBasedOnTransmemInfo() {
+
+		List<Protein> allProteins = Util.getProteins(myNetwork, true);
+		if (allProteins == null || allProteins.size() == 0)
+			return;
+
+		int count_protein = 0;
+
+		for (Protein protein : allProteins.stream().filter(value -> !value.isPredictedBasedOnTransmemInfo)
+				.collect(Collectors.toList())) {
+			try {
+
+				predictDomainsBasedOnTransmemInfo(protein);
 
 			} catch (Exception e) {
 				System.out.println("ERROR: predictDomainsBasedOnTransmemInfo -> index:" + count_protein);
@@ -3254,7 +3280,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * @param protein         current protein
 	 * @param isForward       search forward or backward
 	 */
-	private void predictDomainBasedOnOMMorIMM(int i, int j, List<ProteinDomain> new_domain_list, Protein protein,
+	private static void predictDomainBasedOnOMMorIMM(int i, int j, List<ProteinDomain> new_domain_list, Protein protein,
 			boolean isForward) {
 
 		int count_reverse = 0;
@@ -3316,8 +3342,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	 * @param next_transmem   next transmembrane domain
 	 * @param startDomain     start of new protein domain
 	 */
-	private void addPredictedDomainBasedOnOMMorIMMDomain(List<ProteinDomain> new_domain_list, Protein current_protein,
-			ProteinDomain next_transmem, int startDomain) {
+	private static void addPredictedDomainBasedOnOMMorIMMDomain(List<ProteinDomain> new_domain_list,
+			Protein current_protein, ProteinDomain next_transmem, int startDomain) {
 
 		ProteinDomain new_predicted_domain = null;
 		if (current_protein.location != null && current_protein.location.equals(OUTER_MEMBRANE)) {
@@ -3432,7 +3458,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 			annotatePredictedLocation(taskMonitor, epochs);
 
-			predictDomainsBasedOnTransmemInfo();
+			predictDomainsFromAllProteinsBasedOnTransmemInfo();
 			UnifyProteinsDomains();
 
 			computeFinalDomainScore(taskMonitor, false);
@@ -4856,6 +4882,27 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 	}
 
 	/**
+	 * Method responsible for getting the closest transmem region based on a
+	 * specific position
+	 * 
+	 * @param domains protein domains
+	 * @param start   position
+	 * @return transmem region
+	 */
+	private ProteinDomain getClosestTransmemRegion(List<ProteinDomain> domains, int start) {
+		if (domains == null)
+			return null;
+
+		Optional<ProteinDomain> isPresent = domains.stream()
+				.filter(value -> value.name.toLowerCase().equals(TRANSMEMBRANE) && value.startId > start).findFirst();
+
+		if (isPresent.isPresent())
+			return isPresent.get();
+		return null;
+
+	}
+
+	/**
 	 * 
 	 * Method responsible for updating the annotation domain of all proteins
 	 * according to the new predicted annotations
@@ -4873,7 +4920,6 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 			return;
 
 		int countProtein = 0;
-
 		for (Protein protein : allProteins) {
 
 			try {
@@ -4881,6 +4927,8 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 				int start_domain = -1;
 				int end_domain = -1;
 				String domain = "";
+
+				ProteinDomain transmem = null;
 
 				for (int i = 0; i < protein.reactionSites.size(); i++) {
 
@@ -4909,6 +4957,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					domain = first_residue.predictedLocation;
 					start_domain = first_residue.position;
 					end_domain = first_residue.position;
+					transmem = getClosestTransmemRegion(protein.domains, start_domain);
 
 					int j;
 					for (j = i + 1; j < protein.reactionSites.size(); j++) {
@@ -4933,6 +4982,9 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								second_residue = res.get(res.size() - 1);
 
 						}
+
+						if (transmem != null && second_residue.position >= transmem.startId)
+							break;
 
 						if (second_residue.predictedLocation.equals(UNKNOWN_RESIDUE))
 							continue;
@@ -5298,18 +5350,22 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 						ProteinDomain initial_domain = current_ptn_domain_list.get(0);
 						ProteinDomain final_domain = current_ptn_domain_list.get(current_ptn_domain_list.size() - 1);
-						initial_domain.endId = final_domain.endId;
-						initial_domain.eValue = Util.RoundScore(
-								Util.ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
+						if (initial_domain != final_domain && !initial_domain.name.equals("Unknown")) {
 
-						if (initial_domain.eValue.equals("0E0"))
-							initial_domain.eValue = "predicted";
-						else if (initial_domain.eValue.equals("1.5E2")) {
-							initial_domain.eValue = "";
-							initial_domain.isPredicted = false;
+							initial_domain.endId = final_domain.endId;
+							initial_domain.eValue = Util.RoundScore(
+									Util.ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
+
+							if (initial_domain.eValue.equals("0E0"))
+								initial_domain.eValue = "predicted";
+							else if (initial_domain.eValue.equals("1.5E2")) {
+								initial_domain.eValue = "";
+								initial_domain.isPredicted = false;
+							}
 						}
 						final_domain_list.add(initial_domain);
 						break;
+
 					}
 				}
 
@@ -5328,15 +5384,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 
 					ProteinDomain initial_domain = current_ptn_domain_list.get(0);
 					ProteinDomain final_domain = current_ptn_domain_list.get(current_ptn_domain_list.size() - 1);
-					initial_domain.endId = final_domain.endId;
-					initial_domain.eValue = Util
-							.RoundScore(Util.ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
+					if (initial_domain != final_domain && !initial_domain.name.equals("Unknown")) {
+						initial_domain.endId = final_domain.endId;
+						initial_domain.eValue = Util.RoundScore(
+								Util.ComputeDomainScore(protein, initial_domain.startId, initial_domain.endId));
 
-					if (initial_domain.eValue.equals("0E0"))
-						initial_domain.eValue = "predicted";
-					else if (initial_domain.eValue.equals("1.5E2")) {
-						initial_domain.eValue = "";
-						initial_domain.isPredicted = false;
+						if (initial_domain.eValue.equals("0E0"))
+							initial_domain.eValue = "predicted";
+						else if (initial_domain.eValue.equals("1.5E2")) {
+							initial_domain.eValue = "";
+							initial_domain.isPredicted = false;
+						}
 					}
 					final_domain_list.add(initial_domain);
 
