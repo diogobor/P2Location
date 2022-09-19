@@ -2,6 +2,8 @@ package de.fmp.liulab.task;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -455,51 +457,6 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 			}
 		}
 
-		// ######## PROTEIN DOMAINS SCORES ########
-		if (nodeTable.getColumn(Util.PROTEIN_DOMAINS_SCORES_COLUMN) == null) {
-			try {
-				nodeTable.createListColumn(Util.PROTEIN_DOMAINS_SCORES_COLUMN, String.class, false);
-
-				for (CyRow row : nodeTable.getAllRows()) {
-					row.set(Util.PROTEIN_DOMAINS_SCORES_COLUMN, new ArrayList<String>());
-				}
-
-			} catch (IllegalArgumentException e) {
-				try {
-					for (CyRow row : nodeTable.getAllRows()) {
-						if (row.get(Util.PROTEIN_DOMAINS_SCORES_COLUMN, List.class) == null)
-							row.set(Util.PROTEIN_DOMAINS_SCORES_COLUMN, new ArrayList<String>());
-					}
-				} catch (Exception e2) {
-				}
-			} catch (Exception e) {
-			}
-
-		} else { // The column exists, but it's necessary to check the cells
-			try {
-
-				// Check if proteinDomainsMap has been initialized
-				boolean proteinDomainsMapOK = true;
-				if (Util.proteinsMap == null)
-					proteinDomainsMapOK = false;
-
-				for (CyRow row : nodeTable.getAllRows()) {
-					if (row.get(Util.PROTEIN_DOMAINS_SCORES_COLUMN, List.class) == null)
-						row.set(Util.PROTEIN_DOMAINS_SCORES_COLUMN, new ArrayList<String>());
-					else {
-						String nodeName = row.get(CyNetwork.NAME, String.class);
-						@SuppressWarnings("unchecked")
-						List<String> scores = row.get(Util.PROTEIN_DOMAINS_SCORES_COLUMN, List.class);
-
-						if (scores != null && scores.size() > 0 && proteinDomainsMapOK) {
-							updateProteinDomainsScores(nodeName, networkName, scores, taskMonitor);
-						}
-					}
-				}
-			} catch (Exception e) {
-			}
-		}
-
 		// ######## VALID PROTEIN DOMAINS ########
 		if (nodeTable.getColumn(Util.VALID_DOMAINS_COLUMN) == null) {
 			try {
@@ -584,6 +541,51 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 
 							String nodeName = row.get(CyNetwork.NAME, String.class);
 							updateConflictedDomains(taskMonitor, nodeName, networkName, conflictedDomain);
+						}
+					}
+				}
+			} catch (Exception e) {
+			}
+		}
+
+		// ######## PROTEIN DOMAINS SCORES ########
+		if (nodeTable.getColumn(Util.PROTEIN_DOMAINS_SCORES_COLUMN) == null) {
+			try {
+				nodeTable.createListColumn(Util.PROTEIN_DOMAINS_SCORES_COLUMN, String.class, false);
+
+				for (CyRow row : nodeTable.getAllRows()) {
+					row.set(Util.PROTEIN_DOMAINS_SCORES_COLUMN, new ArrayList<String>());
+				}
+
+			} catch (IllegalArgumentException e) {
+				try {
+					for (CyRow row : nodeTable.getAllRows()) {
+						if (row.get(Util.PROTEIN_DOMAINS_SCORES_COLUMN, List.class) == null)
+							row.set(Util.PROTEIN_DOMAINS_SCORES_COLUMN, new ArrayList<String>());
+					}
+				} catch (Exception e2) {
+				}
+			} catch (Exception e) {
+			}
+
+		} else { // The column exists, but it's necessary to check the cells
+			try {
+
+				// Check if proteinDomainsMap has been initialized
+				boolean proteinDomainsMapOK = true;
+				if (Util.proteinsMap == null)
+					proteinDomainsMapOK = false;
+
+				for (CyRow row : nodeTable.getAllRows()) {
+					if (row.get(Util.PROTEIN_DOMAINS_SCORES_COLUMN, List.class) == null)
+						row.set(Util.PROTEIN_DOMAINS_SCORES_COLUMN, new ArrayList<String>());
+					else {
+						String nodeName = row.get(CyNetwork.NAME, String.class);
+						@SuppressWarnings("unchecked")
+						List<String> scores = row.get(Util.PROTEIN_DOMAINS_SCORES_COLUMN, List.class);
+
+						if (scores != null && scores.size() > 0 && proteinDomainsMapOK) {
+							updateProteinDomainsScores(nodeName, networkName, scores, taskMonitor);
 						}
 					}
 				}
@@ -1075,6 +1077,14 @@ public class ProteinScalingFactorHorizontalExpansionTableTask extends AbstractTa
 
 					if (noDomains) {
 						_myProtein.domains = proteinDomains;
+
+						// Sort protein domains list
+						Collections.sort(_myProtein.domains, new Comparator<ProteinDomain>() {
+							@Override
+							public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+								return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+							}
+						});
 
 						// Check whether exists only transmem regions
 						if (_myProtein.domains.stream().filter(value -> value.name.toLowerCase().equals("transmem"))

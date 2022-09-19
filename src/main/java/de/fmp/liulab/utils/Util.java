@@ -17,6 +17,7 @@ import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -1724,6 +1725,14 @@ public class Util {
 	private static void fillProteinDomainColumns(CyNetwork myNetwork, final Protein protein, CyNode node) {
 
 		if (protein.domains != null) {
+
+			// Sort protein domains list
+			Collections.sort(protein.domains, new Comparator<ProteinDomain>() {
+				@Override
+				public int compare(ProteinDomain lhs, ProteinDomain rhs) {
+					return lhs.startId > rhs.startId ? 1 : (lhs.startId < rhs.startId) ? -1 : 0;
+				}
+			});
 
 			List<String> list_original_domains = new ArrayList<>();
 			List<String> list_predicted_domains = new ArrayList<>();

@@ -19,6 +19,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -1921,20 +1922,24 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					} else if (current_ptn_domain_list.get(i).name.toLowerCase()
 							.equals(current_ptn_domain_list.get(i + 1).name.toLowerCase())) {
 
-						int end_first_domain = current_ptn_domain_list.get(i).endId;
-						int start_next_domain = current_ptn_domain_list.get(i + 1).startId;
+						// [TRANSM | Matrix [epoch 1] | Matrix [epoch 2] ] => it's not a conflict
+						if (current_ptn_domain_list.get(i).epoch == current_ptn_domain_list.get(i + 1).epoch) {
 
-						// [IMS | T <<< score | IMS] => it's valid
-						Optional<ProteinDomain> possible_transm_low_score = protein.domains.stream()
-								.filter(value -> value.name.toLowerCase().equals("transmem") && !value.isValid
-										&& value.startId > end_first_domain && value.endId < start_next_domain)
-								.findFirst();
+							int end_first_domain = current_ptn_domain_list.get(i).endId;
+							int start_next_domain = current_ptn_domain_list.get(i + 1).startId;
 
-						if (possible_transm_low_score.isEmpty()) {
+							// [IMS | T <<< score | IMS] => it's valid
+							Optional<ProteinDomain> possible_transm_low_score = protein.domains.stream()
+									.filter(value -> value.name.toLowerCase().equals("transmem") && !value.isValid
+											&& value.startId > end_first_domain && value.endId < start_next_domain)
+									.findFirst();
 
-							if (Util.fixDomainManually) {
-								protein.isConflictedDomain = true;
-								break;
+							if (possible_transm_low_score.isEmpty()) {
+
+								if (Util.fixDomainManually) {
+									protein.isConflictedDomain = true;
+									break;
+								}
 							}
 						}
 					}
@@ -1942,7 +1947,7 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 					if (current_ptn_domain_list.size() - 2 > i) {
 						if (current_ptn_domain_list.get(i).name.toLowerCase()
 								.equals(current_ptn_domain_list.get(i + 2).name.toLowerCase())
-								&& current_ptn_domain_list.get(i + 1).name.toLowerCase().contains(TRANSMEMBRANE)
+								&& current_ptn_domain_list.get(i + 1).name.toLowerCase().equals(TRANSMEMBRANE)
 								&& !current_ptn_domain_list.get(i).name.equals(UNKNOWN_PREDICTED_DOMAIN)) {
 							if (Util.fixDomainManually) {
 								protein.isConflictedDomain = true;
@@ -2481,19 +2486,30 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
 
 										ProteinDomain domain_with_highest_score = proteinDomain.getValue().get(0);
+										boolean isThereOneHighestScore = false;
 
-										if (!(domain_with_highest_score.eValue.isBlank()
-												|| domain_with_highest_score.eValue.isEmpty())) {
+										if (!Util.fixDomainManually) {
 
-											for (ProteinDomain evalue : proteinDomain.getValue()) {
-												if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty())) {
-													double score = Double.parseDouble(evalue.eValue);
-													if (Double.parseDouble(domain_with_highest_score.eValue) < score)
-														domain_with_highest_score = evalue;
+											if (!(domain_with_highest_score.eValue.isBlank()
+													|| domain_with_highest_score.eValue.isEmpty())) {
+
+												for (ProteinDomain evalue : proteinDomain.getValue()) {
+													if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty())) {
+														double score = Double.parseDouble(evalue.eValue);
+														if (Double.parseDouble(domain_with_highest_score.eValue)
+																- score > Util.deltaScore) {
+															isThereOneHighestScore = true;
+														}
+													}
 												}
 											}
 										}
-										newDomains.add(domain_with_highest_score);
+
+										if (isThereOneHighestScore)
+											newDomains.add(domain_with_highest_score);
+										else
+											newDomains.addAll(proteinDomain.getValue());
+
 									}
 
 									// Add Last Domain (predicted)
@@ -2558,18 +2574,30 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								for (Entry<String, List<ProteinDomain>> proteinDomain : groupedDomains.entrySet()) {
 
 									ProteinDomain domain_with_highest_score = proteinDomain.getValue().get(0);
+									boolean isThereOneHighestScore = false;
 
-									if (!(domain_with_highest_score.eValue.isBlank()
-											|| domain_with_highest_score.eValue.isEmpty())) {
-										for (ProteinDomain evalue : proteinDomain.getValue()) {
-											if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty())) {
-												double score = Double.parseDouble(evalue.eValue);
-												if (Double.parseDouble(domain_with_highest_score.eValue) < score)
-													domain_with_highest_score = evalue;
+									if (!Util.fixDomainManually) {
+
+										if (!(domain_with_highest_score.eValue.isBlank()
+												|| domain_with_highest_score.eValue.isEmpty())) {
+
+											for (ProteinDomain evalue : proteinDomain.getValue()) {
+												if (!(evalue.eValue.isBlank() || evalue.eValue.isEmpty())) {
+													double score = Double.parseDouble(evalue.eValue);
+													if (Double.parseDouble(domain_with_highest_score.eValue)
+															- score > Util.deltaScore) {
+														isThereOneHighestScore = true;
+													}
+												}
 											}
 										}
 									}
-									newDomains.add(domain_with_highest_score);
+
+									if (isThereOneHighestScore)
+										newDomains.add(domain_with_highest_score);
+									else
+										newDomains.addAll(proteinDomain.getValue());
+
 								}
 
 								// Add Domain 2 (predicted)
@@ -3114,9 +3142,20 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 									&& !next_domain.name.equals(UNKNOWN_DOMAIN)) {
 								isForward = true;
 
-								if (next_domains.size() > 1)
-									predicted_protein_domain_name = "Unknown";
-								else
+								if (next_domains.size() > 1) {
+									List<String> uniqueName = new ArrayList<String>();
+									for (ProteinDomain current_domain : next_domains) {
+										uniqueName.add(current_domain.name);
+									}
+									uniqueName = uniqueName.stream().distinct().collect(Collectors.toList());
+
+									// It means that all domains in this range are equal and have been predicted in
+									// different epochs
+									if (uniqueName.size() == 1)
+										predicted_protein_domain_name = next_domain.name;
+									else
+										predicted_protein_domain_name = "Unknown";
+								} else
 									predicted_protein_domain_name = next_domain.name;
 								break;
 							}
@@ -3133,9 +3172,21 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 								if (!previous_domain.name.toLowerCase().contains(TRANSMEMBRANE)
 										&& !previous_domain.name.equals(UNKNOWN_DOMAIN)) {
 
-									if (previous_domains.size() > 1)
-										predicted_protein_domain_name = "Unknown";
-									else
+									if (previous_domains.size() > 1) {
+
+										List<String> uniqueName = new ArrayList<String>();
+										for (ProteinDomain current_domain : previous_domains) {
+											uniqueName.add(current_domain.name);
+										}
+										uniqueName = uniqueName.stream().distinct().collect(Collectors.toList());
+
+										// It means that all domains in this range are equal and have been predicted in
+										// different epochs
+										if (uniqueName.size() == 1)
+											predicted_protein_domain_name = previous_domain.name;
+										else
+											predicted_protein_domain_name = "Unknown";
+									} else
 										predicted_protein_domain_name = previous_domain.name;
 									break;
 								}
@@ -3939,13 +3990,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 															thereIsOnlyTransmem = false;
 															if (neighbor.name.equals(current_residue.location)) {
 																isConflict = false;
-																residue.location = neighbor.name;
-																residue.predictedLocation = neighbor.name;
-																residue.predicted_epoch = epochs;
 
-																double score = Math.sqrt((-Math.log10(crossLink.score)
-																		* current_residue.score) / epochs);
-																residue.score = score;
+																if (residue.score != Util.initialResidueScore) {
+																	residue.location = neighbor.name;
+																	residue.predictedLocation = neighbor.name;
+																	residue.predicted_epoch = epochs;
+
+																	double score = Math
+																			.sqrt((-Math.log10(crossLink.score)
+																					* current_residue.score) / epochs);
+																	residue.score = score;
+																}
 
 																break;
 															}
@@ -4190,13 +4245,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 															thereIsOnlyTransmem = false;
 															if (neighbor.name.equals(current_residue.location)) {
 																isConflict = false;
-																residue.location = neighbor.name;
-																residue.predictedLocation = neighbor.name;
-																residue.predicted_epoch = epochs;
 
-																double score = Math.sqrt((-Math.log10(crossLink.score)
-																		* current_residue.score) / epochs);
-																residue.score = score;
+																if (residue.score != Util.initialResidueScore) {
+																	residue.location = neighbor.name;
+																	residue.predictedLocation = neighbor.name;
+																	residue.predicted_epoch = epochs;
+
+																	double score = Math
+																			.sqrt((-Math.log10(crossLink.score)
+																					* current_residue.score) / epochs);
+																	residue.score = score;
+																}
 
 																break;
 															}
@@ -4454,15 +4513,20 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 													for (ProteinDomain neighbor : neighbors) {
 														if (!neighbor.name.toLowerCase().contains(TRANSMEMBRANE)) {
 
+															thereIsOnlyTransmem = false;
 															if (neighbor.name.equals(current_residue.location)) {
 																isConflict = false;
-																residue.location = neighbor.name;
-																residue.predictedLocation = neighbor.name;
-																residue.predicted_epoch = epochs;
 
-																double score = Math.sqrt((-Math.log10(crossLink.score)
-																		* current_residue.score) / epochs);
-																residue.score = score;
+																if (residue.score != Util.initialResidueScore) {
+																	residue.location = neighbor.name;
+																	residue.predictedLocation = neighbor.name;
+																	residue.predicted_epoch = epochs;
+
+																	double score = Math
+																			.sqrt((-Math.log10(crossLink.score)
+																					* current_residue.score) / epochs);
+																	residue.score = score;
+																}
 
 																break;
 															}
@@ -4707,13 +4771,17 @@ public class ProcessProteinLocationTask extends AbstractTask implements ActionLi
 															thereIsOnlyTransmem = false;
 															if (neighbor.name.equals(current_residue.location)) {
 																isConflict = false;
-																residue.location = neighbor.name;
-																residue.predictedLocation = neighbor.name;
-																residue.predicted_epoch = epochs;
 
-																double score = Math.sqrt((-Math.log10(crossLink.score)
-																		* current_residue.score) / epochs);
-																residue.score = score;
+																if (residue.score != Util.initialResidueScore) {
+																	residue.location = neighbor.name;
+																	residue.predictedLocation = neighbor.name;
+																	residue.predicted_epoch = epochs;
+
+																	double score = Math
+																			.sqrt((-Math.log10(crossLink.score)
+																					* current_residue.score) / epochs);
+																	residue.score = score;
+																}
 
 																break;
 															}

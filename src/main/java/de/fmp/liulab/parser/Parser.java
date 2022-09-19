@@ -176,17 +176,33 @@ public class Parser {
 
 						index = Arrays.asList(uniprot_header_lines).indexOf("Sequence");
 						if (index != -1) {
-							sequence = each_line_cols[index].replaceAll("\"", "").trim();
+							try {
+								sequence = each_line_cols[index].replaceAll("\"", "").trim();
+								
+							} catch (Exception e) {
+								
+							}
 						}
 
 						index = Arrays.asList(uniprot_header_lines).indexOf("Subcellular location");
 						if (index != -1) {
-							location = each_line_cols[index].replaceAll("\"", "").trim();
+							try {
+
+								location = each_line_cols[index].replaceAll("\"", "").trim();
+							} catch (Exception e) {
+
+							}
 						}
 
 						index = Arrays.asList(uniprot_header_lines).indexOf("Description");
 						if (index != -1) {
-							description = each_line_cols[index].replaceAll("\"", "").trim();
+
+							try {
+								description = each_line_cols[index].replaceAll("\"", "").trim();
+
+							} catch (Exception e) {
+
+							}
 						}
 
 					} else {
